@@ -406,6 +406,21 @@ class Builder:
             acc = self.or_(acc, x)
         return acc
 
+    def inline(self, circuit: Circuit, inputs: Sequence[int]) -> list[int]:
+        """Copy a combinational circuit into this builder; returns its outputs."""
+        if len(inputs) != circuit.n_inputs:
+            raise ValueError("input count mismatch")
+        remap = {0: self.ZERO, 1: self.ONE}
+        for i, s in enumerate(inputs):
+            remap[2 + i] = s
+        sig = circuit.first_cell_signal
+        for c in circuit.cells:
+            if not isinstance(c, Nand):
+                raise ValueError("inline supports NAND-only circuits")
+            remap[sig] = self.nand(remap[c.a], remap[c.b])
+            sig += 1
+        return [remap[s] for s in circuit.output_signals()]
+
     # -- finalisation --
     def finish(self, outputs: Sequence[int]) -> Circuit:
         for q, d in self._latch_d.items():
