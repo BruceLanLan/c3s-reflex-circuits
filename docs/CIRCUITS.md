@@ -33,7 +33,7 @@ application publicly served at tapeout.net on 2026-09-12:
 * the public decoder module (SHA-256 `3f857e4a…bb89d9dd`) and tick evaluator
   module (SHA-256 `db9bb3ce…0c3c5c23`) were run under Node.js outside this
   repository;
-* 400 random sequential circuits (up to 8 inputs, 120 cells, 20 % latches),
+* 400 random sequential circuits (up to 8 inputs, up to 119 cells, about 20 % latches),
   4,800 ticks with carried state: **0 mismatches** against `c3s.netlist`;
 * the final `policy-hand-abc` over all 65,536 inputs and three `core-hand-abc`
   episodes (345 ticks with state): **0 mismatches**.
