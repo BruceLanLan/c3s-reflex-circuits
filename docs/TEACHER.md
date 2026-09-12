@@ -13,7 +13,10 @@ contact *τ* its full angular size and expansion speed are
     θ'(τ) = 2 (l/v) / (τ² + (l/v)²)
 
 so each stimulus is characterised by `l/v` (ms) and an azimuth. Stimuli start at
-θ = 10° and end at θ = 170°, sampled every tick (5 ms).
+θ = 10° and end at θ = 170°, sampled every tick (5 ms). The first sample is exactly
+10° by definition rather than recomputed through `tan` and `atan`: 10° is also the
+first size-bin edge, and the recomputed value lands one unit in the last place
+either side of it depending on the platform's maths library.
 
 For a constant-velocity approach a single snapshot (θ, θ') determines `l/v`
 exactly: `l/v = 2 sin²(θ/2) / θ'`. This is why a per-tick circuit that only sees

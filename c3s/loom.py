@@ -325,7 +325,10 @@ def stimulus_samples(stim: Stimulus, p: TeacherParams) -> list[tuple[float, floa
     dt = p.tick_ms / 1000.0
     out = []
     while t > t_end:
-        out.append((theta_at(a, t), dtheta_at(a, t)))
+        # The onset sample is the start size by definition. Recomputed through tan and
+        # atan it lands one ulp either side of the first size-bin edge (10 degrees),
+        # depending on the platform's libm.
+        out.append((stim.start_deg if not out else theta_at(a, t), dtheta_at(a, t)))
         t -= dt
     return out
 

@@ -87,7 +87,8 @@ def abc_binary() -> str:
 
 def abc_version() -> str:
     res = subprocess.run([abc_binary(), "-q", "version"], capture_output=True, text=True)
-    return (res.stdout.strip().splitlines() or ["unknown"])[0]
+    line = (res.stdout.strip().splitlines() or ["unknown"])[0]
+    return re.sub(r"\s*\(compiled [^)]*\)", "", line)  # the build timestamp is not a version
 
 
 def table_to_pla(table: np.ndarray, n_in: int, n_out: int) -> str:

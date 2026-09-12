@@ -68,8 +68,8 @@ def main() -> None:
             if motor in (loom.CORE_SHORT, loom.CORE_LONG):
                 break
         teacher = loom.run_teacher_episode(stim, weights, p)
-        # The samples are embedded because libm and V8 differ in the last ulp, and the onset
-        # angle (10 degrees) sits exactly on the first size-bin edge.
+        # The samples are embedded because libm and V8 can differ in the last ulp; the page
+        # checks its encoding and teacher on exactly these values.
         episodes.append({
             "lv": lv,
             "azimuth": az,
