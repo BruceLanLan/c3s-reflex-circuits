@@ -1,0 +1,45 @@
+C3S Reflex Circuits
+===================
+
+Code in this repository is licensed under the Apache License, Version 2.0
+(see LICENSE). Third-party data and methods used by the code are listed below.
+
+Connectome data
+---------------
+data/malecns-v1.0-gf-escape-subgraph.json is an aggregate derived from the
+MaleCNS v1.0 connectome release (FlyEM project team at HHMI Janelia Research
+Campus, the University of Cambridge Department of Zoology, the MRC Laboratory of
+Molecular Biology and Google Research). The MaleCNS dataset is licensed under
+CC-BY. Cite:
+
+  Berg S, Beckett IR, Costa M, Schlegel P, Januszewski M, et al. Sexual
+  dimorphism in the complete Drosophila male central nervous system connectome.
+  Cell (2026). doi:10.1016/j.cell.2026.08.015
+
+Differentiable logic gate networks
+----------------------------------
+c3s/dlgn.py is an independent implementation of the method described in:
+
+  Petersen F, Borgelt C, Kuehne H, Deussen O. Deep Differentiable Logic Gate
+  Networks. NeurIPS 2022. arXiv:2210.08277
+
+No code from the authors' reference implementation (difflogic, MIT License) is
+included. The difflogic README states "Patent pending". An independent
+implementation does not remove any patent rights that may exist in the method;
+check the current status before commercial use.
+
+ABC and Yosys
+-------------
+The synthesis step invokes ABC (Berkeley Logic Synthesis and Verification Group)
+as an external program, as distributed with Yosys. Neither is bundled.
+
+forge-std
+---------
+The Foundry test suite uses forge-std (MIT/Apache-2.0), installed into
+contracts/lib at test time and not committed.
+
+TapeOut netlist layout
+----------------------
+The netlist byte layout and tick semantics implemented in c3s/netlist.py were
+cross-checked against the publicly served tapeout.net web application. No code
+from that application is included in this repository.

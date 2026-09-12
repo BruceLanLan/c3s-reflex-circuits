@@ -63,6 +63,16 @@ def test_core_matches_vectorised_reference_and_scalar_state_machine(table):
         assert (out, nr | nfr << rb) == (int(outs[r]), int(nxt[r]))
 
 
+def test_default_encoding_policy_has_16_inputs_and_matches_its_table():
+    p = replace(PARAMS, samples_per_bin=4)
+    t = loom.build_table(SUBGRAPH, p, loom.DEFAULT_ENCODING)
+    circuit, info = reflex.hand_policy(t)
+    assert circuit.n_inputs == 16 and circuit.n_outputs == 2
+    bad = np.count_nonzero(exhaust.truth_table(circuit) != t.table)
+    exact = all(v == 0 for side in info["staircase_cells_wrong"].values() for v in side.values())
+    assert (bad == 0) == exact
+
+
 def test_circuit_episode_equals_quantised_teacher(table):
     circuit, _ = reflex.hand_policy(table)
     assert np.array_equal(exhaust.truth_table(circuit), table.table)

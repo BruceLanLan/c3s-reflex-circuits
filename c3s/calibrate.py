@@ -35,12 +35,12 @@ GRID = {
 }
 
 
-def evaluate(p: loom.TeacherParams, subgraph: Path | str, family: str = "train") -> dict:
+def evaluate(p: loom.TeacherParams, subgraph: Path | str, family: str = "train", override: dict | None = None) -> dict:
     stims = loom.family(family)
     lvs = sorted({s.l_over_v_ms for s in stims})
 
     def run(params: loom.TeacherParams) -> tuple[list[float], float]:
-        w = loom.load_weights(subgraph, params)
+        w = loom.load_weights(subgraph, params, override)
         by_lv: dict[float, list[int]] = {}
         for s in stims:
             by_lv.setdefault(s.l_over_v_ms, []).append(loom.run_teacher_episode(s, w, params).action)
@@ -68,7 +68,9 @@ def satisfies(ev: dict) -> dict[str, bool]:
     }
 
 
-def calibrate(subgraph: Path | str, base: loom.TeacherParams | None = None, grid: dict | None = None) -> dict:
+def calibrate(
+    subgraph: Path | str, base: loom.TeacherParams | None = None, grid: dict | None = None, override: dict | None = None
+) -> dict:
     base = base or loom.TeacherParams()
     grid = grid or GRID
     passing = []
@@ -76,7 +78,7 @@ def calibrate(subgraph: Path | str, base: loom.TeacherParams | None = None, grid
     for gt, pt, wr in itertools.product(grid["gf_threshold"], grid["parallel_threshold"], grid["wing_raise_ticks"]):
         n += 1
         p = replace(base, gf_threshold=gt, parallel_threshold=pt, wing_raise_ticks=wr)
-        ev = evaluate(p, subgraph)
+        ev = evaluate(p, subgraph, override=override)
         if all(satisfies(ev).values()):
             key = (abs(float(np.mean(ev["short_fraction"])) - 0.4), wr, gt, pt)
             passing.append((key, p, ev))
