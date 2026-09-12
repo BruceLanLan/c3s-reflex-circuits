@@ -19,6 +19,23 @@ MaleCNS v1.0 connectome ─► explicit teacher model ─► 16-bit decision tab
                 (public, replayable)          (exhaustively equivalent)
 ```
 
+## Web demo
+
+[`docs/demo/index.html`](docs/demo/index.html) is a voxel-world bench for the
+escape core: launch a looming block at a fly, and the page quantises what each eye
+sees into the 16 input bits and evaluates the 173-NAND + 6-LATCH netlist cell by
+cell in the browser, showing the pathway lamps, the latches and the motor command at
+every 5 ms tick. On load it checks the netlist's SHA-256 and replays reference
+episodes from the Python build.
+
+```sh
+python -m http.server -d docs 8000     # then open http://localhost:8000/demo/
+```
+
+With GitHub Pages serving `main` → `/docs`, the same page is at
+`https://brucelanlan.github.io/c3s-reflex-circuits/demo/`.
+`python scripts/build_demo.py` re-embeds the circuits after a rebuild.
+
 ## Results at a glance
 
 | | |
@@ -85,8 +102,9 @@ scripts/        extraction, build, encoding comparison, DLGN training, controls,
 data/           derived connectome aggregate (CC-BY source)
 circuits/       every circuit as a manifest: metrics, SHA-256, netlist bytes, evidence
 contracts/      NandMachine and ReflexCore (Solidity) with Foundry tests
-docs/           connectome, teacher, circuits, evaluation, limitations, references
-tests/          pytest suite (50 tests)
+docs/           connectome, teacher, circuits, evaluation, limitations, references;
+                docs/demo/ is the web demo
+tests/          pytest suite
 ```
 
 ## Reproduce

@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoomEscape Voxel Bench</title>
+<meta name="description" content="A fruit-fly escape reflex, compiled to 173 NAND gates and 6 latches, evaluated gate by gate in your browser inside a voxel world.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;family=Martian+Mono:wght@400;500&amp;family=Silkscreen&amp;display=swap">
+<style>
+  :root {
+    --screen: #E6ECF0;
+    --screen-deep: #C5D1D9;
+    --ink: #1A1E23;
+    --loom: #121417;
+    --rail: #15181C;
+    --rail-raised: #1C2025;
+    --line: #2B3037;
+    --paper: #ECE7DC;
+    --dim: #979CA3;
+    --faint: #5E646C;
+    --gf: #D0473A;
+    --par: #86BFA8;
+    --amber: #F2A541;
+    --bad: #E36A52;
+    --display: "Silkscreen", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --ui: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Noto Sans SC", sans-serif;
+    --mono: "Martian Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--rail);
+    color: var(--paper);
+    font-family: var(--ui);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  .app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 400px;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* ---------- stage ---------- */
+  .stage {
+    position: relative;
+    background: linear-gradient(180deg, #EEF2F4 0%, var(--screen) 55%, var(--screen-deep) 100%);
+    overflow: hidden;
+    min-height: 0;
+  }
+  #view { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  #view:active { cursor: grabbing; }
+  .readout {
+    position: absolute;
+    inset: 16px 16px auto 16px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+    pointer-events: none;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .readout span {
+    background: rgba(236, 241, 244, 0.82);
+    border: 1px solid rgba(26, 30, 35, 0.12);
+    padding: 5px 8px;
+  }
+  .no-webgl {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    text-align: center;
+    color: var(--ink);
+    font-size: 15px;
+  }
+  .timeline {
+    position: absolute;
+    inset: auto 16px 16px 16px;
+    background: rgba(21, 24, 28, 0.92);
+    color: var(--paper);
+    padding: 10px 12px 8px;
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 6px 10px;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 10.5px;
+  }
+  .timeline .row-label { color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; }
+  .timeline canvas { width: 100%; height: 44px; display: block; }
+  .timeline .legend {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    color: var(--dim);
+  }
+  .legend i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; }
+
+  /* ---------- rail ---------- */
+  .rail {
+    overflow-y: auto;
+    border-left: 1px solid var(--line);
+    padding-block: 20px 28px;
+    padding-inline: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .masthead { display: grid; gap: 6px; }
+  .masthead-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .wordmark { font-family: var(--display); font-size: 20px; letter-spacing: 0.02em; line-height: 1; margin: 0; font-weight: 400; }
+  .wordmark b { color: var(--amber); font-weight: 400; }
+  .lede { margin: 0; color: var(--dim); max-width: 44ch; text-wrap: pretty; }
+  .lang {
+    display: inline-flex;
+    border: 1px solid var(--line);
+  }
+  .lang button {
+    background: transparent;
+    border: 0;
+    padding: 4px 9px;
+    font-size: 12px;
+    color: var(--dim);
+    cursor: pointer;
+  }
+  .lang button[aria-pressed="true"] { background: var(--paper); color: var(--rail); }
+
+  .block { display: grid; gap: 12px; }
+  .label {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--dim);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .label small { font-weight: 400; letter-spacing: 0.02em; text-transform: none; color: var(--faint); }
+
+  .field { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
+  .field label { color: var(--paper); }
+  .field output { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--amber); }
+  .field input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--amber); }
+  .hint { grid-column: 1 / -1; color: var(--faint); font-size: 12px; }
+
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    border: 1px solid var(--line);
+    background: transparent;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: var(--paper);
+    cursor: pointer;
+  }
+  .chip:hover { border-color: var(--dim); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn {
+    border: 1px solid var(--amber);
+    background: var(--amber);
+    color: var(--rail);
+    font-weight: 600;
+    padding: 9px 16px;
+    cursor: pointer;
+  }
+  .btn.ghost { background: transparent; color: var(--paper); border-color: var(--line); font-weight: 500; }
+  .btn.ghost:hover { border-color: var(--dim); }
+  select {
+    background: var(--rail-raised);
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+  }
+
+  /* lamps: square, like the voxels they drive */
+  .eyes { display: grid; gap: 10px; }
+  .eye { display: grid; grid-template-columns: 30px 1fr; gap: 4px 10px; align-items: center; }
+  .eye-name { font-family: var(--mono); font-size: 12px; color: var(--paper); }
+  .eye-name.blind { color: var(--faint); }
+  .nibbles { display: flex; gap: 12px; }
+  .nibble { display: flex; gap: 3px; }
+  .lamp { width: 13px; height: 13px; background: #262B31; border: 1px solid #30363D; }
+  .lamp.on { background: var(--amber); border-color: var(--amber); }
+  .lamp.gf.on { background: var(--gf); border-color: var(--gf); }
+  .lamp.par.on { background: var(--par); border-color: var(--par); }
+  .eye-values { grid-column: 2; font-family: var(--mono); font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .bitlegend { font-family: var(--mono); font-size: 10.5px; color: var(--faint); padding-left: 40px; display: flex; gap: 12px; }
+  .bitlegend span { width: 61px; white-space: nowrap; }
+
+  .pathways { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pathway {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 10px;
+    align-items: center;
+    padding: 10px;
+    background: var(--rail-raised);
+  }
+  .pathway .lamp { width: 22px; height: 22px; grid-row: span 2; }
+  .pathway strong { font-weight: 500; }
+  .pathway small { color: var(--dim); font-family: var(--mono); font-size: 10.5px; }
+
+  .motor { display: grid; gap: 10px; }
+  .motor-word {
+    font-family: var(--display);
+    font-size: 26px;
+    line-height: 1.05;
+    min-height: 1.1em;
+    color: var(--dim);
+  }
+  :lang(zh) .motor-word { font-family: var(--ui); font-weight: 600; }
+  .motor-word[data-motor="1"] { color: var(--amber); }
+  .motor-word[data-motor="2"] { color: var(--gf); }
+  .motor-word[data-motor="3"] { color: var(--par); }
+  .latches { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; font-size: 12.5px; }
+  .latches .nibble .lamp { width: 15px; height: 15px; }
+  .latches output { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-left: 8px; font-variant-numeric: tabular-nums; }
+
+  .result {
+    display: grid;
+    gap: 6px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .result[hidden] { display: none; }
+  .result p { margin: 0; }
+  .verdict { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; }
+  .verdict.agree { color: var(--par); }
+  .verdict.differ { color: var(--amber); }
+
+  .facts { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 0; font-size: 12.5px; }
+  .facts dt { color: var(--dim); }
+  .facts dd { margin: 0; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .check { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
+  .check .dot { width: 9px; height: 9px; flex: none; background: var(--faint); }
+  .check.ok .dot { background: var(--par); }
+  .check.fail .dot { background: var(--bad); }
+  .check.fail { color: var(--bad); }
+
+  .footnote { color: var(--faint); font-size: 12px; display: grid; gap: 6px; }
+  .footnote p { margin: 0; }
+  a { color: var(--paper); text-decoration-color: var(--faint); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--amber); }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: minmax(0, 1fr); height: auto; }
+    .stage { height: 64vh; min-height: 380px; }
+    .rail { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  }
+  @media (max-width: 420px) {
+    .pathways { grid-template-columns: 1fr; }
+    .timeline { grid-template-columns: 44px minmax(0, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <main class="stage" id="stage" aria-label="Voxel world">
+    <canvas id="view" aria-label="A fruit fly standing on a grass block while a dark block approaches"></canvas>
+    <div class="readout" aria-live="polite">
+      <span id="ro-tick">tick 0 · 0 ms</span>
+      <span id="ro-size">θ 10.0° · θ′ 0 °/s</span>
+      <span id="ro-slow">slow motion ×15</span>
+    </div>
+    <div class="timeline" aria-label="Per-tick record">
+      <span class="row-label">tick</span>
+      <canvas id="strip" height="44"></canvas>
+      <div class="legend">
+        <span><i style="background: var(--gf)"></i><span data-i18n="legendGf">giant fiber crosses</span></span>
+        <span><i style="background: var(--par)"></i><span data-i18n="legendPar">parallel pathway crosses</span></span>
+        <span><i style="background: var(--amber)"></i><span data-i18n="legendRaise">raising wings</span></span>
+      </div>
+    </div>
+  </main>
+
+  <aside class="rail">
+    <header class="masthead">
+      <div class="masthead-top">
+        <h1 class="wordmark">LoomEscape<b>·16</b></h1>
+        <div class="lang" role="group" aria-label="Language">
+          <button type="button" id="lang-en" aria-pressed="true">EN</button>
+          <button type="button" id="lang-zh" aria-pressed="false">中文</button>
+        </div>
+      </div>
+      <p class="lede" data-i18n="lede">A fruit-fly escape reflex, compiled to NAND gates and latches and run gate by gate in your browser. Launch a looming block and watch the circuit decide whether to jump.</p>
+    </header>
+
+    <section class="block" aria-labelledby="h-stim">
+      <h2 class="label" id="h-stim"><span data-i18n="stimulus">Stimulus</span><small data-i18n="stimulusNote">a dark block approaching at constant speed</small></h2>
+      <div class="presets">
+        <button type="button" class="chip" data-lv="10" data-az="0" data-i18n="presetFast">Fast · l/v 10 ms</button>
+        <button type="button" class="chip" data-lv="40" data-az="-20" data-i18n="presetMedium">Medium · 40 ms</button>
+        <button type="button" class="chip" data-lv="150" data-az="45" data-i18n="presetSlow">Slow · 150 ms</button>
+      </div>
+      <div class="field">
+        <label for="lv" data-i18n="lv">Approach, l/v</label>
+        <output id="lv-out" for="lv">40 ms</output>
+        <input type="range" id="lv" min="5" max="200" step="1" value="40">
+        <span class="hint" data-i18n="lvHint">Half-size over speed. Smaller is a faster, more threatening loom.</span>
+      </div>
+      <div class="field">
+        <label for="az" data-i18n="az">Direction</label>
+        <output id="az-out" for="az">−20° left</output>
+        <input type="range" id="az" min="-90" max="90" step="1" value="-20">
+        <span class="hint" data-i18n="azHint">Each eye sees its own side plus 30° across the midline.</span>
+      </div>
+      <div class="field">
+        <label for="slow" data-i18n="slow">Slow motion</label>
+        <select id="slow">
+          <option value="5">×5</option>
+          <option value="15" selected>×15</option>
+          <option value="40">×40</option>
+          <option value="120">×120</option>
+        </select>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="launch" data-i18n="launch">Launch loom</button>
+        <button type="button" class="btn ghost" id="reset" data-i18n="reset">Reset fly</button>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="h-eyes">
+      <h2 class="label" id="h-eyes"><span data-i18n="eyes">Circuit inputs</span><small data-i18n="eyesNote">16 bits, LSB first</small></h2>
+      <div class="bitlegend" aria-hidden="true"><span data-i18n="sizeBin">size bin</span><span data-i18n="speedBin">speed bin</span></div>
+      <div class="eyes">
+        <div class="eye">
+          <span class="eye-name" id="eye-L-name">L</span>
+          <div class="nibbles"><div class="nibble" id="bits-size-L"></div><div class="nibble" id="bits-speed-L"></div></div>
+          <span class="eye-values" id="eye-L-values">—</span>
+        </div>
+        <div class="eye">
+          <span class="eye-name" id="eye-R-name">R</span>
+          <div class="nibbles"><div class="nibble" id="bits-size-R"></div><div class="nibble" id="bits-speed-R"></div></div>
+          <span class="eye-values" id="eye-R-values">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="h-path">
+      <h2 class="label" id="h-path"><span data-i18n="pathways">Policy outputs</span><small>74 NAND</small></h2>
+      <div class="pathways">
+        <div class="pathway"><span class="lamp gf" id="lamp-gf"></span><strong data-i18n="gf">Giant fiber</strong><small>DNp01</small></div>
+        <div class="pathway"><span class="lamp par" id="lamp-par"></span><strong data-i18n="par">Parallel DNs</strong><small>DNp02/04/06/11</small></div>
+      </div>
+    </section>
+
+    <section class="block motor" aria-labelledby="h-motor">
+      <h2 class="label" id="h-motor"><span data-i18n="motor">Motor core</span><small>173 NAND · 6 LATCH</small></h2>
+      <div class="motor-word" id="motor-word" data-motor="0" aria-live="polite">HOLD</div>
+      <div class="latches">
+        <span data-i18n="raise">Wing-raise counter</span>
+        <span><span class="nibble" id="bits-raise"></span><output id="raise-out">0 / 4</output></span>
+        <span data-i18n="refr">Refractory timer</span>
+        <span><span class="nibble" id="bits-refr"></span><output id="refr-out">0</output></span>
+      </div>
+      <div class="result" id="result" hidden>
+        <p id="result-circuit"></p>
+        <p id="result-teacher"></p>
+        <span class="verdict" id="result-verdict"></span>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="h-circuit">
+      <h2 class="label" id="h-circuit"><span data-i18n="circuit">Netlist in this page</span></h2>
+      <dl class="facts">
+        <dt data-i18n="cells">Cells</dt><dd id="fact-cells">—</dd>
+        <dt data-i18n="size">Size</dt><dd id="fact-bytes">—</dd>
+        <dt data-i18n="layout">Layout</dt><dd>NAND 0x00 · LATCH 0x01 · u24</dd>
+        <dt>SHA-256</dt><dd id="fact-sha">—</dd>
+      </dl>
+      <div class="check" id="check-hash"><span class="dot"></span><span data-i18n="checkingHash">Checking the embedded netlist hash…</span></div>
+      <div class="check" id="check-replay"><span class="dot"></span><span data-i18n="checkingReplay">Replaying reference episodes…</span></div>
+    </section>
+
+    <footer class="footnote">
+      <p data-i18n="foot1">Every tick: the block's angular size and expansion speed are quantised per eye into 16 bits, the netlist is evaluated cell by cell, and its six latches carry the wing program and refractory state to the next tick.</p>
+      <p><a href="https://github.com/BruceLanLan/c3s-reflex-circuits" data-i18n="repo">Source, proofs and docs</a> · <span data-i18n="author">Author</span> <a href="https://github.com/BruceLanLan">BruceBlue</a> · X <a href="https://x.com/BruceBlue">@BruceBlue</a></p>
+    </footer>
+  </aside>
+</div>
+
+<!-- DATA:BEGIN -->
+<script type="application/json" id="c3s-data">{"format":"c3s.demo/1","core":{"name":"core-hand-abc","hex":"0x010000a5010000a7010000a9010000bf010000c1010000c300000013000013000000190000190000001900001a000000140000140000001b00001c0000001d00001d0000001e00001e0000001c00001f0000001500001500000021000021000000200000220000002300002300000016000016000000170000170000002500002600000027000027000000180000180000002800002900000007000007000000080000080000002b00002c0000000400000400000002000002000000030000030000002f000030000000310000310000002e0000320000002d0000330000000500002e00000004000006000000360000360000000500003100000037000038000000350000390000003a00003a0000003400003b0000000900003c0000000f00000f0000000c00000c0000000a00000b0000003f0000400000003e0000410000000a00000a0000000b00000b000000430000440000000e0000450000004600004600000042000047000000100000100000000c0000450000004a00004a0000000d00004b0000000f00004c0000004900004d0000004e00004e0000004800004f0000000d00000d000000450000450000003f0000520000000e00000e0000003f0000540000000f000055000000490000560000005300005700000051000058000000110000590000005a00005a0000005000005b0000004a0000510000004c00005d0000003e0000540000005f00005f00000049000060000000530000610000005e00006200000011000063000000050000050000000900000900000003000037000000660000670000003300006800000065000069000000040000310000000600006b0000000500006c000000070000080000006e00006e0000006d00006f000000660000700000006a0000710000003d00005c000000640000720000002a00002a00000012000075000000760000760000002400002400000073000078000000790000790000007700007a0000007b00007b000000240000730000007d00007d000000730000730000007400007f000000800000800000007e00007e0000008100008100000082000083000000770000840000008500008500000024000086000000870000870000007c00007c000000880000880000008900008a000000780000860000008c00008c000000130000140000008e00008e0000001500008f000000900000900000001400008e0000001300008e00000092000093000000150000900000008f000090000000950000960000009100009100000019000098000000130000910000009900009a00000094000098000000140000910000009c00009d00000097000098000000150000910000009f0000a00000008d00008d000000000000a20000008d00009b000000a30000a40000008d00009e000000a30000a60000008d0000a1000000a30000a800000017000025000000170000aa000000250000aa000000ab0000ac00000018000028000000180000ae000000280000ae000000af0000b000000075000075000000250000b200000016000075000000b30000b4000000ad0000b200000017000075000000b60000b7000000b10000b200000018000075000000b90000ba0000008b00008b000000b50000bc0000000100008b000000bd0000be000000b80000bc000000be0000c0000000bb0000bc000000be0000c2000000850000850000008900008a","sha256":"7c8eaf62495908c434206ff54aa1f3e9146b4295506f59584d6107d2104b2e52","inputs":["size_L[0]","size_L[1]","size_L[2]","size_L[3]","speed_L[0]","speed_L[1]","speed_L[2]","speed_L[3]","size_R[0]","size_R[1]","size_R[2]","size_R[3]","speed_R[0]","speed_R[1]","speed_R[2]","speed_R[3]","standing"],"outputs":["motor[0]","motor[1]"],"nState":6,"metrics":{"nand":173,"latch":6,"ref":0,"cells":179,"bytes":1235,"depth":25},"stateLayout":{"raise_counter_bits":3,"refractory_bits":3,"order":"raise counter bits (LSB first), then refractory timer bits (LSB first)"}},"policy":{"name":"policy-hand-abc","hex":"0x0000000700000700000008000008000000120000130000000400000400000002000002000000030000030000001600001700000018000018000000150000190000001400001a00000005000015000000040000060000001d00001d000000050000180000001e00001f0000001c000020000000210000210000001b000022000000090000230000000f00000f0000000c00000c0000000a00000b00000026000027000000250000280000000a00000a0000000b00000b0000002a00002b0000000e00002c0000002d00002d0000002900002e000000100000100000000c00002c000000310000310000000d0000320000000f00003300000030000034000000350000350000002f0000360000000d00000d0000002c00002c000000260000390000000e00000e0000002600003b0000000f00003c0000003000003d0000003a00003e0000003800003f00000011000040000000410000410000003700004200000031000038000000330000440000002500003b00000046000046000000300000470000003a000048000000450000490000001100004a00000005000005000000090000090000000300001e0000004d00004e0000001a00004f0000004c0000500000000400001800000006000052000000050000530000000700000800000055000055000000540000560000004d00005700000051000058000000240000430000004b000059","sha256":"03f7f8dc8a53e318871ec85e5160e0ed6e04568f3a1c2ad4ceec904b10a1d3bf","inputs":["size_L[0]","size_L[1]","size_L[2]","size_L[3]","speed_L[0]","speed_L[1]","speed_L[2]","speed_L[3]","size_R[0]","size_R[1]","size_R[2]","size_R[3]","speed_R[0]","speed_R[1]","speed_R[2]","speed_R[3]"],"outputs":["gf","parallel"],"nState":0,"metrics":{"nand":74,"latch":0,"ref":0,"cells":74,"bytes":518,"depth":11}},"encoding":{"bits":4,"sizeEdges":[10.0,12.125086,14.701771,17.826025,21.614208,26.207414,31.776715,38.529541,46.717401,56.645251,68.682855,83.278553,100.975963,122.434225,148.452553,180.0],"speedEdges":[25.0,37.892914,57.434918,87.055056,131.950791,200.0,303.143313,459.479342,696.440451,1055.606329,1600.0,2425.146506,3675.834736,5571.523605,8444.850629,12800.0]},"teacher":{"sizeMu":60.0,"sizeSigma":30.0,"speedScale":1000.0,"gfThreshold":4.25,"parallelThreshold":6.0,"wingRaiseTicks":4,"refractoryTicks":7,"tickMs":5.0,"weights":{"R":{"gf_lc4":2580,"gf_lplc2":2220,"par_lc4":8807,"par_lplc2":2294},"L":{"gf_lc4":3782,"gf_lplc2":2642,"par_lc4":11817,"par_lplc2":2899}}},"stimulus":{"startDeg":10.0,"endDeg":170.0,"binocularOverlapDeg":30.0},"motorNames":{"0":"hold","1":"raising wings","2":"short-mode takeoff","3":"long-mode takeoff"},"episodes":[{"lv":10.0,"azimuth":0.0,"ticks":[[77872,0,0],[82241,0,0],[82241,0,0],[82241,0,0],[82241,0,0],[86610,0,0],[86610,0,0],[86610,0,0],[90979,0,0],[90979,0,0],[90979,0,0],[95348,0,0],[95348,0,0],[95605,0,0],[99717,1,1],[104086,2,56]],"teacher":[2,16]},{"lv":40.0,"azimuth":-60.0,"ticks":[[65536,0,0],[65537,0,0],[65537,0,0],[65537,0,0],[65537,0,0],[65537,0,0],[65537,0,0],[65553,0,0],[65553,0,0],[65553,0,0],[65553,0,0],[65553,0,0],[65553,0,0],[65553,0,0],[65553,0,0],[65553,0,0],[65553,0,0],[65554,0,0],[65554,0,0],[65554,0,0],[65554,0,0],[65554,0,0],[65554,0,0],[65570,0,0],[65570,0,0],[65570,0,0],[65570,0,0],[65570,0,0],[65570,0,0],[65570,0,0],[65571,0,0],[65571,0,0],[65571,0,0],[65571,0,0],[65571,0,0],[65571,0,0],[65587,0,0],[65587,0,0],[65587,0,0],[65587,0,0],[65587,0,0],[65588,0,0],[65588,0,0],[65588,0,0],[65588,0,0],[65588,0,0],[65588,0,0],[65604,0,0],[65604,0,0],[65604,0,0],[65605,0,0],[65605,0,0],[65605,0,0],[65605,0,0],[65605,0,0],[65605,0,0],[65621,0,0],[65621,0,0],[65622,0,0],[65622,0,0],[65622,0,0],[65622,0,0],[65622,0,0],[65638,0,0],[65639,0,0],[65639,0,0],[65639,0,0],[65639,0,0],[65639,0,0],[65656,1,1],[65656,1,2],[65656,1,3],[65656,1,4],[65657,3,56]],"teacher":[3,73]},{"lv":80.0,"azimuth":20.0,"ticks":[[65536,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[65793,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66050,0,0],[66307,0,0],[66307,0,0],[66307,0,0],[66307,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70419,0,0],[70676,0,0],[70676,0,0],[70676,0,0],[70676,0,0],[70676,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[74788,0,0],[75045,0,0],[75045,0,0],[75045,0,0],[75045,0,0],[75045,0,0],[79157,0,0],[79157,0,0],[79157,0,0],[79157,0,0],[79157,0,0],[79157,0,0],[79157,0,0],[79157,0,0],[79157,0,0],[79157,0,0],[79414,0,0],[79414,0,0],[79414,0,0],[79414,0,0],[79414,0,0],[83526,0,0],[83526,0,0],[83526,0,0],[83526,0,0],[83526,0,0],[83526,0,0],[83526,0,0],[83783,0,0],[83783,0,0],[83783,0,0],[83783,0,0],[83783,0,0],[83783,0,0],[87895,0,0],[87895,0,0],[87895,0,0],[87895,0,0],[87895,0,0],[88152,0,0],[88152,0,0],[88152,0,0],[88152,0,0],[88152,0,0],[88152,0,0],[92264,0,0],[92264,0,0],[92521,0,0],[92521,0,0],[92521,0,0],[92521,0,0],[92521,0,0],[92521,0,0],[96633,1,1],[96633,1,2],[96890,1,3],[96890,1,4],[96890,3,56]],"teacher":[3,154]}]}</script>
+<!-- DATA:END -->
+
+<!-- three.js r160 UMD build; it logs a deprecation notice about build/three.min.js, which is expected. -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script id="c3s-evaluator">
+/*
+ * NAND/LATCH netlist evaluator, written from docs/CIRCUITS.md.
+ *   signal 0 = constant 0, signal 1 = constant 1, signals 2..2+nIn-1 = inputs,
+ *   then one signal per cell.  NAND: 0x00 u24 a u24 b.  LATCH: 0x01 u24 d.
+ *   A latch outputs its stored bit and stores signal d at the end of the tick.
+ *   Primary outputs are the last nOut signals.
+ */
+window.C3SNetlist = (() => {
+  function hexToBytes(hex) {
+    const h = hex.startsWith("0x") ? hex.slice(2) : hex;
+    const out = new Uint8Array(h.length / 2);
+    for (let i = 0; i < out.length; i++) out[i] = parseInt(h.substr(2 * i, 2), 16);
+    return out;
+  }
+  function decode(hex, nIn, nOut) {
+    const b = hexToBytes(hex);
+    const u24 = (o) => (b[o] << 16) | (b[o + 1] << 8) | b[o + 2];
+    const cells = [];
+    let p = 0, next = 2 + nIn, nState = 0;
+    while (p < b.length) {
+      const op = b[p];
+      if (op === 0x00) {
+        if (p + 7 > b.length) throw new Error(`truncated NAND at byte ${p}`);
+        const a = u24(p + 1), c = u24(p + 4);
+        if (a >= next || c >= next) throw new Error(`NAND at signal ${next} reads a signal not yet defined`);
+        cells.push({ nand: true, a, b: c });
+        p += 7;
+      } else if (op === 0x01) {
+        if (p + 4 > b.length) throw new Error(`truncated LATCH at byte ${p}`);
+        cells.push({ nand: false, d: u24(p + 1), slot: nState++ });
+        p += 4;
+      } else if (op === 0x02) {
+        throw new Error("REF cells are not supported by this evaluator");
+      } else {
+        throw new Error(`unknown opcode 0x${op.toString(16)} at byte ${p}`);
+      }
+      next++;
+    }
+    for (const c of cells) if (!c.nand && c.d >= next) throw new Error(`LATCH reads signal ${c.d} outside the netlist`);
+    if (next - 2 - nIn < nOut) throw new Error("fewer cells than outputs");
+    return { nIn, nOut, nState, nSignals: next, bytes: b.length, cells };
+  }
+  // inputs and state are packed integers, bit i = input i / latch i (latches in cell order)
+  function step(prog, inputs, state) {
+    const s = new Uint8Array(prog.nSignals);
+    s[1] = 1;
+    for (let i = 0; i < prog.nIn; i++) s[2 + i] = (inputs >>> i) & 1;
+    const latchD = new Array(prog.nState);
+    let k = 2 + prog.nIn;
+    for (const c of prog.cells) {
+      if (c.nand) s[k] = s[c.a] & s[c.b] ? 0 : 1;
+      else { s[k] = (state >>> c.slot) & 1; latchD[c.slot] = c.d; }
+      k++;
+    }
+    let out = 0;
+    for (let j = 0; j < prog.nOut; j++) out |= s[prog.nSignals - prog.nOut + j] << j;
+    let nextState = 0;
+    for (let j = 0; j < prog.nState; j++) nextState |= s[latchD[j]] << j;
+    return { out, next: nextState };
+  }
+  return { decode, step, hexToBytes };
+})();
+</script>
+
+<script>
+(() => {
+  "use strict";
+  const DATA = JSON.parse(document.getElementById("c3s-data").textContent);
+  const NL = window.C3SNetlist;
+  const DEG = 180 / Math.PI, RAD = Math.PI / 180;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (id) => document.getElementById(id);
+
+  // ---------------------------------------------------------------- copy
+  const COPY = {
+    en: {
+      lede: "A fruit-fly escape reflex, compiled to NAND gates and latches and run gate by gate in your browser. Launch a looming block and watch the circuit decide whether to jump.",
+      stimulus: "Stimulus", stimulusNote: "a dark block approaching at constant speed",
+      presetFast: "Fast · l/v 10 ms", presetMedium: "Medium · 40 ms", presetSlow: "Slow · 150 ms",
+      lv: "Approach, l/v", lvHint: "Half-size over speed. Smaller is a faster, more threatening loom.",
+      az: "Direction", azHint: "Each eye sees its own side plus 30° across the midline.",
+      slow: "Slow motion", launch: "Launch loom", reset: "Reset fly",
+      eyes: "Circuit inputs", eyesNote: "16 bits, LSB first", sizeBin: "size bin", speedBin: "speed bin",
+      pathways: "Policy outputs", gf: "Giant fiber", par: "Parallel DNs",
+      motor: "Motor core", raise: "Wing-raise counter", refr: "Refractory timer",
+      circuit: "Netlist in this page", cells: "Cells", size: "Size", layout: "Layout",
+      checkingHash: "Checking the embedded netlist hash…", checkingReplay: "Replaying reference episodes…",
+      foot1: "Every tick: the block's angular size and expansion speed are quantised per eye into 16 bits, the netlist is evaluated cell by cell, and its six latches carry the wing program and refractory state to the next tick.",
+      repo: "Source, proofs and docs", author: "Author",
+      legendGf: "giant fiber crosses", legendPar: "parallel pathway crosses", legendRaise: "raising wings",
+      motorWords: ["HOLD", "RAISING WINGS", "SHORT JUMP", "LONG TAKEOFF"],
+      outcome: ["held until the block arrived", "raising wings", "short-mode jump", "long-mode takeoff"],
+      left: "left", right: "right", ahead: "ahead", blind: "does not see it",
+      hashOk: (h) => `Netlist hash matches the build (${h}…)`,
+      hashBad: "Netlist hash does not match the build: this page is stale or altered",
+      hashNa: "Hash check needs a secure context (https); skipped here",
+      replayOk: (e, t) => `Reproduces ${e} reference episodes from the Python build (${t} circuit ticks and the continuous model), 0 mismatches`,
+      replayBad: (m) => `${m} mismatches against the Python reference episodes`,
+      circuitSaid: (o, t, ms, th) => `Circuit: ${o} at tick ${t} (${ms} ms, block at ${th}°).`,
+      circuitHeld: "Circuit: held; the block reached 170° without a takeoff.",
+      teacherSaid: (o, t) => t === null ? `Continuous model: ${o}.` : `Continuous model: ${o} at tick ${t}.`,
+      agree: "SAME MODE AS THE CONTINUOUS MODEL", differ: "DIFFERENT MODE FROM THE CONTINUOUS MODEL — quantisation at the mode boundary",
+      slowLabel: (x) => `slow motion ×${x}`,
+      noWebgl: "The 3D view needs WebGL. The circuit still runs in the panel.",
+    },
+    zh: {
+      lede: "一条果蝇逃逸反射，编译成 NAND 门和锁存器，在你的浏览器里逐门运行。发射一个逼近的方块，看电路决定跳不跳。",
+      stimulus: "刺激", stimulusNote: "一个匀速逼近的深色方块",
+      presetFast: "快 · l/v 10 ms", presetMedium: "中 · 40 ms", presetSlow: "慢 · 150 ms",
+      lv: "逼近速度 l/v", lvHint: "半边长除以速度。数值越小，逼近越快、越危险。",
+      az: "方向", azHint: "每只眼看自己这一侧，再加上越过中线的 30°。",
+      slow: "慢放", launch: "发射方块", reset: "重置果蝇",
+      eyes: "电路输入", eyesNote: "16 位，低位在前", sizeBin: "大小分箱", speedBin: "速度分箱",
+      pathways: "策略电路输出", gf: "巨纤维", par: "并行下行神经元",
+      motor: "运动核心", raise: "抬翅计数器", refr: "不应期计时器",
+      circuit: "本页运行的网表", cells: "单元", size: "大小", layout: "字节布局",
+      checkingHash: "正在核对嵌入网表的哈希…", checkingReplay: "正在回放参考回合…",
+      foot1: "每一拍：方块在每只眼里的角大小和扩张速度被量化成 16 位，网表逐个单元求值，6 个锁存器把抬翅进度和不应期带到下一拍。",
+      repo: "源码、证明与文档", author: "作者",
+      legendGf: "巨纤维过阈", legendPar: "并行通路过阈", legendRaise: "抬翅中",
+      motorWords: ["静止", "抬翅中", "短模式跳跃", "长模式起飞"],
+      outcome: ["一直没起飞，方块已到眼前", "抬翅中", "短模式跳跃", "长模式起飞"],
+      left: "左", right: "右", ahead: "正前方", blind: "看不到",
+      hashOk: (h) => `网表哈希与构建一致（${h}…）`,
+      hashBad: "网表哈希与构建不一致：页面已过期或被改动",
+      hashNa: "哈希核对需要安全上下文（https），此处跳过",
+      replayOk: (e, t) => `复现 Python 构建的 ${e} 个参考回合（电路 ${t} 拍 + 连续模型），0 差异`,
+      replayBad: (m) => `与 Python 参考回合有 ${m} 处不一致`,
+      circuitSaid: (o, t, ms, th) => `电路：第 ${t} 拍${o}（${ms} ms，方块张角 ${th}°）。`,
+      circuitHeld: "电路：没有起飞，方块张角到了 170°。",
+      teacherSaid: (o, t) => t === null ? `连续模型：${o}。` : `连续模型：第 ${t} 拍${o}。`,
+      agree: "与连续模型的起飞模式一致", differ: "与连续模型的起飞模式不同——量化落在模式分界附近",
+      slowLabel: (x) => `慢放 ×${x}`,
+      noWebgl: "3D 视图需要 WebGL。电路仍在右侧面板运行。",
+    },
+  };
+  let lang = "en";
+  const t = (k) => COPY[lang][k];
+
+  // ---------------------------------------------------------------- model
+  const core = NL.decode(DATA.core.hex, DATA.core.inputs.length, DATA.core.outputs.length);
+  const policy = NL.decode(DATA.policy.hex, DATA.policy.inputs.length, DATA.policy.outputs.length);
+  const ENC = DATA.encoding, T = DATA.teacher, S = DATA.stimulus;
+  const BITS = ENC.bits, LEVELS = 1 << BITS, NF = 4 * BITS;
+  const RAISE_BITS = DATA.core.stateLayout.raise_counter_bits;
+
+  const bisectRight = (edges, v) => { let n = 0; for (const e of edges) if (e <= v) n++; else break; return n; };
+  const sizeBin = (th) => Math.min(bisectRight(ENC.sizeEdges, th), LEVELS - 1);
+  const speedBin = (d) => Math.min(bisectRight(ENC.speedEdges, d), LEVELS - 1);
+  const visible = (az) => [az <= S.binocularOverlapDeg, az >= -S.binocularOverlapDeg];
+
+  function encode(th, dth, az) {
+    const [seeL, seeR] = visible(az);
+    const sb = sizeBin(th), vb = speedBin(dth);
+    const sl = seeL ? sb : 0, vl = seeL ? vb : 0, sr = seeR ? sb : 0, vr = seeR ? vb : 0;
+    return sl | (vl << BITS) | (sr << (2 * BITS)) | (vr << (3 * BITS));
+  }
+
+  // Same geometry and tick sampling as c3s/loom.py.
+  function stimulusSamples(lvMs) {
+    const a = lvMs / 1000;
+    let tc = a / Math.tan((S.startDeg * RAD) / 2);
+    const tEnd = a / Math.tan((S.endDeg * RAD) / 2);
+    const dt = T.tickMs / 1000;
+    const out = [];
+    while (tc > tEnd) {
+      const tt = Math.max(tc, 1e-9);
+      out.push({ theta: 2 * Math.atan(a / tt) * DEG, dtheta: ((2 * a) / (tt * tt + a * a)) * DEG, ttc: tc });
+      tc -= dt;
+    }
+    return out;
+  }
+
+  // Continuous teacher, for comparison only (the circuit never sees it).
+  function selectAction(gf, par, wings, refr) {
+    if (refr) return 0;
+    if (gf) return wings ? 1 : 2;
+    return par ? 1 : 0;
+  }
+  function coreStep(action, raise, refr) {
+    const wings = raise >= T.wingRaiseTicks;
+    const out = action === 2 ? 2 : action === 1 ? (wings ? 3 : 1) : 0;
+    const took = out === 2 || out === 3;
+    return {
+      out,
+      raise: action === 0 || took ? 0 : Math.min(raise + 1, T.wingRaiseTicks),
+      refr: took ? T.refractoryTicks : Math.max(refr - 1, 0),
+    };
+  }
+  function teacherEpisode(lvMs, az) {
+    const [seeL, seeR] = visible(az);
+    let raise = 0, refr = 0;
+    const samples = stimulusSamples(lvMs);
+    for (let i = 0; i < samples.length; i++) {
+      const { theta, dtheta } = samples[i];
+      let gf = false, par = false;
+      if (theta >= 10) {
+        for (const [side, seen] of [["L", seeL], ["R", seeR]]) {
+          if (!seen) continue;
+          const w = T.weights[side];
+          const rs = Math.exp(-((theta - T.sizeMu) ** 2) / (2 * T.sizeSigma ** 2));
+          const rv = Math.max(dtheta, 0) / T.speedScale;
+          gf = gf || (w.gf_lc4 * rv + w.gf_lplc2 * rs) / 1000 >= T.gfThreshold;
+          par = par || (w.par_lc4 * rv + w.par_lplc2 * rs) / 1000 >= T.parallelThreshold;
+        }
+      }
+      const r = coreStep(selectAction(gf, par, raise >= T.wingRaiseTicks, refr > 0), raise, refr);
+      raise = r.raise; refr = r.refr;
+      if (r.out === 2 || r.out === 3) return { action: r.out, tick: i };
+    }
+    return { action: 0, tick: null };
+  }
+
+  // ---------------------------------------------------------------- panel
+  function makeLamps(id, n, cls = "") {
+    const host = $(id);
+    host.textContent = "";
+    for (let i = 0; i < n; i++) {
+      const s = document.createElement("span");
+      s.className = `lamp ${cls}`;
+      host.appendChild(s);
+    }
+    return [...host.children];
+  }
+  const lamps = {
+    sizeL: makeLamps("bits-size-L", BITS), speedL: makeLamps("bits-speed-L", BITS),
+    sizeR: makeLamps("bits-size-R", BITS), speedR: makeLamps("bits-speed-R", BITS),
+    raise: makeLamps("bits-raise", RAISE_BITS), refr: makeLamps("bits-refr", DATA.core.stateLayout.refractory_bits),
+  };
+  const setLamps = (arr, v) => arr.forEach((l, i) => l.classList.toggle("on", ((v >>> i) & 1) === 1));
+
+  $("fact-cells").textContent = `${DATA.core.metrics.nand} NAND · ${DATA.core.metrics.latch} LATCH · depth ${DATA.core.metrics.depth}`;
+  $("fact-bytes").textContent = `${core.bytes.toLocaleString("en-US")} bytes`;
+  $("fact-sha").textContent = DATA.core.sha256;
+
+  const fmt = (x, d = 1) => x.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  function describeAz(az) {
+    if (az === 0) return `0° ${t("ahead")}`;
+    return `${az < 0 ? "−" : ""}${Math.abs(az)}° ${az < 0 ? t("left") : t("right")}`;
+  }
+
+  function renderInputs(sample, x) {
+    const [seeL, seeR] = visible(state.az);
+    const m = LEVELS - 1;
+    const bins = [x & m, (x >> BITS) & m, (x >> (2 * BITS)) & m, (x >> (3 * BITS)) & m];
+    setLamps(lamps.sizeL, bins[0]); setLamps(lamps.speedL, bins[1]);
+    setLamps(lamps.sizeR, bins[2]); setLamps(lamps.speedR, bins[3]);
+    for (const [side, seen, sb, vb] of [["L", seeL, bins[0], bins[1]], ["R", seeR, bins[2], bins[3]]]) {
+      $(`eye-${side}-name`).classList.toggle("blind", !seen);
+      $(`eye-${side}-values`).textContent = !sample
+        ? "—"
+        : seen
+          ? `θ ${fmt(sample.theta)}° → ${sb} · θ′ ${fmt(sample.dtheta, 0)} °/s → ${vb}`
+          : t("blind");
+    }
+  }
+  function renderCore(pathBits, motor, coreState) {
+    $("lamp-gf").classList.toggle("on", (pathBits & 1) === 1);
+    $("lamp-par").classList.toggle("on", (pathBits & 2) === 2);
+    const word = $("motor-word");
+    word.dataset.motor = String(motor);
+    word.textContent = t("motorWords")[motor];
+    const raise = coreState & ((1 << RAISE_BITS) - 1), refr = coreState >>> RAISE_BITS;
+    setLamps(lamps.raise, raise); setLamps(lamps.refr, refr);
+    $("raise-out").textContent = `${Math.min(raise, T.wingRaiseTicks)} / ${T.wingRaiseTicks}`;
+    $("refr-out").textContent = String(refr);
+  }
+
+  // ---------------------------------------------------------------- timeline strip
+  const strip = $("strip");
+  const stripCtx = strip.getContext("2d");
+  function drawStrip() {
+    const w = strip.clientWidth, h = strip.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (strip.width !== Math.round(w * dpr)) { strip.width = Math.round(w * dpr); strip.height = Math.round(h * dpr); }
+    stripCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    stripCtx.clearRect(0, 0, w, h);
+    const n = Math.max(state.samples.length, 1), cw = w / n;
+    const rows = [[0, 12, "#D0473A"], [15, 12, "#86BFA8"], [30, 12, "#F2A541"]];
+    stripCtx.fillStyle = "#23272D";
+    for (const [y, hh] of rows) stripCtx.fillRect(0, y, w, hh);
+    state.record.forEach((r, i) => {
+      const x = i * cw, ww = Math.max(cw, 1);
+      if (r.path & 1) { stripCtx.fillStyle = rows[0][2]; stripCtx.fillRect(x, rows[0][0], ww, rows[0][1]); }
+      if (r.path & 2) { stripCtx.fillStyle = rows[1][2]; stripCtx.fillRect(x, rows[1][0], ww, rows[1][1]); }
+      if (r.motor === 1) { stripCtx.fillStyle = rows[2][2]; stripCtx.fillRect(x, rows[2][0], ww, rows[2][1]); }
+      if (r.motor === 2 || r.motor === 3) {
+        stripCtx.fillStyle = r.motor === 2 ? "#D0473A" : "#86BFA8";
+        stripCtx.fillRect(x, 0, Math.max(cw, 3), 42);
+      }
+    });
+    if (state.tick > 0 && state.tick <= n) {
+      stripCtx.fillStyle = "#ECE7DC";
+      stripCtx.fillRect(Math.min(state.tick * cw, w - 1), 0, 1, 42);
+    }
+  }
+
+  // ---------------------------------------------------------------- scene
+  let three = null;
+  function buildScene() {
+    if (!window.THREE) throw new Error("three.js did not load");
+    const canvas = $("view");
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xE3E9ED);
+    scene.fog = new THREE.Fog(0xE3E9ED, 16, 38);
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 120);
+
+    scene.add(new THREE.HemisphereLight(0xF6F8FA, 0x55663F, 1.15));
+    const sun = new THREE.DirectionalLight(0xFFF3DE, 1.6);
+    sun.position.set(-7, 12, 5);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 40 });
+    scene.add(sun);
+
+    // terrain: one instanced mesh of unit blocks, deterministic pseudo-random heights
+    let seed = 7;
+    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const R = 12, blocks = [];
+    for (let x = -R; x <= R; x++) {
+      for (let z = -R; z <= R; z++) {
+        const dist = Math.hypot(x, z);
+        let top = dist < 1.6 ? 0 : -1 - (dist > 5 && rand() < 0.18 ? -1 : 0) - (dist > 8 && rand() < 0.25 ? 1 : 0);
+        for (let y = top; y >= top - 1; y--) blocks.push([x, y, z, y === top]);
+      }
+    }
+    const box = new THREE.BoxGeometry(1, 1, 1);
+    const terrain = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial(), blocks.length);
+    const m4 = new THREE.Matrix4(), col = new THREE.Color();
+    blocks.forEach(([x, y, z, isTop], i) => {
+      m4.makeTranslation(x, y - 0.5, z);
+      terrain.setMatrixAt(i, m4);
+      const j = rand() * 0.06 - 0.03;
+      col.set(isTop ? 0x6F8C45 : 0x80623F).offsetHSL(0, 0, j);
+      terrain.setColorAt(i, col);
+    });
+    terrain.receiveShadow = true;
+    scene.add(terrain);
+
+    // the fly: a few voxels, oriented to face +z
+    const fly = new THREE.Group();
+    const mat = (c, extra = {}) => new THREE.MeshLambertMaterial({ color: c, ...extra });
+    const part = (w, h, d, c, x, y, z, parent = fly) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), c);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = true;
+      parent.add(mesh);
+      return mesh;
+    };
+    const bodyMat = mat(0x3B3029), abdMat = mat(0x5C4733), stripe = mat(0x2A221D), eyeMat = mat(0xB83A2E), legMat = mat(0x221C18);
+    part(0.24, 0.2, 0.24, bodyMat, 0, 0.22, 0);
+    part(0.2, 0.17, 0.3, abdMat, 0, 0.2, -0.26);
+    part(0.21, 0.02, 0.05, stripe, 0, 0.29, -0.2);
+    part(0.21, 0.02, 0.05, stripe, 0, 0.29, -0.32);
+    part(0.18, 0.15, 0.13, bodyMat, 0, 0.24, 0.18);
+    part(0.07, 0.12, 0.1, eyeMat, 0.11, 0.25, 0.19);
+    part(0.07, 0.12, 0.1, eyeMat, -0.11, 0.25, 0.19);
+    for (const side of [-1, 1]) {
+      for (const z of [-0.08, 0.02, 0.12]) {
+        const leg = part(0.16, 0.025, 0.025, legMat, side * 0.16, 0.1, z);
+        leg.rotation.z = side * 0.9;
+      }
+    }
+    const wingMat = mat(0xDCE6EB, { transparent: true, opacity: 0.6 });
+    const wings = [-1, 1].map((side) => {
+      const pivot = new THREE.Group();
+      pivot.position.set(side * 0.1, 0.33, -0.02);
+      fly.add(pivot);
+      const w = part(0.36, 0.012, 0.15, wingMat, side * 0.17, 0, -0.08, pivot);
+      w.castShadow = false;
+      pivot.userData.side = side;
+      return pivot;
+    });
+    scene.add(fly);
+
+    const loom = new THREE.Mesh(box, new THREE.MeshLambertMaterial({ color: 0x121417 }));
+    loom.castShadow = true;
+    scene.add(loom);
+
+    const path = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+      new THREE.LineDashedMaterial({ color: 0x1A1E23, dashSize: 0.18, gapSize: 0.12, transparent: true, opacity: 0.35 }),
+    );
+    scene.add(path);
+
+    const orbit = { yaw: -2.35, pitch: 0.38, radius: 8.4, target: new THREE.Vector3(0, 0.35, 0.6) };
+    const placeCamera = () => {
+      const { yaw, pitch, radius, target } = orbit;
+      camera.position.set(
+        target.x + radius * Math.cos(pitch) * Math.sin(yaw),
+        target.y + radius * Math.sin(pitch),
+        target.z + radius * Math.cos(pitch) * Math.cos(yaw),
+      );
+      camera.lookAt(target);
+    };
+    let drag = null;
+    canvas.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      orbit.yaw -= (e.clientX - drag.x) * 0.006;
+      orbit.pitch = Math.min(1.35, Math.max(0.08, orbit.pitch + (e.clientY - drag.y) * 0.004));
+      drag = { x: e.clientX, y: e.clientY };
+    });
+    canvas.addEventListener("pointerup", () => { drag = null; });
+    canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      orbit.radius = Math.min(18, Math.max(3, orbit.radius * (1 + Math.sign(e.deltaY) * 0.08)));
+    }, { passive: false });
+
+    const resize = () => {
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.fov = w < h ? 64 : 40; // keep the approaching block in frame on portrait screens
+      camera.updateProjectionMatrix();
+    };
+    new ResizeObserver(resize).observe($("stage"));
+    resize();
+    return { renderer, scene, camera, fly, wings, loom, path, orbit, placeCamera };
+  }
+
+  // Block position for time-to-contact: half-size 0.5, so theta = 2·atan(0.5 / distance).
+  const HALF = 0.5, EYE_Y = 0.28;
+  function loomPosition(theta, az) {
+    const dist = Math.max(HALF / Math.tan((theta * RAD) / 2) + HALF, HALF + 0.22);
+    return { x: -Math.sin(az * RAD) * dist, z: Math.cos(az * RAD) * dist };
+  }
+
+  // ---------------------------------------------------------------- episode
+  const state = {
+    lv: 40, az: -20, slow: 15,
+    samples: [], tick: 0, coreState: 0, record: [],
+    running: false, lastTickAt: 0,
+    outcome: null, teacher: null,
+    takeoff: null, takeoffAt: 0,
+  };
+
+  function resetEpisode() {
+    state.samples = stimulusSamples(state.lv);
+    state.tick = 0;
+    state.coreState = 0;
+    state.record = [];
+    state.running = false;
+    state.outcome = null;
+    state.takeoff = null;
+    state.teacher = teacherEpisode(state.lv, state.az);
+    $("result").hidden = true;
+    const s0 = state.samples[0];
+    const x0 = encode(s0.theta, s0.dtheta, state.az);
+    renderInputs(s0, x0);
+    renderCore(NL.step(policy, x0, 0).out, 0, 0);
+    $("ro-tick").textContent = `tick 0 · 0 ms`;
+    $("ro-size").textContent = `θ ${fmt(s0.theta)}° · θ′ ${fmt(s0.dtheta, 0)} °/s`;
+    if (three) {
+      three.fly.position.set(0, 0, 0);
+      three.fly.rotation.set(0, 0, 0);
+      three.wings.forEach((w) => w.rotation.set(0, 0, 0));
+      const p = loomPosition(s0.theta, state.az);
+      three.loom.position.set(p.x, EYE_Y, p.z);
+      three.loom.material.opacity = 1;
+      three.path.geometry.setFromPoints([new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(p.x * 1.02, 0.02, p.z * 1.02)]);
+      three.path.computeLineDistances();
+    }
+    drawStrip();
+  }
+
+  function advanceTick() {
+    const i = state.tick;
+    const sample = state.samples[i];
+    if (!sample) {
+      state.running = false;
+      finish(null);
+      return;
+    }
+    const x = encode(sample.theta, sample.dtheta, state.az);
+    const path = NL.step(policy, x, 0).out;
+    const r = NL.step(core, x | (1 << NF), state.coreState);
+    state.coreState = r.next;
+    state.record.push({ path, motor: r.out });
+    state.tick = i + 1;
+    renderInputs(sample, x);
+    renderCore(path, r.out, r.next);
+    $("ro-tick").textContent = `tick ${i} · ${i * T.tickMs} ms`;
+    $("ro-size").textContent = `θ ${fmt(sample.theta)}° · θ′ ${fmt(sample.dtheta, 0)} °/s`;
+    if (three) {
+      const p = loomPosition(sample.theta, state.az);
+      three.loom.position.set(p.x, EYE_Y, p.z);
+    }
+    if (r.out === 2 || r.out === 3) {
+      state.running = false;
+      state.takeoff = r.out;
+      state.takeoffAt = performance.now();
+      finish({ action: r.out, tick: i, theta: sample.theta });
+    }
+    drawStrip();
+  }
+
+  function finish(outcome) {
+    state.outcome = outcome;
+    renderResult();
+  }
+  function renderResult() {
+    if (state.outcome === undefined || (!state.outcome && state.running) || (state.outcome === null && state.tick < state.samples.length)) return;
+    const out = state.outcome, tch = state.teacher, words = t("outcome");
+    $("result-circuit").textContent = out
+      ? t("circuitSaid")(words[out.action], out.tick, out.tick * T.tickMs, fmt(out.theta, 0))
+      : t("circuitHeld");
+    $("result-teacher").textContent = t("teacherSaid")(words[tch.action], tch.tick);
+    const same = (out ? out.action : 0) === tch.action;
+    const v = $("result-verdict");
+    v.className = `verdict ${same ? "agree" : "differ"}`;
+    v.textContent = same ? t("agree") : t("differ");
+    $("result").hidden = false;
+  }
+
+  function launch() {
+    resetEpisode();
+    state.running = true;
+    state.lastTickAt = performance.now();
+  }
+
+  // ---------------------------------------------------------------- controls
+  const lvIn = $("lv"), azIn = $("az"), slowIn = $("slow");
+  function syncControls() {
+    $("lv-out").textContent = `${state.lv} ms`;
+    $("az-out").textContent = describeAz(state.az);
+    $("ro-slow").textContent = t("slowLabel")(state.slow);
+  }
+  lvIn.addEventListener("input", () => { state.lv = +lvIn.value; syncControls(); resetEpisode(); });
+  azIn.addEventListener("input", () => { state.az = +azIn.value; syncControls(); resetEpisode(); });
+  slowIn.addEventListener("change", () => { state.slow = +slowIn.value; syncControls(); });
+  $("launch").addEventListener("click", launch);
+  $("reset").addEventListener("click", resetEpisode);
+  document.querySelectorAll(".chip[data-lv]").forEach((chip) => chip.addEventListener("click", () => {
+    state.lv = +chip.dataset.lv; state.az = +chip.dataset.az;
+    lvIn.value = state.lv; azIn.value = state.az;
+    syncControls();
+    launch();
+  }));
+
+  function applyLanguage(next) {
+    lang = next;
+    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+    $("lang-en").setAttribute("aria-pressed", String(lang === "en"));
+    $("lang-zh").setAttribute("aria-pressed", String(lang === "zh"));
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const v = COPY[lang][el.dataset.i18n];
+      if (typeof v === "string") el.textContent = v;
+    });
+    syncControls();
+    const last = state.record[state.record.length - 1];
+    renderCore(last ? last.path : NL.step(policy, 0, 0).out, last ? last.motor : 0, state.coreState);
+    renderInputs(state.samples[Math.max(state.tick - 1, 0)], encode(state.samples[Math.max(state.tick - 1, 0)].theta, state.samples[Math.max(state.tick - 1, 0)].dtheta, state.az));
+    runChecks.render();
+    if (!$("result").hidden) renderResult();
+  }
+  $("lang-en").addEventListener("click", () => applyLanguage("en"));
+  $("lang-zh").addEventListener("click", () => applyLanguage("zh"));
+
+  // ---------------------------------------------------------------- self-check
+  const runChecks = (() => {
+    const result = { hash: "pending", hashPrefix: "", replay: "pending", ticks: 0, mismatches: 0 };
+    function render() {
+      const h = $("check-hash"), r = $("check-replay");
+      h.className = `check ${result.hash === "ok" ? "ok" : result.hash === "bad" ? "fail" : ""}`;
+      h.lastElementChild.textContent =
+        result.hash === "ok" ? t("hashOk")(result.hashPrefix) : result.hash === "bad" ? t("hashBad") : result.hash === "na" ? t("hashNa") : t("checkingHash");
+      r.className = `check ${result.replay === "ok" ? "ok" : result.replay === "bad" ? "fail" : ""}`;
+      r.lastElementChild.textContent =
+        result.replay === "ok" ? t("replayOk")(DATA.episodes.length, result.ticks) : result.replay === "bad" ? t("replayBad")(result.mismatches, result.ticks) : t("checkingReplay");
+    }
+    async function run() {
+      let ticks = 0, bad = 0;
+      for (const ep of DATA.episodes) {
+        const samples = stimulusSamples(ep.lv);
+        let st = 0;
+        ep.ticks.forEach(([x, motor, next], i) => {
+          ticks++;
+          const r = NL.step(core, x, st);
+          const recomputed = encode(samples[i].theta, samples[i].dtheta, ep.azimuth) | (1 << NF);
+          if (r.out !== motor || r.next !== next || recomputed !== x) bad++;
+          st = r.next;
+        });
+        const tch = teacherEpisode(ep.lv, ep.azimuth);
+        if (tch.action !== ep.teacher[0] || tch.tick !== ep.teacher[1]) bad++;
+      }
+      Object.assign(result, { ticks, mismatches: bad, replay: bad ? "bad" : "ok" });
+      render();
+      if (window.crypto && crypto.subtle) {
+        try {
+          const digest = await crypto.subtle.digest("SHA-256", NL.hexToBytes(DATA.core.hex));
+          const hex = [...new Uint8Array(digest)].map((v) => v.toString(16).padStart(2, "0")).join("");
+          result.hash = hex === DATA.core.sha256 ? "ok" : "bad";
+          result.hashPrefix = hex.slice(0, 12);
+        } catch { result.hash = "na"; }
+      } else {
+        result.hash = "na";
+      }
+      render();
+    }
+    return { run, render };
+  })();
+
+  // ---------------------------------------------------------------- loop
+  function frame(now) {
+    if (state.running) {
+      const tickReal = T.tickMs * state.slow;
+      let guard = 0;
+      while (state.running && now - state.lastTickAt >= tickReal && guard++ < 8) {
+        state.lastTickAt += tickReal;
+        advanceTick();
+      }
+    }
+    if (three) {
+      const { fly, wings, loom } = three;
+      const raise = Math.min(state.coreState & ((1 << RAISE_BITS) - 1), T.wingRaiseTicks) / T.wingRaiseTicks;
+      const buzz = reduceMotion ? 0 : Math.sin(now / 45) * 0.04;
+      if (!state.takeoff) {
+        wings.forEach((w) => { w.rotation.z = w.userData.side * (raise * 1.15 + (raise > 0 ? buzz : 0)); });
+      } else {
+        const s = (now - state.takeoffAt) / 1000;
+        const away = { x: -loom.position.x, z: -loom.position.z };
+        const len = Math.hypot(away.x, away.z) || 1;
+        away.x /= len; away.z /= len;
+        if (state.takeoff === 2) {
+          // short mode: fast, unstable jump, wings still folded
+          const k = Math.min(s, 1.6);
+          fly.position.set(away.x * k * 2.4, Math.max(0, 3.2 * k - 2.6 * k * k) + k * 0.4, away.z * k * 2.4);
+          fly.rotation.x = reduceMotion ? 0 : k * 5.5;
+          wings.forEach((w) => { w.rotation.z = w.userData.side * 0.15; });
+        } else {
+          // long mode: wings up, stable climb
+          const k = Math.min(s, 3);
+          fly.position.set(away.x * k * 1.6, k * k * 0.45 + k * 0.5, away.z * k * 1.6);
+          fly.rotation.x = -0.12;
+          const flap = reduceMotion ? 0.9 : 0.75 + Math.sin(now / 28) * 0.6;
+          wings.forEach((w) => { w.rotation.z = w.userData.side * flap; });
+        }
+      }
+      if (!reduceMotion && !drag3d()) three.orbit.yaw += 0.00012 * 16;
+      three.placeCamera();
+      three.renderer.render(three.scene, three.camera);
+    }
+    requestAnimationFrame(frame);
+  }
+  const drag3d = () => false;
+
+  // ---------------------------------------------------------------- boot
+  try {
+    three = buildScene();
+  } catch (err) {
+    three = null;
+    const note = document.createElement("div");
+    note.className = "no-webgl";
+    note.textContent = COPY.en.noWebgl;
+    $("stage").appendChild(note);
+  }
+  syncControls();
+  resetEpisode();
+  runChecks.run();
+  requestAnimationFrame(frame);
+  if (!reduceMotion) setTimeout(() => { if (!state.running && !state.record.length) launch(); }, 900);
+})();
+</script>
+</body>
+</html>

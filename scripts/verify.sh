@@ -35,9 +35,10 @@ step "rebuild LoomEscape-16 from scratch (calibration, table, circuits, cores)"
 "$PY" scripts/build_loom_escape.py
 "$PY" scripts/compare_encodings.py
 "$PY" scripts/export_components.py
+"$PY" scripts/build_demo.py
 
 step "committed artifacts must be reproduced byte for byte"
-git diff --exit-code -- circuits/ data/
+git diff --exit-code -- circuits/ data/ docs/demo/
 
 step "EVM evaluator over the full domain of every exported circuit"
 "$PY" scripts/export_evm_fixtures.py

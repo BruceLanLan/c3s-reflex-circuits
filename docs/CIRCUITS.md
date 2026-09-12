@@ -44,6 +44,16 @@ signature `tapeout(bytes nl, uint32 nIn, uint32 nOut) payable`. Fees, on-chain
 size limits and deployment behaviour were **not** checked, and nothing from this
 repository has been deployed to any chain.
 
+### In-browser evaluator (`docs/demo/`)
+
+The web demo carries a third evaluator, written in JavaScript from the tables above
+(`<script id="c3s-evaluator">` in `docs/demo/index.html`). On 2026-09-12 it was run
+under Node.js over the complete domain of `core-hand-abc` (8,388,608 rows) and
+`policy-hand-abc` (65,536 rows): its output and next-state bytes were identical to
+`exhaust.step_table` and to the public tapeout.net evaluator. On every page load it
+also checks the SHA-256 of the embedded netlist and replays the reference episodes
+written by `scripts/build_demo.py`, and shows any mismatch on screen.
+
 ## Circuit inventory
 
 ### LoomEscape-16 (`circuits/loom-escape/`)
@@ -104,6 +114,7 @@ policy + motor spec ──(2^23 (input, state) rows)──► core
 core step tables ──(every tick)──► quantised-teacher episodes (must be identical)
 Python bit-sliced evaluator ──(SHA-256 chain over 2^n rows)──► EVM NandMachine
 Python codec + tick evaluator ──(random + final circuits)──► public tapeout.net evaluator
+Python step tables ──(2^16 and 2^23 rows)──► in-browser JavaScript evaluator
 ```
 
 * **Two independent evaluators in Python.** `netlist.tick` is scalar;
