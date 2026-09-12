@@ -29,16 +29,52 @@ from .netlist import Builder, Circuit, Nand
 NAND_GENLIB = """\
 GATE ZERO  0 Y=CONST0;
 GATE ONE   0 Y=CONST1;
+GATE buf   0 Y=A;        PIN * NONINV 1 999 1 0 1 0
 GATE inv   1 Y=!A;       PIN * INV 1 999 1 0 1 0
 GATE nand2 1 Y=!(A*B);   PIN * INV 1 999 1 0 1 0
 """
 
-# Optimisation recipes tried in order; the smallest verified result wins.
+# ABC's standard scripts, spelled out with full command names (the short forms
+# b/rw/rf/rs/resyn2/... are aliases defined in abc.rc, which a bare ABC binary
+# does not load).
+_ALIASES = {
+    "b": "balance",
+    "rw": "rewrite",
+    "rwz": "rewrite -z",
+    "rf": "refactor",
+    "rfz": "refactor -z",
+    "rs": "resub",
+}
+
+
+def _expand(script: str) -> str:
+    out = []
+    for cmd in script.split(";"):
+        words = cmd.split()
+        if words and words[0] in _ALIASES:
+            words = _ALIASES[words[0]].split() + words[1:]
+        out.append(" ".join(words))
+    return "; ".join(out)
+
+
+_RESYN2 = _expand("b; rw; rf; b; rw; rwz; b; rfz; rwz; b")
+_RESYN2RS = _expand(
+    "b; rs -K 6; rw; rs -K 6 -N 2; rf; rs -K 8; b; rs -K 8 -N 2; rw; rs -K 10; rwz; "
+    "rs -K 10 -N 2; b; rs -K 12; rfz; rs -K 12 -N 2; rwz; b"
+)
+_COMPRESS2RS = _expand(
+    "b -l; rs -K 6 -l; rw -l; rs -K 6 -N 2 -l; rf -l; rs -K 8 -l; b -l; rs -K 8 -N 2 -l; "
+    "rw -l; rs -K 10 -l; rwz -l; rs -K 10 -N 2 -l; b -l; rs -K 12 -l; rfz -l; "
+    "rs -K 12 -N 2 -l; rwz -l; b -l"
+)
+
+# Optimisation recipes; the smallest verified result wins.
 RECIPES = {
-    "resyn2": "strash; resyn2; resyn2; map -a",
-    "compress2rs": "strash; dc2; resyn2rs; compress2rs; map -a",
-    "collapse": "collapse; strash; dch -f; resyn2; map -a",
+    "resyn2": f"strash; {_RESYN2}; {_RESYN2}; map -a",
+    "compress2rs": f"strash; dc2; {_RESYN2RS}; {_COMPRESS2RS}; map -a",
+    "collapse": f"collapse; strash; dch -f; {_RESYN2}; map -a",
     "dch": "strash; dch -f; map -a; mfs2; strash; dch -f; map -a",
+    "deep": f"strash; {_COMPRESS2RS}; dch -f; {_COMPRESS2RS}; dch -f; map -a; mfs2; strash; dch -f; map -a",
 }
 
 
@@ -130,6 +166,8 @@ def parse_mapped_blif(text: str, n_in: int, n_out: int) -> Circuit:
                     net[out] = b.ZERO
                 elif g == "ONE":
                     net[out] = b.ONE
+                elif g == "buf":
+                    net[out] = net[ins[0]]
                 elif g == "inv":
                     net[out] = b.not_(net[ins[0]])
                 elif g == "nand2":
