@@ -1,0 +1,975 @@
+{
+ "format": "c3s.controls/1",
+ "slots": [
+  "gf_lc4",
+  "gf_lplc2",
+  "par_lc4",
+  "par_lplc2"
+ ],
+ "measured_counts": {
+  "L": {
+   "gf_lc4": 3782,
+   "gf_lplc2": 2642,
+   "par_lc4": 11817,
+   "par_lplc2": 2899
+  },
+  "R": {
+   "gf_lc4": 2580,
+   "gf_lplc2": 2220,
+   "par_lc4": 8807,
+   "par_lplc2": 2294
+  }
+ },
+ "teacher_params": {
+  "size_mu_deg": 60.0,
+  "size_sigma_deg": 30.0,
+  "speed_scale_dps": 1000.0,
+  "gf_threshold": 4.25,
+  "parallel_threshold": 6.0,
+  "lesion": [],
+  "symmetric": false,
+  "samples_per_bin": 64,
+  "seed": 0,
+  "tick_ms": 5.0,
+  "wing_raise_ticks": 4,
+  "refractory_ticks": 7
+ },
+ "summary": {
+  "measured_points_satisfying": 89,
+  "permutations_satisfiable_after_recalibration": 5,
+  "permutations_total": 23,
+  "permutations_meeting_C1_C3_with_fixed_thresholds": 1
+ },
+ "variants": [
+  {
+   "label": "permutation 0132",
+   "counts": {
+    "L": {
+     "gf_lc4": 3782,
+     "gf_lplc2": 2642,
+     "par_lc4": 2899,
+     "par_lplc2": 11817
+    },
+    "R": {
+     "gf_lc4": 2580,
+     "gf_lplc2": 2220,
+     "par_lc4": 2294,
+     "par_lplc2": 8807
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 13295,
+    "train_episodes_mode_differing": 13,
+    "train_episodes_timing_differing": 34
+   },
+   "permutation": [
+    0,
+    1,
+    3,
+    2
+   ]
+  },
+  {
+   "label": "permutation 0213",
+   "counts": {
+    "L": {
+     "gf_lc4": 3782,
+     "gf_lplc2": 11817,
+     "par_lc4": 2642,
+     "par_lplc2": 2899
+    },
+    "R": {
+     "gf_lc4": 2580,
+     "gf_lplc2": 8807,
+     "par_lc4": 2220,
+     "par_lplc2": 2294
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 30315,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    0,
+    2,
+    1,
+    3
+   ]
+  },
+  {
+   "label": "permutation 0231",
+   "counts": {
+    "L": {
+     "gf_lc4": 3782,
+     "gf_lplc2": 11817,
+     "par_lc4": 2899,
+     "par_lplc2": 2642
+    },
+    "R": {
+     "gf_lc4": 2580,
+     "gf_lplc2": 8807,
+     "par_lc4": 2294,
+     "par_lplc2": 2220
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 30124,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    0,
+    2,
+    3,
+    1
+   ]
+  },
+  {
+   "label": "permutation 0312",
+   "counts": {
+    "L": {
+     "gf_lc4": 3782,
+     "gf_lplc2": 2899,
+     "par_lc4": 2642,
+     "par_lplc2": 11817
+    },
+    "R": {
+     "gf_lc4": 2580,
+     "gf_lplc2": 2294,
+     "par_lc4": 2220,
+     "par_lplc2": 8807
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": true,
+     "C3": false
+    },
+    "table_rows_differing": 13703,
+    "train_episodes_mode_differing": 9,
+    "train_episodes_timing_differing": 34
+   },
+   "permutation": [
+    0,
+    3,
+    1,
+    2
+   ]
+  },
+  {
+   "label": "permutation 0321",
+   "counts": {
+    "L": {
+     "gf_lc4": 3782,
+     "gf_lplc2": 2899,
+     "par_lc4": 11817,
+     "par_lplc2": 2642
+    },
+    "R": {
+     "gf_lc4": 2580,
+     "gf_lplc2": 2294,
+     "par_lc4": 8807,
+     "par_lplc2": 2220
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 100,
+    "points_evaluated": 1105,
+    "selected": {
+     "gf_threshold": 5.5,
+     "parallel_threshold": 8.0,
+     "wing_raise_ticks": 3
+    },
+    "table_rows_differing": 7584,
+    "train_episodes_mode_differing": 0,
+    "train_episodes_timing_differing": 35
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": true,
+     "C3": true
+    },
+    "table_rows_differing": 313,
+    "train_episodes_mode_differing": 8,
+    "train_episodes_timing_differing": 20
+   },
+   "permutation": [
+    0,
+    3,
+    2,
+    1
+   ]
+  },
+  {
+   "label": "permutation 1023",
+   "counts": {
+    "L": {
+     "gf_lc4": 2642,
+     "gf_lplc2": 3782,
+     "par_lc4": 11817,
+     "par_lplc2": 2899
+    },
+    "R": {
+     "gf_lc4": 2220,
+     "gf_lplc2": 2580,
+     "par_lc4": 8807,
+     "par_lplc2": 2294
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 79,
+    "points_evaluated": 1105,
+    "selected": {
+     "gf_threshold": 5.25,
+     "parallel_threshold": 6.5,
+     "wing_raise_ticks": 5
+    },
+    "table_rows_differing": 5911,
+    "train_episodes_mode_differing": 0,
+    "train_episodes_timing_differing": 35
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": true
+    },
+    "table_rows_differing": 1682,
+    "train_episodes_mode_differing": 16,
+    "train_episodes_timing_differing": 16
+   },
+   "permutation": [
+    1,
+    0,
+    2,
+    3
+   ]
+  },
+  {
+   "label": "LC4 <-> LPLC2 swap",
+   "counts": {
+    "L": {
+     "gf_lc4": 2642,
+     "gf_lplc2": 3782,
+     "par_lc4": 2899,
+     "par_lplc2": 11817
+    },
+    "R": {
+     "gf_lc4": 2220,
+     "gf_lplc2": 2580,
+     "par_lc4": 2294,
+     "par_lplc2": 8807
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 14457,
+    "train_episodes_mode_differing": 13,
+    "train_episodes_timing_differing": 34
+   },
+   "permutation": [
+    1,
+    0,
+    3,
+    2
+   ]
+  },
+  {
+   "label": "permutation 1203",
+   "counts": {
+    "L": {
+     "gf_lc4": 2642,
+     "gf_lplc2": 11817,
+     "par_lc4": 3782,
+     "par_lplc2": 2899
+    },
+    "R": {
+     "gf_lc4": 2220,
+     "gf_lplc2": 8807,
+     "par_lc4": 2580,
+     "par_lplc2": 2294
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 27476,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    1,
+    2,
+    0,
+    3
+   ]
+  },
+  {
+   "label": "permutation 1230",
+   "counts": {
+    "L": {
+     "gf_lc4": 2642,
+     "gf_lplc2": 11817,
+     "par_lc4": 2899,
+     "par_lplc2": 3782
+    },
+    "R": {
+     "gf_lc4": 2220,
+     "gf_lplc2": 8807,
+     "par_lc4": 2294,
+     "par_lplc2": 2580
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 28766,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    1,
+    2,
+    3,
+    0
+   ]
+  },
+  {
+   "label": "permutation 1302",
+   "counts": {
+    "L": {
+     "gf_lc4": 2642,
+     "gf_lplc2": 2899,
+     "par_lc4": 3782,
+     "par_lplc2": 11817
+    },
+    "R": {
+     "gf_lc4": 2220,
+     "gf_lplc2": 2294,
+     "par_lc4": 2580,
+     "par_lplc2": 8807
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 15328,
+    "train_episodes_mode_differing": 13,
+    "train_episodes_timing_differing": 34
+   },
+   "permutation": [
+    1,
+    3,
+    0,
+    2
+   ]
+  },
+  {
+   "label": "permutation 1320",
+   "counts": {
+    "L": {
+     "gf_lc4": 2642,
+     "gf_lplc2": 2899,
+     "par_lc4": 11817,
+     "par_lplc2": 3782
+    },
+    "R": {
+     "gf_lc4": 2220,
+     "gf_lplc2": 2294,
+     "par_lc4": 8807,
+     "par_lplc2": 2580
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 65,
+    "points_evaluated": 1105,
+    "selected": {
+     "gf_threshold": 4.5,
+     "parallel_threshold": 7.0,
+     "wing_raise_ticks": 5
+    },
+    "table_rows_differing": 4683,
+    "train_episodes_mode_differing": 1,
+    "train_episodes_timing_differing": 35
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": true
+    },
+    "table_rows_differing": 3230,
+    "train_episodes_mode_differing": 12,
+    "train_episodes_timing_differing": 30
+   },
+   "permutation": [
+    1,
+    3,
+    2,
+    0
+   ]
+  },
+  {
+   "label": "permutation 2013",
+   "counts": {
+    "L": {
+     "gf_lc4": 11817,
+     "gf_lplc2": 3782,
+     "par_lc4": 2642,
+     "par_lplc2": 2899
+    },
+    "R": {
+     "gf_lc4": 8807,
+     "gf_lplc2": 2580,
+     "par_lc4": 2220,
+     "par_lplc2": 2294
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 22493,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    2,
+    0,
+    1,
+    3
+   ]
+  },
+  {
+   "label": "permutation 2031",
+   "counts": {
+    "L": {
+     "gf_lc4": 11817,
+     "gf_lplc2": 3782,
+     "par_lc4": 2899,
+     "par_lplc2": 2642
+    },
+    "R": {
+     "gf_lc4": 8807,
+     "gf_lplc2": 2580,
+     "par_lc4": 2294,
+     "par_lplc2": 2220
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 22302,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    2,
+    0,
+    3,
+    1
+   ]
+  },
+  {
+   "label": "permutation 2103",
+   "counts": {
+    "L": {
+     "gf_lc4": 11817,
+     "gf_lplc2": 2642,
+     "par_lc4": 3782,
+     "par_lplc2": 2899
+    },
+    "R": {
+     "gf_lc4": 8807,
+     "gf_lplc2": 2220,
+     "par_lc4": 2580,
+     "par_lplc2": 2294
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 17974,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    2,
+    1,
+    0,
+    3
+   ]
+  },
+  {
+   "label": "permutation 2130",
+   "counts": {
+    "L": {
+     "gf_lc4": 11817,
+     "gf_lplc2": 2642,
+     "par_lc4": 2899,
+     "par_lplc2": 3782
+    },
+    "R": {
+     "gf_lc4": 8807,
+     "gf_lplc2": 2220,
+     "par_lc4": 2294,
+     "par_lplc2": 2580
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 19264,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    2,
+    1,
+    3,
+    0
+   ]
+  },
+  {
+   "label": "GF <-> parallel swap",
+   "counts": {
+    "L": {
+     "gf_lc4": 11817,
+     "gf_lplc2": 2899,
+     "par_lc4": 3782,
+     "par_lplc2": 2642
+    },
+    "R": {
+     "gf_lc4": 8807,
+     "gf_lplc2": 2294,
+     "par_lc4": 2580,
+     "par_lplc2": 2220
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 18836,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    2,
+    3,
+    0,
+    1
+   ]
+  },
+  {
+   "label": "permutation 2310",
+   "counts": {
+    "L": {
+     "gf_lc4": 11817,
+     "gf_lplc2": 2899,
+     "par_lc4": 2642,
+     "par_lplc2": 3782
+    },
+    "R": {
+     "gf_lc4": 8807,
+     "gf_lplc2": 2294,
+     "par_lc4": 2220,
+     "par_lplc2": 2580
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 20498,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    2,
+    3,
+    1,
+    0
+   ]
+  },
+  {
+   "label": "permutation 3012",
+   "counts": {
+    "L": {
+     "gf_lc4": 2899,
+     "gf_lplc2": 3782,
+     "par_lc4": 2642,
+     "par_lplc2": 11817
+    },
+    "R": {
+     "gf_lc4": 2294,
+     "gf_lplc2": 2580,
+     "par_lc4": 2220,
+     "par_lplc2": 8807
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 14693,
+    "train_episodes_mode_differing": 13,
+    "train_episodes_timing_differing": 34
+   },
+   "permutation": [
+    3,
+    0,
+    1,
+    2
+   ]
+  },
+  {
+   "label": "permutation 3021",
+   "counts": {
+    "L": {
+     "gf_lc4": 2899,
+     "gf_lplc2": 3782,
+     "par_lc4": 11817,
+     "par_lplc2": 2642
+    },
+    "R": {
+     "gf_lc4": 2294,
+     "gf_lplc2": 2580,
+     "par_lc4": 8807,
+     "par_lplc2": 2220
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 87,
+    "points_evaluated": 1105,
+    "selected": {
+     "gf_threshold": 5.5,
+     "parallel_threshold": 8.0,
+     "wing_raise_ticks": 3
+    },
+    "table_rows_differing": 9322,
+    "train_episodes_mode_differing": 0,
+    "train_episodes_timing_differing": 35
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": true
+    },
+    "table_rows_differing": 1823,
+    "train_episodes_mode_differing": 16,
+    "train_episodes_timing_differing": 16
+   },
+   "permutation": [
+    3,
+    0,
+    2,
+    1
+   ]
+  },
+  {
+   "label": "permutation 3102",
+   "counts": {
+    "L": {
+     "gf_lc4": 2899,
+     "gf_lplc2": 2642,
+     "par_lc4": 3782,
+     "par_lplc2": 11817
+    },
+    "R": {
+     "gf_lc4": 2294,
+     "gf_lplc2": 2220,
+     "par_lc4": 2580,
+     "par_lplc2": 8807
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 15328,
+    "train_episodes_mode_differing": 13,
+    "train_episodes_timing_differing": 34
+   },
+   "permutation": [
+    3,
+    1,
+    0,
+    2
+   ]
+  },
+  {
+   "label": "permutation 3120",
+   "counts": {
+    "L": {
+     "gf_lc4": 2899,
+     "gf_lplc2": 2642,
+     "par_lc4": 11817,
+     "par_lplc2": 3782
+    },
+    "R": {
+     "gf_lc4": 2294,
+     "gf_lplc2": 2220,
+     "par_lc4": 8807,
+     "par_lplc2": 2580
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 63,
+    "points_evaluated": 1105,
+    "selected": {
+     "gf_threshold": 4.5,
+     "parallel_threshold": 7.0,
+     "wing_raise_ticks": 5
+    },
+    "table_rows_differing": 4163,
+    "train_episodes_mode_differing": 1,
+    "train_episodes_timing_differing": 35
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": true
+    },
+    "table_rows_differing": 3230,
+    "train_episodes_mode_differing": 12,
+    "train_episodes_timing_differing": 30
+   },
+   "permutation": [
+    3,
+    1,
+    2,
+    0
+   ]
+  },
+  {
+   "label": "permutation 3201",
+   "counts": {
+    "L": {
+     "gf_lc4": 2899,
+     "gf_lplc2": 11817,
+     "par_lc4": 3782,
+     "par_lplc2": 2642
+    },
+    "R": {
+     "gf_lc4": 2294,
+     "gf_lplc2": 8807,
+     "par_lc4": 2580,
+     "par_lplc2": 2220
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 27852,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    3,
+    2,
+    0,
+    1
+   ]
+  },
+  {
+   "label": "GF/parallel and LC4/LPLC2 swap",
+   "counts": {
+    "L": {
+     "gf_lc4": 2899,
+     "gf_lplc2": 11817,
+     "par_lc4": 2642,
+     "par_lplc2": 3782
+    },
+    "R": {
+     "gf_lc4": 2294,
+     "gf_lplc2": 8807,
+     "par_lc4": 2220,
+     "par_lplc2": 2580
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 0,
+    "points_evaluated": 1105
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": false,
+     "C3": false
+    },
+    "table_rows_differing": 29514,
+    "train_episodes_mode_differing": 21,
+    "train_episodes_timing_differing": 35
+   },
+   "permutation": [
+    3,
+    2,
+    1,
+    0
+   ]
+  },
+  {
+   "label": "left/right symmetrised",
+   "counts": {
+    "L": {
+     "gf_lc4": 3181.0,
+     "gf_lplc2": 2431.0,
+     "par_lc4": 10312.0,
+     "par_lplc2": 2596.5
+    },
+    "R": {
+     "gf_lc4": 3181.0,
+     "gf_lplc2": 2431.0,
+     "par_lc4": 10312.0,
+     "par_lplc2": 2596.5
+    }
+   },
+   "recalibrated": {
+    "points_satisfying": 127,
+    "points_evaluated": 1105,
+    "selected": {
+     "gf_threshold": 4.0,
+     "parallel_threshold": 6.5,
+     "wing_raise_ticks": 3
+    },
+    "table_rows_differing": 4404,
+    "train_episodes_mode_differing": 1,
+    "train_episodes_timing_differing": 27
+   },
+   "fixed_thresholds": {
+    "constraints": {
+     "C1": true,
+     "C2": true,
+     "C3": true
+    },
+    "table_rows_differing": 4541,
+    "train_episodes_mode_differing": 4,
+    "train_episodes_timing_differing": 31
+   }
+  }
+ ]
+}

@@ -50,7 +50,7 @@ column records what this repository found.
 | F1 | a hand-written baseline cannot reproduce the teacher's decision table | Not triggered: `policy-hand` matches all 65,536 rows |
 | F2 | a compiled or optimised circuit differs from its specification anywhere | Not triggered: 0 mismatches over every complete domain, in Python and on the EVM |
 | F3 | the quantised policy's behaviour diverges badly from the continuous teacher | Partially triggered: escape agreement 1.0, but mode agreement 0.83 (train) / 0.90 (holdout) |
-| F4 | wrongly assigned wiring constrains behaviour as well as the measured wiring | <!-- RESULT:F4 --> |
+| F4 | wrongly assigned wiring constrains behaviour as well as the measured wiring | Partially triggered: 18 of 23 permutations admit no parameters, but the 5 that keep the parallel pathway's LC4 count in place calibrate as well as the measured wiring; the constraint reduces to one ordinal fact |
 | F5 | the circuit is too large for an on-chain evaluator | Not triggered: 173 NAND + 6 LATCH, 1,235 bytes, about 370k gas per tick on the reference EVM evaluator |
-| F6 | results on the sealed family contradict the reported fidelity | <!-- RESULT:F6 --> |
+| F6 | results on the sealed family contradict the reported fidelity | Not triggered: 48 sealed episodes, escape agreement 1.000, mode agreement 0.875 (between train 0.829 and holdout 0.905) |
 | F7 | no one other than the authors can reproduce the artifacts | Open: `scripts/verify.sh` rebuilds everything byte for byte, but no independent reproduction has been reported yet |

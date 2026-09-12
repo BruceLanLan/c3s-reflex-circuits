@@ -30,8 +30,8 @@ MaleCNS v1.0 connectome ─► explicit teacher model ─► 16-bit decision tab
 | **EVM** | full-domain differential test of 18 circuits passes; one tick of the core costs ~370k gas on the reference evaluator |
 | **TapeOut byte layout** | cross-checked against the public tapeout.net decoder and evaluator: 0 mismatches over 4,800 random ticks and the final circuits |
 | **Learned circuits (DLGN)** | 67–90 % row accuracy at 216–1,340 NAND: on a fully tabulable function, exact synthesis wins |
-| **Controls** | <!-- RESULT:readme-controls --> |
-| **Sealed family** | <!-- RESULT:readme-sealed --> |
+| **Controls** | of 23 wrong assignments of the measured synapse counts, 18 admit no teacher parameters at all; the 5 that do all keep the parallel pathway's dominant LC4 count in place — the wiring constrains behaviour, but through one ordinal fact |
+| **Sealed family** | pre-registered by SHA-256, evaluated once: escape agreement 1.00, mode agreement 0.875 over 48 unseen stimuli |
 | **Reproducibility** | two from-scratch builds are byte-identical; `scripts/verify.sh` re-checks everything |
 
 ## Evidence ladder

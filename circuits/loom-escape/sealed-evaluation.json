@@ -1,0 +1,1391 @@
+{
+ "format": "c3s.sealed-evaluation/1",
+ "sealed_family_sha256": "cd71f34b36f20d90cb3f552d683f4bfd03e3211d5e1a63b4649ca64429f77764",
+ "stimuli": 48,
+ "depends_on": {
+  "decision_table_sha256": "f13579971b88e6e1079987b1a4210292aa01fc7da75b72ca5d90719d6d3b47aa",
+  "teacher_calibration_file_sha256": "b77e145163e612cd66afcd8cadc986a2e4120ff4964c91da06a4a7186849e600",
+  "subgraph_file_sha256": "8dff72df950377a14e2b2243f13200c9c5780c28bdcf395a5732854d2d6bc2de",
+  "encoding": "4bit-log",
+  "core_netlist_sha256": {
+   "core-hand-abc": "7c8eaf62495908c434206ff54aa1f3e9146b4295506f59584d6107d2104b2e52"
+  }
+ },
+ "summary": {
+  "quantised_teacher": {
+   "mode_agreement": 0.875,
+   "escape_agreement": 1.0,
+   "mean_abs_takeoff_tick_difference": 1.0
+  },
+  "core-hand-abc": {
+   "mode_agreement": 0.875,
+   "escape_agreement": 1.0,
+   "mean_abs_takeoff_tick_difference": 1.0
+  },
+  "core-dlgn-128x128x64-s0": {
+   "mode_agreement": 0.8542,
+   "escape_agreement": 1.0,
+   "mean_abs_takeoff_tick_difference": 3.833
+  },
+  "core-dlgn-256x256x128-s0": {
+   "mode_agreement": 0.7917,
+   "escape_agreement": 1.0,
+   "mean_abs_takeoff_tick_difference": 3.417
+  },
+  "core-dlgn-64x64x32-s0": {
+   "mode_agreement": 0.625,
+   "escape_agreement": 0.7708,
+   "mean_abs_takeoff_tick_difference": 3.946
+  }
+ },
+ "teacher_action_counts": {
+  "short-mode takeoff": 13,
+  "long-mode takeoff": 35
+ },
+ "rows": [
+  {
+   "l_over_v_ms": 51.82,
+   "azimuth_deg": 69.6,
+   "teacher": [
+    3,
+    102
+   ],
+   "quantised_teacher": [
+    3,
+    103
+   ],
+   "core-hand-abc": [
+    3,
+    103
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    103
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    103
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    103
+   ]
+  },
+  {
+   "l_over_v_ms": 22.59,
+   "azimuth_deg": 19.3,
+   "teacher": [
+    2,
+    39
+   ],
+   "quantised_teacher": [
+    3,
+    38
+   ],
+   "core-hand-abc": [
+    3,
+    38
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    39
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    41
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    42
+   ]
+  },
+  {
+   "l_over_v_ms": 65.12,
+   "azimuth_deg": -82.8,
+   "teacher": [
+    3,
+    124
+   ],
+   "quantised_teacher": [
+    3,
+    125
+   ],
+   "core-hand-abc": [
+    3,
+    125
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    131
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    131
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  },
+  {
+   "l_over_v_ms": 17.02,
+   "azimuth_deg": -61.8,
+   "teacher": [
+    3,
+    29
+   ],
+   "quantised_teacher": [
+    3,
+    29
+   ],
+   "core-hand-abc": [
+    3,
+    29
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    31
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    31
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  },
+  {
+   "l_over_v_ms": 53.66,
+   "azimuth_deg": 46.6,
+   "teacher": [
+    3,
+    106
+   ],
+   "quantised_teacher": [
+    3,
+    107
+   ],
+   "core-hand-abc": [
+    3,
+    107
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    107
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    107
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    107
+   ]
+  },
+  {
+   "l_over_v_ms": 32.76,
+   "azimuth_deg": 42.4,
+   "teacher": [
+    3,
+    63
+   ],
+   "quantised_teacher": [
+    2,
+    62
+   ],
+   "core-hand-abc": [
+    2,
+    62
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    63
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    63
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    63
+   ]
+  },
+  {
+   "l_over_v_ms": 38.42,
+   "azimuth_deg": 49.8,
+   "teacher": [
+    3,
+    74
+   ],
+   "quantised_teacher": [
+    3,
+    74
+   ],
+   "core-hand-abc": [
+    3,
+    74
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    74
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    74
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    74
+   ]
+  },
+  {
+   "l_over_v_ms": 46.15,
+   "azimuth_deg": 71.6,
+   "teacher": [
+    3,
+    90
+   ],
+   "quantised_teacher": [
+    3,
+    91
+   ],
+   "core-hand-abc": [
+    3,
+    91
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    91
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    91
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    91
+   ]
+  },
+  {
+   "l_over_v_ms": 12.1,
+   "azimuth_deg": -13.6,
+   "teacher": [
+    2,
+    19
+   ],
+   "quantised_teacher": [
+    2,
+    20
+   ],
+   "core-hand-abc": [
+    2,
+    20
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    21
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    21
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    21
+   ]
+  },
+  {
+   "l_over_v_ms": 56.46,
+   "azimuth_deg": -8.4,
+   "teacher": [
+    3,
+    106
+   ],
+   "quantised_teacher": [
+    3,
+    107
+   ],
+   "core-hand-abc": [
+    3,
+    107
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    113
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    113
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    113
+   ]
+  },
+  {
+   "l_over_v_ms": 52.86,
+   "azimuth_deg": -14.6,
+   "teacher": [
+    3,
+    99
+   ],
+   "quantised_teacher": [
+    3,
+    99
+   ],
+   "core-hand-abc": [
+    3,
+    99
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    105
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    101
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    105
+   ]
+  },
+  {
+   "l_over_v_ms": 43.89,
+   "azimuth_deg": 34.4,
+   "teacher": [
+    3,
+    85
+   ],
+   "quantised_teacher": [
+    3,
+    86
+   ],
+   "core-hand-abc": [
+    3,
+    86
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    86
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    86
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    86
+   ]
+  },
+  {
+   "l_over_v_ms": 25.1,
+   "azimuth_deg": 38.7,
+   "teacher": [
+    3,
+    47
+   ],
+   "quantised_teacher": [
+    2,
+    46
+   ],
+   "core-hand-abc": [
+    2,
+    46
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    47
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    47
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    47
+   ]
+  },
+  {
+   "l_over_v_ms": 9.76,
+   "azimuth_deg": -65.8,
+   "teacher": [
+    2,
+    15
+   ],
+   "quantised_teacher": [
+    2,
+    15
+   ],
+   "core-hand-abc": [
+    2,
+    15
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    17
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    17
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  },
+  {
+   "l_over_v_ms": 133.96,
+   "azimuth_deg": 87.2,
+   "teacher": [
+    3,
+    296
+   ],
+   "quantised_teacher": [
+    3,
+    298
+   ],
+   "core-hand-abc": [
+    3,
+    298
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    286
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    286
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    286
+   ]
+  },
+  {
+   "l_over_v_ms": 21.91,
+   "azimuth_deg": 65.3,
+   "teacher": [
+    3,
+    41
+   ],
+   "quantised_teacher": [
+    3,
+    40
+   ],
+   "core-hand-abc": [
+    3,
+    40
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    40
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    40
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    40
+   ]
+  },
+  {
+   "l_over_v_ms": 67.54,
+   "azimuth_deg": 38.5,
+   "teacher": [
+    3,
+    135
+   ],
+   "quantised_teacher": [
+    3,
+    137
+   ],
+   "core-hand-abc": [
+    3,
+    137
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    137
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    137
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    137
+   ]
+  },
+  {
+   "l_over_v_ms": 76.07,
+   "azimuth_deg": -50.1,
+   "teacher": [
+    3,
+    146
+   ],
+   "quantised_teacher": [
+    3,
+    148
+   ],
+   "core-hand-abc": [
+    3,
+    148
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    155
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    155
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  },
+  {
+   "l_over_v_ms": 140.19,
+   "azimuth_deg": 44.9,
+   "teacher": [
+    3,
+    311
+   ],
+   "quantised_teacher": [
+    3,
+    313
+   ],
+   "core-hand-abc": [
+    3,
+    313
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    300
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    300
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    300
+   ]
+  },
+  {
+   "l_over_v_ms": 87.82,
+   "azimuth_deg": -2.9,
+   "teacher": [
+    3,
+    171
+   ],
+   "quantised_teacher": [
+    3,
+    173
+   ],
+   "core-hand-abc": [
+    3,
+    173
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    181
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    180
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    181
+   ]
+  },
+  {
+   "l_over_v_ms": 17.05,
+   "azimuth_deg": -89.3,
+   "teacher": [
+    3,
+    29
+   ],
+   "quantised_teacher": [
+    3,
+    29
+   ],
+   "core-hand-abc": [
+    3,
+    29
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    31
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    31
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  },
+  {
+   "l_over_v_ms": 26.62,
+   "azimuth_deg": -23.4,
+   "teacher": [
+    3,
+    47
+   ],
+   "quantised_teacher": [
+    3,
+    46
+   ],
+   "core-hand-abc": [
+    3,
+    46
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    46
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    49
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    50
+   ]
+  },
+  {
+   "l_over_v_ms": 74.84,
+   "azimuth_deg": -89.2,
+   "teacher": [
+    3,
+    144
+   ],
+   "quantised_teacher": [
+    3,
+    145
+   ],
+   "core-hand-abc": [
+    3,
+    145
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    153
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    153
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  },
+  {
+   "l_over_v_ms": 51.37,
+   "azimuth_deg": 50.8,
+   "teacher": [
+    3,
+    101
+   ],
+   "quantised_teacher": [
+    3,
+    102
+   ],
+   "core-hand-abc": [
+    3,
+    102
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    102
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    102
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    102
+   ]
+  },
+  {
+   "l_over_v_ms": 27.22,
+   "azimuth_deg": 22.9,
+   "teacher": [
+    3,
+    48
+   ],
+   "quantised_teacher": [
+    3,
+    47
+   ],
+   "core-hand-abc": [
+    3,
+    47
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    47
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    50
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    51
+   ]
+  },
+  {
+   "l_over_v_ms": 14.22,
+   "azimuth_deg": 2.4,
+   "teacher": [
+    2,
+    23
+   ],
+   "quantised_teacher": [
+    2,
+    24
+   ],
+   "core-hand-abc": [
+    2,
+    24
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    25
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    25
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    25
+   ]
+  },
+  {
+   "l_over_v_ms": 29.54,
+   "azimuth_deg": 68.6,
+   "teacher": [
+    3,
+    56
+   ],
+   "quantised_teacher": [
+    2,
+    55
+   ],
+   "core-hand-abc": [
+    2,
+    55
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    56
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    56
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    56
+   ]
+  },
+  {
+   "l_over_v_ms": 110.62,
+   "azimuth_deg": 0.9,
+   "teacher": [
+    3,
+    219
+   ],
+   "quantised_teacher": [
+    3,
+    223
+   ],
+   "core-hand-abc": [
+    3,
+    223
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    233
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    225
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    233
+   ]
+  },
+  {
+   "l_over_v_ms": 30.52,
+   "azimuth_deg": -36.2,
+   "teacher": [
+    3,
+    55
+   ],
+   "quantised_teacher": [
+    3,
+    54
+   ],
+   "core-hand-abc": [
+    3,
+    54
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    58
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    58
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  },
+  {
+   "l_over_v_ms": 65.6,
+   "azimuth_deg": 13.1,
+   "teacher": [
+    3,
+    125
+   ],
+   "quantised_teacher": [
+    3,
+    126
+   ],
+   "core-hand-abc": [
+    3,
+    126
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    133
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    133
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    133
+   ]
+  },
+  {
+   "l_over_v_ms": 9.18,
+   "azimuth_deg": 18.2,
+   "teacher": [
+    2,
+    14
+   ],
+   "quantised_teacher": [
+    2,
+    14
+   ],
+   "core-hand-abc": [
+    2,
+    14
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    15
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    15
+   ],
+   "core-dlgn-64x64x32-s0": [
+    2,
+    15
+   ]
+  },
+  {
+   "l_over_v_ms": 41.84,
+   "azimuth_deg": -19.5,
+   "teacher": [
+    3,
+    77
+   ],
+   "quantised_teacher": [
+    3,
+    76
+   ],
+   "core-hand-abc": [
+    3,
+    76
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    82
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    78
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    82
+   ]
+  },
+  {
+   "l_over_v_ms": 21.56,
+   "azimuth_deg": 6.9,
+   "teacher": [
+    2,
+    37
+   ],
+   "quantised_teacher": [
+    3,
+    36
+   ],
+   "core-hand-abc": [
+    3,
+    36
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    37
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    39
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    40
+   ]
+  },
+  {
+   "l_over_v_ms": 8.31,
+   "azimuth_deg": -27.9,
+   "teacher": [
+    2,
+    13
+   ],
+   "quantised_teacher": [
+    2,
+    12
+   ],
+   "core-hand-abc": [
+    2,
+    12
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    14
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    14
+   ],
+   "core-dlgn-64x64x32-s0": [
+    2,
+    14
+   ]
+  },
+  {
+   "l_over_v_ms": 105.18,
+   "azimuth_deg": 9.1,
+   "teacher": [
+    3,
+    208
+   ],
+   "quantised_teacher": [
+    3,
+    211
+   ],
+   "core-hand-abc": [
+    3,
+    211
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    220
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    214
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    220
+   ]
+  },
+  {
+   "l_over_v_ms": 53.81,
+   "azimuth_deg": -82.5,
+   "teacher": [
+    3,
+    101
+   ],
+   "quantised_teacher": [
+    3,
+    101
+   ],
+   "core-hand-abc": [
+    3,
+    101
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    107
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    107
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  },
+  {
+   "l_over_v_ms": 50.6,
+   "azimuth_deg": 4.7,
+   "teacher": [
+    3,
+    94
+   ],
+   "quantised_teacher": [
+    3,
+    94
+   ],
+   "core-hand-abc": [
+    3,
+    94
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    100
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    96
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    100
+   ]
+  },
+  {
+   "l_over_v_ms": 9.99,
+   "azimuth_deg": 16.7,
+   "teacher": [
+    2,
+    16
+   ],
+   "quantised_teacher": [
+    2,
+    15
+   ],
+   "core-hand-abc": [
+    2,
+    15
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    17
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    17
+   ],
+   "core-dlgn-64x64x32-s0": [
+    2,
+    17
+   ]
+  },
+  {
+   "l_over_v_ms": 13.0,
+   "azimuth_deg": 9.3,
+   "teacher": [
+    2,
+    21
+   ],
+   "quantised_teacher": [
+    2,
+    21
+   ],
+   "core-hand-abc": [
+    2,
+    21
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    23
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    23
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    23
+   ]
+  },
+  {
+   "l_over_v_ms": 19.38,
+   "azimuth_deg": 25.3,
+   "teacher": [
+    2,
+    33
+   ],
+   "quantised_teacher": [
+    3,
+    32
+   ],
+   "core-hand-abc": [
+    3,
+    32
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    34
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    34
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    35
+   ]
+  },
+  {
+   "l_over_v_ms": 48.8,
+   "azimuth_deg": 52.0,
+   "teacher": [
+    3,
+    96
+   ],
+   "quantised_teacher": [
+    3,
+    96
+   ],
+   "core-hand-abc": [
+    3,
+    96
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    96
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    96
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    96
+   ]
+  },
+  {
+   "l_over_v_ms": 136.87,
+   "azimuth_deg": 79.5,
+   "teacher": [
+    3,
+    303
+   ],
+   "quantised_teacher": [
+    3,
+    305
+   ],
+   "core-hand-abc": [
+    3,
+    305
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    293
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    293
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    293
+   ]
+  },
+  {
+   "l_over_v_ms": 10.62,
+   "azimuth_deg": -44.4,
+   "teacher": [
+    2,
+    17
+   ],
+   "quantised_teacher": [
+    2,
+    17
+   ],
+   "core-hand-abc": [
+    2,
+    17
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    18
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    18
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  },
+  {
+   "l_over_v_ms": 21.79,
+   "azimuth_deg": 5.9,
+   "teacher": [
+    3,
+    38
+   ],
+   "quantised_teacher": [
+    3,
+    37
+   ],
+   "core-hand-abc": [
+    3,
+    37
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    38
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    39
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    40
+   ]
+  },
+  {
+   "l_over_v_ms": 152.58,
+   "azimuth_deg": -56.8,
+   "teacher": [
+    3,
+    317
+   ],
+   "quantised_teacher": [
+    3,
+    316
+   ],
+   "core-hand-abc": [
+    3,
+    316
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    329
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    329
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    329
+   ]
+  },
+  {
+   "l_over_v_ms": 13.81,
+   "azimuth_deg": -22.5,
+   "teacher": [
+    2,
+    23
+   ],
+   "quantised_teacher": [
+    2,
+    23
+   ],
+   "core-hand-abc": [
+    2,
+    23
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    24
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    24
+   ],
+   "core-dlgn-64x64x32-s0": [
+    3,
+    25
+   ]
+  },
+  {
+   "l_over_v_ms": 80.05,
+   "azimuth_deg": -70.0,
+   "teacher": [
+    3,
+    154
+   ],
+   "quantised_teacher": [
+    3,
+    157
+   ],
+   "core-hand-abc": [
+    3,
+    157
+   ],
+   "core-dlgn-128x128x64-s0": [
+    3,
+    164
+   ],
+   "core-dlgn-256x256x128-s0": [
+    3,
+    164
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  },
+  {
+   "l_over_v_ms": 9.02,
+   "azimuth_deg": -76.3,
+   "teacher": [
+    2,
+    14
+   ],
+   "quantised_teacher": [
+    2,
+    14
+   ],
+   "core-hand-abc": [
+    2,
+    14
+   ],
+   "core-dlgn-128x128x64-s0": [
+    2,
+    15
+   ],
+   "core-dlgn-256x256x128-s0": [
+    2,
+    15
+   ],
+   "core-dlgn-64x64x32-s0": [
+    0,
+    null
+   ]
+  }
+ ]
+}

@@ -93,7 +93,50 @@ evaluate each variant in two ways: re-running the identical calibration
 procedure, and holding the measured thresholds fixed. The interpretation was
 written into the script before the results were computed.
 
-<!-- RESULT:controls -->
+Slots per side: `gf_lc4`, `gf_lplc2`, `par_lc4`, `par_lplc2` (measured: right
+2,580 / 2,220 / 8,807 / 2,294; left 3,782 / 2,642 / 11,817 / 2,899).
+
+### Recalibrated
+
+| Variant | Grid points satisfying C1–C3 (of 1,105) |
+| --- | ---: |
+| **measured wiring** | **89** |
+| permutations keeping `par_lc4` in place (5 of 5) | 63, 65, 79, 87, 100 |
+| permutations moving `par_lc4` (0 of 18) | 0 each |
+| of which: GF ↔ parallel swap | 0 |
+| of which: LC4 ↔ LPLC2 swap | 0 |
+| left/right symmetrised | 127 |
+
+The split is exact. A wrong wiring remains calibratable **if and only if** the
+largest count — LC4 input to the parallel candidates — stays in its slot; the
+other three counts can be exchanged freely and the free parameters absorb the
+difference. The five satisfiable permutations still change 4,163–9,322 of the
+65,536 table rows (6–14 %) and shift the takeoff tick of every train episode, but
+change the takeoff *mode* of at most 1 of 35.
+
+### Thresholds held at the measured calibration
+
+| | |
+| --- | --- |
+| Permutations still meeting C1–C3 | 1 of 23 (`gf_lplc2` ↔ `par_lplc2`, 313 table rows different) |
+| Table rows differing from the measured wiring | median 17,974 (range 313–30,315) of 65,536 |
+| Train episodes whose takeoff mode changes | median 21 (range 8–21) of 35 |
+| Constraint failing | C2 in 21 permutations, C3 in 18, C1 in none |
+| Left/right symmetrised | meets C1–C3; 4,541 table rows and 4 train modes differ |
+
+### Reading
+
+Against the interpretation written in advance: few permutations are satisfiable,
+so the measured counts do carry behavioural constraint that the three free
+parameters cannot absorb — but the constraint is narrow. Under C1–C3, the
+connectome contributes one ordinal fact: **the candidate parallel pathway is
+dominated by LC4 (velocity) input.** It does not pin down the giant fiber's own
+LC4/LPLC2 balance or the parallel pathway's LPLC2 count. With thresholds fixed,
+almost every wrong wiring breaks the literature-derived behaviour, so the
+measured counts and the calibrated thresholds are strongly coupled, but that
+coupling is not identifiable from qualitative targets alone. Stronger conclusions
+would need quantitative targets (recorded GF response timing, measured mode
+probabilities per `l/v`), which this repository does not have.
 
 ## Sealed family
 
@@ -108,7 +151,20 @@ decision table and checks it against the committed one, and records the hashes o
 every artifact the result depends on. It was run once, after the teacher,
 encoding, calibration and all circuits were frozen.
 
-<!-- RESULT:sealed -->
+Result (`circuits/loom-escape/sealed-evaluation.json`). The continuous teacher
+chose short-mode takeoff in 13 and long-mode takeoff in 35 of the 48 episodes.
+
+| Circuit | Escape agreement | Mode agreement | Mean \|Δ takeoff tick\| |
+| --- | ---: | ---: | ---: |
+| quantised teacher | 1.000 | 0.875 | 1.00 |
+| `core-hand-abc` (exact policy) | 1.000 | 0.875 | 1.00 |
+| core with DLGN 128-128-64 | 1.000 | 0.854 | 3.83 |
+| core with DLGN 256-256-128 | 1.000 | 0.792 | 3.42 |
+| core with DLGN 64-64-32 | 0.771 | 0.625 | 3.95 |
+
+The exact core again behaves identically to the quantised teacher, and its mode
+agreement on the sealed family (0.875) lies between the train (0.829) and holdout
+(0.905) figures, so the reported fidelity was not an artefact of the fixed families.
 
 The spec itself is not in the repository. Publishing it later lets anyone verify
 the digest and re-run the evaluation.
