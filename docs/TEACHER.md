@@ -45,10 +45,18 @@ pathway crosses when `V_P ≥ parallel_threshold`. The two eyes are OR-ed.
 Motor selection, per tick, for a standing fly outside its refractory period:
 
 * GF crosses and the wings are **not yet** raised → **short-mode takeoff**
-* GF crosses and the wings **are** raised → **long-mode takeoff**
-* only the parallel pathway crosses → continue the long-mode program (raise the
-  wings; after `wing_raise_ticks` consecutive ticks the wings count as raised)
+* only the parallel pathway crosses and the wings are not yet raised → continue
+  the long-mode program (the wings count as raised after `wing_raise_ticks`
+  consecutive ticks of it)
+* the wings **are** raised and either pathway still crosses → **long-mode
+  takeoff**; a GF crossing is not required, so a long-mode takeoff can be driven
+  by the parallel pathway alone
 * otherwise hold, and the wing program resets
+
+Because the wing program needs `wing_raise_ticks` (4 ticks, 20 ms) of sustained
+parallel-pathway drive, slow looms take off late or not at all: with the selected
+parameters the core takes off at about 47° (l/v 40 ms), 62° (80 ms) and 85°
+(150 ms), and holds for l/v of 300 ms and 1,000 ms.
 
 After a takeoff the machine is refractory for `refractory_ticks` ticks.
 
