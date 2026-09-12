@@ -166,5 +166,11 @@ The exact core again behaves identically to the quantised teacher, and its mode
 agreement on the sealed family (0.875) lies between the train (0.829) and holdout
 (0.905) figures, so the reported fidelity was not an artefact of the fixed families.
 
-The spec itself is not in the repository. Publishing it later lets anyone verify
-the digest and re-run the evaluation.
+The spec was published on 2026-09-13, after this evaluation, as
+`circuits/loom-escape/sealed-family.json`. Anyone can check its digest and re-run
+the evaluation:
+
+    python scripts/evaluate_sealed.py --spec circuits/loom-escape/sealed-family.json
+
+From that date the family is no longer sealed: any later change evaluated on it is
+an ordinary test, not a blind one.

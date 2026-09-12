@@ -1,6 +1,6 @@
 """Evaluate the frozen circuits on the pre-registered sealed stimulus family.
 
-    python scripts/evaluate_sealed.py --spec path/to/sealed-family.json
+    python scripts/evaluate_sealed.py --spec circuits/loom-escape/sealed-family.json
 
 The spec's SHA-256 must equal circuits/loom-escape/sealed-family.sha256, which
 was committed before the controls and before this evaluation. The result records

@@ -171,7 +171,7 @@ python scripts/train_dlgn.py --widths 128,128,64 --epochs 200 --seed 0
 
 **这是果蝇大脑吗？** 不是。这是一条反射的最小确定性模型，简化与不主张的内容列在 [docs/LIMITATIONS.md](docs/LIMITATIONS.md)。
 
-**`verify.sh` 没跑哪些东西？** DLGN 训练、对照实验（约 25 分钟）和密封评估（需要尚未公开的密封刺激规格）需要单独运行。
+**`verify.sh` 没跑哪些东西？** DLGN 训练、对照实验（约 25 分钟）和密封评估（`python scripts/evaluate_sealed.py --spec circuits/loom-escape/sealed-family.json`；规格已在唯一一次评估之后公开，此后在它上面的评估不再是盲测）需要单独运行。
 
 ## 研究基础
 
