@@ -3,7 +3,8 @@
 **Connectome-constrained circuit synthesis: from the fruit-fly giant-fiber escape
 pathway to exhaustively verified NAND/LATCH netlists that run on chain.**
 
-[中文说明](README.zh-CN.md)
+[中文说明](README.zh-CN.md) · [Live demo](https://brucelanlan.github.io/c3s-reflex-circuits/demo/) ·
+[Release v0.1.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.1.0)
 
 This repository asks a narrow question: *if a behaviour is shaped by measured
 wiring, how small a deterministic machine reproduces it, and how much of that
@@ -21,19 +22,22 @@ MaleCNS v1.0 connectome ─► explicit teacher model ─► 16-bit decision tab
 
 ## Web demo
 
-[`docs/demo/index.html`](docs/demo/index.html) is a voxel-world bench for the
+The [live demo](https://brucelanlan.github.io/c3s-reflex-circuits/demo/)
+([`docs/demo/index.html`](docs/demo/index.html)) is a voxel-world bench for the
 escape core: launch a looming block at a fly, and the page quantises what each eye
-sees into the 16 input bits and evaluates the 173-NAND + 6-LATCH netlist cell by
-cell in the browser, showing the pathway lamps, the latches and the motor command at
-every 5 ms tick. On load it checks the netlist's SHA-256 and replays reference
-episodes from the Python build.
+sees into the 16 input bits and evaluates the 173-NAND + 6-LATCH netlist
+([`core-hand-abc`](circuits/loom-escape/core-hand-abc.json)) cell by cell in the
+browser, showing the pathway lamps, the latches and the motor command at every
+5 ms tick. On load it checks the netlist's SHA-256 and replays reference episodes
+from the Python build.
+
+To run it locally:
 
 ```sh
 python -m http.server -d docs 8000     # then open http://localhost:8000/demo/
 ```
 
-With GitHub Pages serving `main` → `/docs`, the same page is at
-`https://brucelanlan.github.io/c3s-reflex-circuits/demo/`.
+GitHub Pages serves the page from `main` → `/docs`.
 `python scripts/build_demo.py` re-embeds the circuits after a rebuild.
 
 ## Results at a glance

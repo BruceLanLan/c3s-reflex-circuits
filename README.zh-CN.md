@@ -20,10 +20,10 @@ MaleCNS v1.0 连接组 ─► 显式教师模型 ─► 16 位决策表
 
 ## 在线演示
 
-[`docs/demo/index.html`](docs/demo/index.html) 是一个方块世界里的逃逸反射实验台：向果蝇发射一个逼近的方块，页面把每只眼看到的角大小和扩张速度量化成 16 个输入位，在浏览器里逐个单元求值 173 NAND + 6 LATCH 的核心网表，每 5 ms 一拍显示通路指示灯、锁存器和运动指令，并在结束时与连续教师模型的结果对照。
+[在线演示](https://brucelanlan.github.io/c3s-reflex-circuits/demo/)（源文件 [`docs/demo/index.html`](docs/demo/index.html)）是一个方块世界里的逃逸反射实验台：向果蝇发射一个逼近的方块，页面把每只眼看到的角大小和扩张速度量化成 16 个输入位，在浏览器里逐个单元求值 173 NAND + 6 LATCH 的核心网表（[`core-hand-abc`](circuits/loom-escape/core-hand-abc.json)），每 5 ms 一拍显示通路指示灯、锁存器和运动指令，并在结束时与连续教师模型的结果对照。
 
 * 本地打开：`python -m http.server -d docs 8000`，然后访问 <http://localhost:8000/demo/>。
-* GitHub Pages 开启（`main` 分支、`/docs` 目录）后，地址是 `https://brucelanlan.github.io/c3s-reflex-circuits/demo/`。
+* 线上地址：<https://brucelanlan.github.io/c3s-reflex-circuits/demo/>（GitHub Pages，`main` 分支、`/docs` 目录）。
 * 页面每次加载都会核对嵌入网表的 SHA-256，并回放 Python 构建写入的参考回合；不一致会直接显示在页面上。
 * 页面里的 JavaScript 求值器已在完整定义域上与 Python 求值器、tapeout.net 公开求值器逐字节对照（见 [docs/CIRCUITS.md](docs/CIRCUITS.md#in-browser-evaluator-docsdemo)）。
 

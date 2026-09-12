@@ -378,6 +378,7 @@
     <section class="block" aria-labelledby="h-circuit">
       <h2 class="label" id="h-circuit"><span data-i18n="circuit">Netlist in this page</span></h2>
       <dl class="facts">
+        <dt data-i18n="manifest">Manifest</dt><dd><a id="fact-manifest" href="https://github.com/BruceLanLan/c3s-reflex-circuits/tree/main/circuits/loom-escape">—</a> <span data-i18n="builtOn">built on</span> <a id="fact-policy" href="https://github.com/BruceLanLan/c3s-reflex-circuits/tree/main/circuits/loom-escape">—</a></dd>
         <dt data-i18n="cells">Cells</dt><dd id="fact-cells">—</dd>
         <dt data-i18n="size">Size</dt><dd id="fact-bytes">—</dd>
         <dt data-i18n="layout">Layout</dt><dd>NAND 0x00 · LATCH 0x01 · u24</dd>
@@ -487,7 +488,7 @@ window.C3SNetlist = (() => {
       eyes: "Circuit inputs", eyesNote: "16 bits, LSB first", sizeBin: "size bin", speedBin: "speed bin",
       pathways: "Policy outputs", gf: "Giant fiber", par: "Parallel DNs",
       motor: "Motor core", raise: "Wing-raise counter", refr: "Refractory timer",
-      circuit: "Netlist in this page", cells: "Cells", size: "Size", layout: "Layout",
+      circuit: "Netlist in this page", manifest: "Manifest", builtOn: "built on", cells: "Cells", size: "Size", layout: "Layout",
       checkingHash: "Checking the embedded netlist hash…", checkingReplay: "Replaying reference episodes…",
       foot1: "Every tick: the block's angular size and expansion speed are quantised per eye into 16 bits, the netlist is evaluated cell by cell, and its six latches carry the wing program and refractory state to the next tick.",
       repo: "Source, proofs and docs", author: "Author",
@@ -517,7 +518,7 @@ window.C3SNetlist = (() => {
       eyes: "电路输入", eyesNote: "16 位，低位在前", sizeBin: "大小分箱", speedBin: "速度分箱",
       pathways: "策略电路输出", gf: "巨纤维", par: "并行下行神经元",
       motor: "运动核心", raise: "抬翅计数器", refr: "不应期计时器",
-      circuit: "本页运行的网表", cells: "单元", size: "大小", layout: "字节布局",
+      circuit: "本页运行的网表", manifest: "清单文件", builtOn: "基于策略电路", cells: "单元", size: "大小", layout: "字节布局",
       checkingHash: "正在核对嵌入网表的哈希…", checkingReplay: "正在回放参考回合…",
       foot1: "每一拍：方块在每只眼里的角大小和扩张速度被量化成 16 位，网表逐个单元求值，6 个锁存器把抬翅进度和不应期带到下一拍。",
       repo: "源码、证明与文档", author: "作者",
@@ -633,6 +634,12 @@ window.C3SNetlist = (() => {
   };
   const setLamps = (arr, v) => arr.forEach((l, i) => l.classList.toggle("on", ((v >>> i) & 1) === 1));
 
+  // Name the committed manifests this page runs, so the netlist can be traced to its proofs.
+  const MANIFESTS = "https://github.com/BruceLanLan/c3s-reflex-circuits/blob/main/circuits/loom-escape/";
+  for (const [id, entry] of [["fact-manifest", DATA.core], ["fact-policy", DATA.policy]]) {
+    $(id).textContent = `${entry.name}.json`;
+    $(id).href = `${MANIFESTS}${entry.name}.json`;
+  }
   $("fact-cells").textContent = `${DATA.core.metrics.nand} NAND · ${DATA.core.metrics.latch} LATCH · depth ${DATA.core.metrics.depth}`;
   $("fact-bytes").textContent = `${core.bytes.toLocaleString("en-US")} bytes`;
   $("fact-sha").textContent = DATA.core.sha256;
