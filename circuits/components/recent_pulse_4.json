@@ -1,0 +1,24 @@
+{
+ "format": "c3s.circuit/1",
+ "name": "recent_pulse_4",
+ "summary": "pulse seen within the last 4 ticks (inclusive of the current tick)",
+ "inputs": [
+  "pulse"
+ ],
+ "outputs": [
+  "recent"
+ ],
+ "n_state": 3,
+ "metrics": {
+  "nand": 9,
+  "latch": 3,
+  "ref": 0,
+  "cells": 12,
+  "bytes": 75,
+  "depth": 6
+ },
+ "reference_rows_checked": 16,
+ "reference_mismatches": 0,
+ "netlist_sha256": "d394a776069be919e39de9c25f4785915bea2f39c6c3061ca7f390fdc5d932d5",
+ "tapeout_netlist_hex": "0x01000002010000030100000400000002000002000000030000030000000600000700000008000008000000040000040000000900000a0000000b00000b000000050000050000000c00000d"
+}

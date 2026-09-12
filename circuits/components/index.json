@@ -1,0 +1,212 @@
+[
+ {
+  "name": "argmax_3x3",
+  "summary": "index of the largest of 3 3-bit values (ties -> lowest index)",
+  "n_state": 0,
+  "metrics": {
+   "nand": 96,
+   "latch": 0,
+   "ref": 0,
+   "cells": 96,
+   "bytes": 672,
+   "depth": 36
+  },
+  "reference_rows_checked": 512,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "argmax_4x2",
+  "summary": "index of the largest of 4 2-bit values (ties -> lowest index)",
+  "n_state": 0,
+  "metrics": {
+   "nand": 104,
+   "latch": 0,
+   "ref": 0,
+   "cells": 104,
+   "bytes": 728,
+   "depth": 42
+  },
+  "reference_rows_checked": 256,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "laterality_max2_w3",
+  "summary": "reduce two 3-bit eye channels to max magnitude + side bit (1 = second input wins)",
+  "n_state": 0,
+  "metrics": {
+   "nand": 49,
+   "latch": 0,
+   "ref": 0,
+   "cells": 49,
+   "bytes": 343,
+   "depth": 18
+  },
+  "reference_rows_checked": 64,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "laterality_max2_w4",
+  "summary": "reduce two 4-bit eye channels to max magnitude + side bit (1 = second input wins)",
+  "n_state": 0,
+  "metrics": {
+   "nand": 65,
+   "latch": 0,
+   "ref": 0,
+   "cells": 65,
+   "bytes": 455,
+   "depth": 22
+  },
+  "reference_rows_checked": 256,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "popcount_15",
+  "summary": "number of set bits among 15 inputs",
+  "n_state": 0,
+  "metrics": {
+   "nand": 200,
+   "latch": 0,
+   "ref": 0,
+   "cells": 200,
+   "bytes": 1400,
+   "depth": 28
+  },
+  "reference_rows_checked": 32768,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "popcount_8",
+  "summary": "number of set bits among 8 inputs",
+  "n_state": 0,
+  "metrics": {
+   "nand": 87,
+   "latch": 0,
+   "ref": 0,
+   "cells": 87,
+   "bytes": 609,
+   "depth": 19
+  },
+  "reference_rows_checked": 256,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "recent_pulse_4",
+  "summary": "pulse seen within the last 4 ticks (inclusive of the current tick)",
+  "n_state": 3,
+  "metrics": {
+   "nand": 9,
+   "latch": 3,
+   "ref": 0,
+   "cells": 12,
+   "bytes": 75,
+   "depth": 6
+  },
+  "reference_rows_checked": 16,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "recent_pulse_8",
+  "summary": "pulse seen within the last 8 ticks (inclusive of the current tick)",
+  "n_state": 7,
+  "metrics": {
+   "nand": 21,
+   "latch": 7,
+   "ref": 0,
+   "cells": 28,
+   "bytes": 175,
+   "depth": 14
+  },
+  "reference_rows_checked": 256,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "refractory_hold3_w2",
+  "summary": "lets a trigger through, then blocks for 3 ticks",
+  "n_state": 2,
+  "metrics": {
+   "nand": 24,
+   "latch": 2,
+   "ref": 0,
+   "cells": 26,
+   "bytes": 176,
+   "depth": 8
+  },
+  "reference_rows_checked": 8,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "refractory_hold5_w3",
+  "summary": "lets a trigger through, then blocks for 5 ticks",
+  "n_state": 3,
+  "metrics": {
+   "nand": 37,
+   "latch": 3,
+   "ref": 0,
+   "cells": 40,
+   "bytes": 271,
+   "depth": 10
+  },
+  "reference_rows_checked": 16,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "saturating_counter_w3",
+  "summary": "3-bit saturating event counter with synchronous clear",
+  "n_state": 3,
+  "metrics": {
+   "nand": 39,
+   "latch": 3,
+   "ref": 0,
+   "cells": 42,
+   "bytes": 285,
+   "depth": 11
+  },
+  "reference_rows_checked": 32,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "saturating_counter_w4",
+  "summary": "4-bit saturating event counter with synchronous clear",
+  "n_state": 4,
+  "metrics": {
+   "nand": 52,
+   "latch": 4,
+   "ref": 0,
+   "cells": 56,
+   "bytes": 380,
+   "depth": 13
+  },
+  "reference_rows_checked": 64,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "threshold_ge100_w8",
+  "summary": "x >= 100 for a 8-bit unsigned x",
+  "n_state": 0,
+  "metrics": {
+   "nand": 35,
+   "latch": 0,
+   "ref": 0,
+   "cells": 35,
+   "bytes": 245,
+   "depth": 25
+  },
+  "reference_rows_checked": 256,
+  "reference_mismatches": 0
+ },
+ {
+  "name": "threshold_ge5_w4",
+  "summary": "x >= 5 for a 4-bit unsigned x",
+  "n_state": 0,
+  "metrics": {
+   "nand": 16,
+   "latch": 0,
+   "ref": 0,
+   "cells": 16,
+   "bytes": 112,
+   "depth": 12
+  },
+  "reference_rows_checked": 16,
+  "reference_mismatches": 0
+ }
+]

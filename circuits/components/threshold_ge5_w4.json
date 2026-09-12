@@ -1,0 +1,27 @@
+{
+ "format": "c3s.circuit/1",
+ "name": "threshold_ge5_w4",
+ "summary": "x >= 5 for a 4-bit unsigned x",
+ "inputs": [
+  "x[0]",
+  "x[1]",
+  "x[2]",
+  "x[3]"
+ ],
+ "outputs": [
+  "above"
+ ],
+ "n_state": 0,
+ "metrics": {
+  "nand": 16,
+  "latch": 0,
+  "ref": 0,
+  "cells": 16,
+  "bytes": 112,
+  "depth": 12
+ },
+ "reference_rows_checked": 16,
+ "reference_mismatches": 0,
+ "netlist_sha256": "892ce4c3abbe161de1e6f9b12898f1309dcf5511bab8b779738497ae6a229e45",
+ "tapeout_netlist_hex": "0x00000002000002000000060000060000000300000300000007000008000000090000090000000a00000a0000000800000b000000040000040000000d00000d0000000c00000e0000000f00000f0000000500000500000010000011000000120000120000001300001300000011000014"
+}
