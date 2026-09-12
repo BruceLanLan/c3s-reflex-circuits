@@ -340,9 +340,9 @@ class Outcome:
     size_at_takeoff_deg: float | None
 
 
-def _episode(stim: Stimulus, p: TeacherParams, pathways) -> Outcome:
+def _episode(stim: Stimulus, p: TeacherParams, pathways, samples: list[tuple[float, float]] | None = None) -> Outcome:
     raise_count = refr = 0
-    for i, (th, dth) in enumerate(stimulus_samples(stim, p)):
+    for i, (th, dth) in enumerate(stimulus_samples(stim, p) if samples is None else samples):
         gf_any, par_any = pathways(th, dth)
         action = select_action(gf_any, par_any, 1, int(raise_count >= p.wing_raise_ticks), int(refr > 0))
         out, raise_count, refr = core_step(action, raise_count, refr, p)
@@ -351,8 +351,10 @@ def _episode(stim: Stimulus, p: TeacherParams, pathways) -> Outcome:
     return Outcome(CORE_HOLD, None, None)
 
 
-def run_teacher_episode(stim: Stimulus, w: dict[str, Weights], p: TeacherParams) -> Outcome:
-    """Continuous (unquantised) teacher."""
+def run_teacher_episode(
+    stim: Stimulus, w: dict[str, Weights], p: TeacherParams, samples: list[tuple[float, float]] | None = None
+) -> Outcome:
+    """Continuous (unquantised) teacher. `samples` replaces the stimulus geometry when given."""
     see = dict(zip(("L", "R"), visible(stim.azimuth_deg)))
 
     def pathways(th: float, dth: float) -> tuple[bool, bool]:
@@ -365,7 +367,7 @@ def run_teacher_episode(stim: Stimulus, w: dict[str, Weights], p: TeacherParams)
                     par_any |= bool(q[0] >= p.parallel_threshold)
         return gf_any, par_any
 
-    return _episode(stim, p, pathways)
+    return _episode(stim, p, pathways, samples)
 
 
 def run_quantized_teacher_episode(stim: Stimulus, table: DecisionTable) -> Outcome:

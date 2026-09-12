@@ -58,7 +58,9 @@ def main() -> None:
     episodes = []
     for lv, az in EPISODES:
         stim = loom.Stimulus(lv, az)
-        samples = loom.stimulus_samples(stim, p)
+        # Rounded to 6 decimals: the raw samples differ in the last ulp between maths
+        # libraries, and the page's reference values are computed from exactly these.
+        samples = [(round(th, 6), round(dth, 6)) for th, dth in loom.stimulus_samples(stim, p)]
         state, ticks = 0, []
         for th, dth in samples:
             x = loom.encode_features(th, dth, az, enc) | (1 << nf)
@@ -67,9 +69,8 @@ def main() -> None:
             ticks.append([x, motor, state])
             if motor in (loom.CORE_SHORT, loom.CORE_LONG):
                 break
-        teacher = loom.run_teacher_episode(stim, weights, p)
-        # The samples are embedded because libm and V8 can differ in the last ulp; the page
-        # checks its encoding and teacher on exactly these values.
+        teacher = loom.run_teacher_episode(stim, weights, p, samples)
+        # The page checks its encoding and teacher on exactly these samples.
         episodes.append({
             "lv": lv,
             "azimuth": az,
