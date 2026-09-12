@@ -1,0 +1,136 @@
+# C3S Reflex Circuits
+
+**Connectome-constrained circuit synthesis: from the fruit-fly giant-fiber escape
+pathway to exhaustively verified NAND/LATCH netlists that run on chain.**
+
+[中文说明](README.zh-CN.md)
+
+This repository asks a narrow question: *if a behaviour is shaped by measured
+wiring, how small a deterministic machine reproduces it, and how much of that
+machine can be proven rather than trusted?* It does not put a brain on chain. It
+takes one reflex — looming-evoked escape, gated by the giant fiber — and carries it
+through five layers of evidence, each checked against the one before it.
+
+```
+MaleCNS v1.0 connectome ─► explicit teacher model ─► 16-bit decision table
+      (measured)              (cited + assumed)          (65,536 rows)
+                                                              │
+             EVM / TapeOut-layout netlist ◄─ NAND+LATCH core ◄─┘
+                (public, replayable)          (exhaustively equivalent)
+```
+
+## Results at a glance
+
+| | |
+| --- | --- |
+| **Measured wiring** | LC4 + LPLC2 provide 99.61 % (right) and 99.86 % (left) of the giant fibers' visual-projection input synapses in MaleCNS v1.0 — but only 25.8 % of all their input synapses |
+| **Policy circuit** | 16 sensory bits → 2 pathway bits in **74 NAND**, depth 11, exactly equal to the teacher on all 65,536 inputs |
+| **Stateful escape core** | **173 NAND + 6 LATCH** (1,235 bytes); step relation equal to its specification on all 8,388,608 (input, state) rows |
+| **Behaviour vs continuous teacher** | escape agreement 1.00; short/long-mode agreement 0.83 (train) and 0.90 (holdout); takeoff within ~1 tick (5 ms) |
+| **EVM** | full-domain differential test of 18 circuits passes; one tick of the core costs ~370k gas on the reference evaluator |
+| **TapeOut byte layout** | cross-checked against the public tapeout.net decoder and evaluator: 0 mismatches over 4,800 random ticks and the final circuits |
+| **Learned circuits (DLGN)** | 67–90 % row accuracy at 216–1,340 NAND: on a fully tabulable function, exact synthesis wins |
+| **Controls** | <!-- RESULT:readme-controls --> |
+| **Sealed family** | <!-- RESULT:readme-sealed --> |
+| **Reproducibility** | two from-scratch builds are byte-identical; `scripts/verify.sh` re-checks everything |
+
+## Evidence ladder
+
+Each layer answers a different question, and none can stand in for another.
+
+| Layer | Question | Where |
+| --- | --- | --- |
+| **L0** Biological provenance | Which cells, synapses and release files? | [docs/CONNECTOME.md](docs/CONNECTOME.md), `data/` |
+| **L1** Executable teacher | Which equations, which parameters, where does each come from? | [docs/TEACHER.md](docs/TEACHER.md), `c3s/loom.py` |
+| **L2** Hard circuit | Which gates, how many, how deep? | [docs/CIRCUITS.md](docs/CIRCUITS.md), `circuits/` |
+| **L3** Equivalence | Is every circuit exactly its specification? | [docs/CIRCUITS.md](docs/CIRCUITS.md#how-equivalence-is-established) |
+| **L4** Public machine | Can anyone replay it on an EVM? | `contracts/`, [docs/CIRCUITS.md](docs/CIRCUITS.md#evm-contracts-contracts) |
+
+Behavioural fidelity, controls and the sealed test are in
+[docs/EVALUATION.md](docs/EVALUATION.md). What is simplified, assumed or not
+claimed is in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
+
+## How it works
+
+1. **Connectome (L0).** From the pinned MaleCNS v1.0 release, extract the LC4 and
+   LPLC2 inputs to both giant fibers (`DNp01`) and to a candidate parallel set of
+   descending neurons. The connectome contributes the *ratio* of looming-speed to
+   looming-size drive in each pathway: about 1.2–1.4 : 1 onto the giant fiber and
+   3.8–4.1 : 1 onto the parallel candidates.
+2. **Teacher (L1).** Each pathway's drive is a linear speed term plus a Gaussian
+   size term (the form reported by Ache et al. 2019), weighted by those synapse
+   counts. The giant fiber crossing threshold before the wings are raised selects a
+   short-mode takeoff; otherwise the parallel pathway drives the long-mode program
+   (the timing mechanism of von Reyn et al. 2014). Three free parameters are
+   calibrated against literature-derived constraints on a training stimulus family.
+3. **Encoding.** Each eye reports angular size and expansion speed as 4-bit
+   logarithmic bins: 16 input bits (**LoomEscape-16**).
+4. **Circuits (L2).** A readable hand-written policy (per-eye threshold staircases),
+   ABC-optimised versions, circuits learned with differentiable logic gate networks,
+   and a stateful core that adds the motor state machine in six latches.
+5. **Proof (L3).** Every circuit is checked over its complete domain by a
+   bit-sliced evaluator; ABC is treated as untrusted; two independent Python
+   evaluators and the EVM evaluator must agree.
+6. **Chain (L4).** `NandMachine` evaluates any netlist in the TapeOut byte layout;
+   `ReflexCore` holds one escape core with independent latch state per caller and
+   no admin.
+
+## Repository layout
+
+```
+c3s/            netlist IR and codec, exhaustive evaluator, components, connectome
+                extraction, teacher, calibration, reflex circuits, ABC bridge, DLGN
+scripts/        extraction, build, encoding comparison, DLGN training, controls,
+                sealed evaluation, fixture export, verify.sh
+data/           derived connectome aggregate (CC-BY source)
+circuits/       every circuit as a manifest: metrics, SHA-256, netlist bytes, evidence
+contracts/      NandMachine and ReflexCore (Solidity) with Foundry tests
+docs/           connectome, teacher, circuits, evaluation, limitations, references
+tests/          pytest suite (50 tests)
+```
+
+## Reproduce
+
+Requirements: Python ≥ 3.10 with `numpy`, `torch`, `pytest` (plus `pyarrow` and
+`pandas` to re-extract the connectome), Yosys (for `yosys-abc`), Foundry.
+
+```sh
+pip install -e ".[dev,learn,connectome]"
+scripts/verify.sh          # tests, full rebuild, byte-for-byte artifact check, EVM suite
+scripts/verify.sh --full   # also re-download and re-extract the MaleCNS subgraph (~1.1 GB)
+```
+
+Individual stages:
+
+```sh
+python scripts/extract_connectome.py      # L0
+python scripts/build_loom_escape.py       # L1–L3: calibration, table, circuits, cores
+python scripts/train_dlgn.py --widths 128,128,64
+python scripts/run_controls.py
+python scripts/export_evm_fixtures.py && (cd contracts && forge test)
+```
+
+## Research basis
+
+* **Connectome.** MaleCNS v1.0 (Berg et al., *Cell* 2026), produced by the FlyEM
+  team at HHMI Janelia with the University of Cambridge, the MRC Laboratory of
+  Molecular Biology and **Google Research**, whose flood-filling networks performed
+  the automated segmentation.
+* **Escape circuit.** Ache et al. 2019 (LC4 velocity and LPLC2 size inputs to the
+  giant fiber); von Reyn et al. 2014 (spike timing selects takeoff mode) and 2017
+  (linear feature integration).
+* **Logic learning.** Deep differentiable logic gate networks (Petersen, Borgelt,
+  Kuehne and Deussen, NeurIPS 2022, arXiv:2210.08277), re-implemented here; and
+  **Google Research**'s differentiable logic cellular automata (Miotti, Niklasson,
+  Randazzo and Mordvintsev, 2025), which first trained such gates in recurrent,
+  stateful circuits.
+* **Limits.** Scheffer & Meinertzhagen 2021 (*A connectome is not enough*); Pospisil
+  et al. 2024 (connectome as a prior for causal models).
+
+Full list: [docs/REFERENCES.md](docs/REFERENCES.md).
+
+## Licence and notices
+
+Code: Apache-2.0 ([LICENSE](LICENSE)). The connectome aggregate derives from
+CC-BY data and must be attributed. The DLGN method's reference implementation
+carries a "Patent pending" notice. See [NOTICE](NOTICE).
