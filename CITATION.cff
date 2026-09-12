@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use these circuits, tools or results, please cite this repository, and cite the MaleCNS v1.0 connectome it derives from (see docs/REFERENCES.md)."
+title: "C3S Reflex Circuits: connectome-constrained synthesis of the fly giant-fiber escape reflex as verified NAND/LATCH netlists"
+type: software
+authors:
+  - alias: BruceBlue
+    website: "https://github.com/BruceLanLan"
+repository-code: "https://github.com/BruceLanLan/c3s-reflex-circuits"
+license: Apache-2.0
+version: 0.1.0
+keywords:
+  - connectome
+  - Drosophila
+  - giant fiber
+  - logic synthesis
+  - NAND
+  - EVM
+  - differentiable logic gate networks

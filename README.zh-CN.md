@@ -70,7 +70,7 @@ x = loom.encode_features(40.0, 900.0, -20.0)  # 张角 40°、扩张 900°/s、�
 print("巨纤维", outs[x] & 1, "并行通路", outs[x] >> 1 & 1)
 ```
 
-完整复现（重建所有产物、逐字节核对、跑 EVM 测试）需要 Yosys（提供 `yosys-abc`）和 Foundry：
+完整复现（重建所有产物、逐字节核对、跑 EVM 测试）需要 Yosys 0.68（提供 `yosys-abc`）和 Foundry 1.8.1。已提交的产物是用 Yosys 0.68 与 CPU 版 torch 2.14 构建的；换了 ABC 版本可能综合出不同但等价的网表，此时穷举等价检查照常通过，只有逐字节核对会失败。每次推送，`.github/workflows/verify.yml` 会在干净机器上跑测试、逐字节重建 EVM 测试数据与演示数据，并跑 Foundry 全域差分测试。
 
 ```sh
 pip install -e ".[dev,learn,connectome]"

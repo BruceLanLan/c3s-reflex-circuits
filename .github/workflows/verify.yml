@@ -1,0 +1,93 @@
+# Re-runs the repository's checks on a clean machine.
+#
+#   test         unit and exhaustive tests (the ABC-dependent test skips here)
+#   reproduce    rebuilds the EVM fixtures and the demo data byte for byte, then runs
+#                the Foundry suite, including the full-domain differential test
+#   verify-full  scripts/verify.sh end to end with a pinned OSS CAD Suite build.
+#                Informational: another ABC build may synthesise a different but
+#                equivalent netlist, which fails only the byte comparison
+#                (docs/LIMITATIONS.md).
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit and exhaustive tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[dev]"
+      - name: pytest
+        run: python -m pytest -q
+
+  reproduce:
+    name: Fixtures, demo data and EVM suite
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: python -m pip install -e .
+      - name: Rebuild EVM fixtures and demo data
+        run: |
+          python scripts/export_evm_fixtures.py
+          python scripts/build_demo.py
+      - name: Committed files must be reproduced byte for byte
+        run: git diff --exit-code -- contracts/test/fixtures docs/demo
+      - uses: foundry-rs/foundry-toolchain@v1.9.1
+        with:
+          version: v1.8.1
+      - name: Foundry suite
+        working-directory: contracts
+        run: |
+          forge install foundry-rs/forge-std@v1.16.2 --no-git
+          forge test
+
+  verify-full:
+    name: Full verify.sh with Yosys 0.68 (informational)
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[dev]"
+      - uses: YosysHQ/setup-oss-cad-suite@v4
+        with:
+          version: "2026-09-08"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: foundry-rs/foundry-toolchain@v1.9.1
+        with:
+          version: v1.8.1
+      - name: Tool versions
+        run: |
+          yosys -V
+          command -v yosys-abc
+          python --version
+          forge --version
+      - name: verify.sh
+        env:
+          PYTHON: python
+        run: scripts/verify.sh

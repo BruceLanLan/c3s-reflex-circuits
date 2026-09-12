@@ -171,6 +171,8 @@ storage would remove most of the read cost; that optimisation is not implemented
 
 ## Reproducing
 
+With Yosys 0.68 (`yosys-abc`) and Foundry 1.8.1:
+
 ```sh
 python scripts/build_loom_escape.py     # teacher, table, policies, cores, manifests
 python scripts/export_components.py

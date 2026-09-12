@@ -39,6 +39,10 @@
 * **On-chain cost** is measured only for the EVM evaluator in this repository
   (about 370k gas per tick). TapeOut protocol fees and limits were not checked.
 * **REF composition** is decoded and simulated but not exercised by any circuit.
+* **Byte identity depends on tool versions.** Artifacts reproduce byte for byte with
+  Yosys 0.68 and torch 2.14 (CPU). Another ABC release may synthesise a different
+  but equivalent netlist: the exhaustive equivalence checks still gate the build,
+  but the byte comparison in `scripts/verify.sh` would then fail.
 
 ## Falsification criteria
 

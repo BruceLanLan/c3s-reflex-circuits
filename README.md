@@ -110,7 +110,10 @@ tests/          pytest suite
 ## Reproduce
 
 Requirements: Python ≥ 3.10 with `numpy`, `torch`, `pytest` (plus `pyarrow` and
-`pandas` to re-extract the connectome), Yosys (for `yosys-abc`), Foundry.
+`pandas` to re-extract the connectome), Yosys 0.68 (for `yosys-abc`) and Foundry
+1.8.1 (solc 0.8.28). The committed artifacts were built with Yosys 0.68 and torch
+2.14 on CPU; byte-for-byte identity is asserted for those versions (see
+[LIMITATIONS](docs/LIMITATIONS.md#known-limitations-of-the-circuits-and-evaluation)).
 
 ```sh
 pip install -e ".[dev,learn,connectome]"
@@ -127,6 +130,26 @@ python scripts/train_dlgn.py --widths 128,128,64
 python scripts/run_controls.py
 python scripts/export_evm_fixtures.py && (cd contracts && forge test)
 ```
+
+`.github/workflows/verify.yml` repeats this on a clean machine for every push: the
+test suite, a byte-for-byte rebuild of the EVM fixtures and the demo data, and the
+Foundry suite including the full-domain differential test. A third job runs the
+whole of `scripts/verify.sh` with Yosys 0.68 and reports, without gating, whether
+the ABC-produced netlists also reproduce byte for byte there.
+
+## Common tasks
+
+| Task | Where to start |
+| --- | --- |
+| Add a reusable component | Write a builder and a Python reference model in `c3s/components.py` and register it in `CATALOG`. `tests/test_components.py` checks it over its whole (input, state) domain; `scripts/export_evm_fixtures.py` adds it to the EVM differential test. |
+| Change the encoding | Add an `Encoding` in `c3s/loom.py` and to `CANDIDATES` in `scripts/compare_encodings.py`. The script refuses a `DEFAULT_ENCODING` that its train-only selection rule does not pick. |
+| Change the teacher | Equations are `drives`, `select_action` and `core_step` in `c3s/loom.py`; calibration is `c3s/calibrate.py`; the source of every parameter is in [docs/TEACHER.md](docs/TEACHER.md). |
+| Train a learned circuit | `python scripts/train_dlgn.py --widths 128,128,64` writes `circuits/loom-escape/dlgn-128x128x64-s0.json`. |
+| Use a circuit on chain | Every manifest carries `tapeout_netlist_hex`; `contracts/src/NandMachine.sol` evaluates any such netlist and `contracts/src/ReflexCore.sol` holds one core with per-caller state. Usage is in `contracts/test/`. |
+| Update the web demo | `python scripts/build_demo.py` after a rebuild. |
+
+Any change to the teacher, the encoding or the calibration voids the one-time sealed
+evaluation ([docs/EVALUATION.md](docs/EVALUATION.md)).
 
 ## Research basis
 
