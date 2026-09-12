@@ -71,6 +71,11 @@ scripts/verify.sh --full   # 另外重新下载并抽取 MaleCNS 子图（约 1.
 * **逻辑学习。** 深度可微逻辑门网络（Petersen、Borgelt、Kuehne、Deussen，NeurIPS 2022，arXiv:2210.08277），本仓库独立重新实现；以及 **Google Research** 的可微逻辑元胞自动机（Miotti、Niklasson、Randazzo、Mordvintsev，2025），首次在带状态的循环电路中训练这类逻辑门。
 * **边界。** Scheffer 与 Meinertzhagen 2021（《连接组是不够的》）；Pospisil 等 2024（以连接组为先验估计因果模型）。
 
+## 作者与联系方式
+
+作者：[BruceBlue](https://github.com/BruceLanLan) · 联系：X
+[@BruceBlue](https://x.com/BruceBlue)
+
 ## 许可与声明
 
 代码：Apache-2.0。连接组聚合数据来自 CC-BY 数据集，使用时须署名。DLGN 方法的参考实现声明了“Patent pending”。详见 [NOTICE](NOTICE)。

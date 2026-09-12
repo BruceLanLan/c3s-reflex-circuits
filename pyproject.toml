@@ -9,7 +9,12 @@ description = "Connectome-constrained circuit synthesis: from a fly escape pathw
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
+authors = [{ name = "BruceBlue" }]
 dependencies = ["numpy>=1.26"]
+
+[project.urls]
+Author = "https://github.com/BruceLanLan"
+Contact = "https://x.com/BruceBlue"
 
 [project.optional-dependencies]
 connectome = ["pyarrow>=15", "pandas>=2"]

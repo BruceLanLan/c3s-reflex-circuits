@@ -129,6 +129,11 @@ python scripts/export_evm_fixtures.py && (cd contracts && forge test)
 
 Full list: [docs/REFERENCES.md](docs/REFERENCES.md).
 
+## Author and contact
+
+Author: [BruceBlue](https://github.com/BruceLanLan) · Contact: X
+[@BruceBlue](https://x.com/BruceBlue)
+
 ## Licence and notices
 
 Code: Apache-2.0 ([LICENSE](LICENSE)). The connectome aggregate derives from
