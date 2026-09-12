@@ -2,7 +2,8 @@
 
 Everything in this module is a *model*. Where a modelling choice comes from the
 literature or from the MaleCNS measurement it is cited; everything else is a
-labelled assumption of this repository and lives in `TeacherParams`.
+labelled assumption of this repository and lives in `TeacherParams` or in the
+`Encoding`.
 
 Structure of the teacher (one eye shown; the two eyes are independent):
 
@@ -12,91 +13,102 @@ Structure of the teacher (one eye shown; the two eyes are independent):
     V_GF = (n_LC4->GF * r_v + n_LPLC2->GF * r_s) / 1000     # synapse counts, MaleCNS v1.0
     V_P  = (n_LC4->P  * r_v + n_LPLC2->P  * r_s) / 1000     # P = candidate parallel DNs
 
-    GF fires when V_GF >= gf_threshold; the parallel pathway engages when
-    V_P >= parallel_threshold.
+    the GF pathway crosses when V_GF >= gf_threshold; the parallel pathway crosses
+    when V_P >= parallel_threshold.
 
 Literature basis (abstract-level): GF looming responses are well described by a
 sum of a linear function of angular velocity (LC4) and a Gaussian function of
 angular size (LPLC2) [Ache et al. 2019]; integration of the two features in the
 GF is linear [von Reyn et al. 2017]; the GF has a higher activation threshold
-than parallel escape circuits and its spike timing relative to them selects
+than parallel escape circuits, and its spike timing relative to them selects
 short- versus long-mode takeoff [von Reyn et al. 2014].
 
-Assumptions of this repository (not claims about the fly): instantaneous
-drive with no synaptic delay; synapse count as a proxy for weight; the choice of
-DNp02/DNp04/DNp06/DNp11 as the parallel pathway; all numeric parameters in
-`TeacherParams`; binocular visibility rule; the motor state machine.
+Assumptions of this repository (not claims about the fly): instantaneous drive
+with no synaptic delay; synapse count as a proxy for weight; DNp02/DNp04/DNp06/
+DNp11 as the parallel pathway; all numeric parameters in `TeacherParams`; the
+binocular visibility rule; the motor state machine; the sensory encoding.
+
+The split into circuits mirrors that structure:
+
+    LoomEscape-16 policy   16 sensory bits -> 2 pathway bits (GF crosses, parallel crosses)
+    escape core            policy + standing + motor latches -> motor command
 """
 
 from __future__ import annotations
 
 import json
 import math
-from dataclasses import asdict, dataclass, field, replace
+from bisect import bisect_right
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 import numpy as np
 
 # ---------------------------------------------------------------------------
-# Encoding (15 input bits, 2 output bits)
+# Sensory encoding
 # ---------------------------------------------------------------------------
 
-# Size bin k (1..7) covers [SIZE_EDGES[k-1], SIZE_EDGES[k]) degrees; bin 0 is
-# anything below 10 degrees (treated as "no loom yet").
-SIZE_EDGES_DEG = (10.0, 15.0, 22.0, 33.0, 50.0, 75.0, 110.0, 180.0)
-# Speed bin k (1..7) covers [VEL_EDGES[k-1], VEL_EDGES[k]) deg/s; bin 0 is below
-# 50 deg/s; bin 7 is open-ended.
-VEL_EDGES_DPS = (50.0, 100.0, 200.0, 400.0, 800.0, 1600.0, 3200.0, 12800.0)
-SIZE_FLOOR_DEG = 1.0
-VEL_FLOOR_DPS = 5.0
 
-INPUT_NAMES = (
-    "size_L[0]", "size_L[1]", "size_L[2]",
-    "speed_L[0]", "speed_L[1]", "speed_L[2]",
-    "size_R[0]", "size_R[1]", "size_R[2]",
-    "speed_R[0]", "speed_R[1]", "speed_R[2]",
-    "standing", "wings_raised", "refractory",
+@dataclass(frozen=True)
+class Encoding:
+    """Per-eye (size, speed) quantisation. With `bits` per feature there are
+    2**bits bins: bin 0 is below the first edge, bin k covers [edge k-1, edge k),
+    and the top bin also absorbs everything above the last edge."""
+
+    name: str
+    bits: int
+    size_edges_deg: tuple[float, ...]
+    speed_edges_dps: tuple[float, ...]
+    size_floor_deg: float = 1.0
+    speed_floor_dps: float = 5.0
+
+    @property
+    def levels(self) -> int:
+        return 1 << self.bits
+
+    @property
+    def n_inputs(self) -> int:
+        return 4 * self.bits
+
+    def size_bin(self, theta_deg: float) -> int:
+        return min(bisect_right(self.size_edges_deg, theta_deg), self.levels - 1)
+
+    def speed_bin(self, dtheta_dps: float) -> int:
+        return min(bisect_right(self.speed_edges_dps, dtheta_dps), self.levels - 1)
+
+    def size_range(self, k: int) -> tuple[float, float]:
+        e = self.size_edges_deg
+        return (self.size_floor_deg, e[0]) if k == 0 else (e[k - 1], e[k])
+
+    def speed_range(self, k: int) -> tuple[float, float]:
+        e = self.speed_edges_dps
+        return (self.speed_floor_dps, e[0]) if k == 0 else (e[k - 1], e[k])
+
+    def input_names(self) -> tuple[str, ...]:
+        names: tuple[str, ...] = ()
+        for field in ("size_L", "speed_L", "size_R", "speed_R"):
+            names += tuple(f"{field}[{i}]" for i in range(self.bits))
+        return names
+
+
+def _log_edges(lo: float, hi: float, n: int) -> tuple[float, ...]:
+    return tuple(round(lo * (hi / lo) ** (k / (n - 1)), 6) for k in range(n))
+
+
+ENCODING_3BIT = Encoding(
+    "3bit-hand",
+    3,
+    (10.0, 15.0, 22.0, 33.0, 50.0, 75.0, 110.0, 180.0),
+    (50.0, 100.0, 200.0, 400.0, 800.0, 1600.0, 3200.0, 12800.0),
 )
-N_INPUTS = len(INPUT_NAMES)
-OUTPUT_NAMES = ("action[0]", "action[1]")
+ENCODING_4BIT = Encoding("4bit-log", 4, _log_edges(10.0, 180.0, 16), _log_edges(25.0, 12800.0, 16))
+ENCODING_4BIT_SPEED50 = Encoding("4bit-log-speed50", 4, _log_edges(10.0, 180.0, 16), _log_edges(50.0, 12800.0, 16))
+ENCODING_5BIT = Encoding("5bit-log", 5, _log_edges(10.0, 180.0, 32), _log_edges(25.0, 12800.0, 32))
 
+DEFAULT_ENCODING = ENCODING_4BIT  # chosen by scripts/compare_encodings.py (train family only)
+
+OUTPUT_NAMES = ("gf", "parallel")
 HOLD, LONG_PROGRAM, SHORT_TAKEOFF = 0, 1, 2
-ACTION_NAMES = {HOLD: "hold", LONG_PROGRAM: "long-mode program", SHORT_TAKEOFF: "short-mode takeoff"}
-
-
-def size_bin(theta_deg: float) -> int:
-    if theta_deg < SIZE_EDGES_DEG[0]:
-        return 0
-    for k in range(1, 8):
-        if theta_deg < SIZE_EDGES_DEG[k]:
-            return k
-    return 7
-
-
-def speed_bin(dtheta_dps: float) -> int:
-    if dtheta_dps < VEL_EDGES_DPS[0]:
-        return 0
-    for k in range(1, 7):
-        if dtheta_dps < VEL_EDGES_DPS[k]:
-            return k
-    return 7
-
-
-def size_range(k: int) -> tuple[float, float]:
-    return (SIZE_FLOOR_DEG, SIZE_EDGES_DEG[0]) if k == 0 else (SIZE_EDGES_DEG[k - 1], SIZE_EDGES_DEG[k])
-
-
-def speed_range(k: int) -> tuple[float, float]:
-    return (VEL_FLOOR_DPS, VEL_EDGES_DPS[0]) if k == 0 else (VEL_EDGES_DPS[k - 1], VEL_EDGES_DPS[k])
-
-
-def pack_row(size_l: int, speed_l: int, size_r: int, speed_r: int, standing: int, wings: int, refr: int) -> int:
-    return size_l | speed_l << 3 | size_r << 6 | speed_r << 9 | standing << 12 | wings << 13 | refr << 14
-
-
-def unpack_row(r: int) -> tuple[int, int, int, int, int, int, int]:
-    return (r & 7, (r >> 3) & 7, (r >> 6) & 7, (r >> 9) & 7, (r >> 12) & 1, (r >> 13) & 1, (r >> 14) & 1)
-
 
 # ---------------------------------------------------------------------------
 # Looming geometry
@@ -127,7 +139,7 @@ def l_over_v_from_snapshot(theta_deg: float, dtheta_dps: float) -> float:
 
 @dataclass(frozen=True)
 class Weights:
-    """Synapse counts per eye side (ipsilateral inputs only)."""
+    """Ipsilateral synapse counts onto one side's GF and parallel candidates."""
 
     gf_lc4: float
     gf_lplc2: float
@@ -152,18 +164,17 @@ class TeacherParams:
     refractory_ticks: int = 7
 
 
-def load_weights(subgraph_json: Path | str, params: TeacherParams) -> dict[str, Weights]:
+def load_weights(subgraph_json: Path | str, params: TeacherParams, override: dict | None = None) -> dict[str, Weights]:
     d = json.loads(Path(subgraph_json).read_text())
     w: dict[str, dict[str, float]] = {}
     for g in d["giant_fibers"]:
         side = g["instance"].rsplit("_", 1)[-1]
-        w[side] = {
-            "gf_lc4": g["inputs"]["LC4"]["synapses"],
-            "gf_lplc2": g["inputs"]["LPLC2"]["synapses"],
-        }
+        w[side] = {"gf_lc4": g["inputs"]["LC4"]["synapses"], "gf_lplc2": g["inputs"]["LPLC2"]["synapses"]}
     for side, entry in d["parallel_dn_candidates"]["by_postsynaptic_side"].items():
         w[side]["par_lc4"] = entry["LC4"]["ipsilateral"]
         w[side]["par_lplc2"] = entry["LPLC2"]["ipsilateral"]
+    if override:  # used by controls: replace counts wholesale
+        w = {s: dict(override[s]) for s in ("L", "R")}
     if params.symmetric:
         avg = {k: (w["L"][k] + w["R"][k]) / 2 for k in w["L"]}
         w = {"L": dict(avg), "R": dict(avg)}
@@ -183,66 +194,63 @@ def drives(theta_deg: np.ndarray, dtheta_dps: np.ndarray, w: Weights, p: Teacher
     return v_gf, v_par
 
 
-@dataclass
-class EyeTable:
-    """Per-eye decision for each (size bin, speed bin): majority label and purity."""
-
-    gf: np.ndarray  # (8, 8) bool
-    par: np.ndarray  # (8, 8) bool
-    gf_purity: np.ndarray  # (8, 8) fraction of samples agreeing with the majority
-    par_purity: np.ndarray
-
-
-def eye_table(w: Weights, p: TeacherParams, side: str) -> EyeTable:
-    rng = np.random.default_rng([p.seed, 0 if side == "L" else 1])
-    gf = np.zeros((8, 8), bool)
-    par = np.zeros((8, 8), bool)
-    gfp = np.ones((8, 8))
-    parp = np.ones((8, 8))
-    n = p.samples_per_bin
-    for s in range(8):
-        lo, hi = size_range(s)
-        for v in range(8):
-            vlo, vhi = speed_range(v)
-            th = np.exp(rng.uniform(math.log(lo), math.log(hi), n))
-            dth = np.exp(rng.uniform(math.log(vlo), math.log(vhi), n))
-            if s == 0:  # below loom onset: no drive by definition
-                g_on = np.zeros(n, bool)
-                p_on = np.zeros(n, bool)
-            else:
-                v_gf, v_par = drives(th, dth, w, p)
-                g_on = v_gf >= p.gf_threshold
-                p_on = v_par >= p.parallel_threshold
-            gf[s, v] = g_on.mean() >= 0.5
-            par[s, v] = p_on.mean() >= 0.5
-            gfp[s, v] = max(g_on.mean(), 1 - g_on.mean())
-            parp[s, v] = max(p_on.mean(), 1 - p_on.mean())
-    return EyeTable(gf, par, gfp, parp)
-
-
-def policy(gf_any: bool, par_any: bool, standing: int, wings: int, refr: int) -> int:
-    if not standing or refr:
+def select_action(gf_any: bool, par_any: bool, standing: int, wings_raised: int, refractory: int) -> int:
+    """Action selection by relative pathway timing (von Reyn et al. 2014, as modelled here)."""
+    if not standing or refractory:
         return HOLD
     if gf_any:
-        return LONG_PROGRAM if wings else SHORT_TAKEOFF
+        return LONG_PROGRAM if wings_raised else SHORT_TAKEOFF
     if par_any:
         return LONG_PROGRAM
     return HOLD
 
 
 @dataclass
+class EyeTable:
+    """Per-eye pathway crossing for each (size bin, speed bin): majority label and purity."""
+
+    gf: np.ndarray  # (levels, levels) bool
+    par: np.ndarray
+    gf_purity: np.ndarray
+    par_purity: np.ndarray
+
+
+def eye_table(w: Weights, p: TeacherParams, side: str, enc: Encoding) -> EyeTable:
+    rng = np.random.default_rng([p.seed, 0 if side == "L" else 1])
+    n, L = p.samples_per_bin, enc.levels
+    gf = np.zeros((L, L), bool)
+    par = np.zeros((L, L), bool)
+    gfp = np.ones((L, L))
+    parp = np.ones((L, L))
+    for s in range(L):
+        lo, hi = enc.size_range(s)
+        for v in range(L):
+            vlo, vhi = enc.speed_range(v)
+            th = np.exp(rng.uniform(math.log(lo), math.log(hi), n))
+            dth = np.exp(rng.uniform(math.log(vlo), math.log(vhi), n))
+            if s == 0:  # below loom onset: no drive by definition
+                continue
+            v_gf, v_par = drives(th, dth, w, p)
+            g_on, p_on = (v_gf >= p.gf_threshold).mean(), (v_par >= p.parallel_threshold).mean()
+            gf[s, v], par[s, v] = g_on >= 0.5, p_on >= 0.5
+            gfp[s, v], parp[s, v] = max(g_on, 1 - g_on), max(p_on, 1 - p_on)
+    return EyeTable(gf, par, gfp, parp)
+
+
+@dataclass
 class DecisionTable:
     params: TeacherParams
+    encoding: Encoding
     weights: dict[str, Weights]
     eyes: dict[str, EyeTable]
-    table: np.ndarray  # uint64, length 2**15, value = action
+    table: np.ndarray  # uint64, length 2**n_inputs, value = gf | parallel << 1
 
     def to_json(self) -> dict:
         return {
-            "format": "c3s.decision-table/1",
-            "inputs": list(INPUT_NAMES),
+            "format": "c3s.decision-table/2",
+            "inputs": list(self.encoding.input_names()),
             "outputs": list(OUTPUT_NAMES),
-            "actions": {str(k): v for k, v in ACTION_NAMES.items()},
+            "encoding": asdict(self.encoding),
             "params": asdict(self.params),
             "weights": {s: asdict(w) for s, w in self.weights.items()},
             "eye_tables": {
@@ -260,16 +268,16 @@ class DecisionTable:
         }
 
 
-def build_table(subgraph_json: Path | str, p: TeacherParams) -> DecisionTable:
-    w = load_weights(subgraph_json, p)
-    eyes = {s: eye_table(w[s], p, s) for s in ("L", "R")}
-    table = np.zeros(1 << N_INPUTS, dtype=np.uint64)
-    for r in range(1 << N_INPUTS):
-        sl, vl, sr, vr, st, wg, rf = unpack_row(r)
-        gf_any = bool(eyes["L"].gf[sl, vl] or eyes["R"].gf[sr, vr])
-        par_any = bool(eyes["L"].par[sl, vl] or eyes["R"].par[sr, vr])
-        table[r] = policy(gf_any, par_any, st, wg, rf)
-    return DecisionTable(p, w, eyes, table)
+def build_table(subgraph_json: Path | str, p: TeacherParams, enc: Encoding = DEFAULT_ENCODING, override: dict | None = None) -> DecisionTable:
+    w = load_weights(subgraph_json, p, override)
+    eyes = {s: eye_table(w[s], p, s, enc) for s in ("L", "R")}
+    b, m = enc.bits, enc.levels - 1
+    rows = np.arange(1 << enc.n_inputs, dtype=np.int64)
+    sl, vl, sr, vr = rows & m, (rows >> b) & m, (rows >> 2 * b) & m, (rows >> 3 * b) & m
+    gf = eyes["L"].gf[sl, vl] | eyes["R"].gf[sr, vr]
+    par = eyes["L"].par[sl, vl] | eyes["R"].par[sr, vr]
+    table = (gf.astype(np.uint64) | (par.astype(np.uint64) << np.uint64(1))).astype(np.uint64)
+    return DecisionTable(p, enc, w, eyes, table)
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +289,7 @@ CORE_ACTION_NAMES = {0: "hold", 1: "raising wings", 2: "short-mode takeoff", 3: 
 
 
 def core_step(action: int, raise_count: int, refr: int, p: TeacherParams) -> tuple[int, int, int]:
-    """Shared motor state machine. Returns (core output, next raise count, next refractory)."""
+    """Shared motor state machine. Returns (motor command, next raise count, next refractory)."""
     wings_raised = raise_count >= p.wing_raise_ticks
     if action == SHORT_TAKEOFF:
         out = CORE_SHORT
@@ -310,13 +318,12 @@ class Stimulus:
 
 
 def stimulus_samples(stim: Stimulus, p: TeacherParams) -> list[tuple[float, float]]:
-    """(theta, theta') at each tick from onset until end size."""
+    """(theta, theta') at each tick from onset until the end size."""
     a = stim.l_over_v_ms / 1000.0
-    t_start = a / math.tan(math.radians(stim.start_deg) / 2.0)
+    t = a / math.tan(math.radians(stim.start_deg) / 2.0)
     t_end = a / math.tan(math.radians(stim.end_deg) / 2.0)
     dt = p.tick_ms / 1000.0
     out = []
-    t = t_start
     while t > t_end:
         out.append((theta_at(a, t), dtheta_at(a, t)))
         t -= dt
@@ -330,32 +337,55 @@ class Outcome:
     size_at_takeoff_deg: float | None
 
 
-def run_teacher_episode(stim: Stimulus, w: dict[str, Weights], p: TeacherParams) -> Outcome:
-    """Continuous (unquantised) teacher, ticked with the shared state machine."""
-    see_l, see_r = visible(stim.azimuth_deg)
+def _episode(stim: Stimulus, p: TeacherParams, pathways) -> Outcome:
     raise_count = refr = 0
     for i, (th, dth) in enumerate(stimulus_samples(stim, p)):
-        onset = th >= SIZE_EDGES_DEG[0]
-        gf_any = par_any = False
-        for side, seen in (("L", see_l), ("R", see_r)):
-            if seen and onset:
-                g, q = drives(np.array([th]), np.array([dth]), w[side], p)
-                gf_any |= bool(g[0] >= p.gf_threshold)
-                par_any |= bool(q[0] >= p.parallel_threshold)
-        action = policy(gf_any, par_any, 1, int(raise_count >= p.wing_raise_ticks), int(refr > 0))
+        gf_any, par_any = pathways(th, dth)
+        action = select_action(gf_any, par_any, 1, int(raise_count >= p.wing_raise_ticks), int(refr > 0))
         out, raise_count, refr = core_step(action, raise_count, refr, p)
         if out in (CORE_SHORT, CORE_LONG):
             return Outcome(out, i, th)
     return Outcome(CORE_HOLD, None, None)
 
 
-def encode_features(th: float, dth: float, azimuth_deg: float) -> int:
-    """The 12 feature bits for one tick of a stimulus."""
+def run_teacher_episode(stim: Stimulus, w: dict[str, Weights], p: TeacherParams) -> Outcome:
+    """Continuous (unquantised) teacher."""
+    see = dict(zip(("L", "R"), visible(stim.azimuth_deg)))
+
+    def pathways(th: float, dth: float) -> tuple[bool, bool]:
+        gf_any = par_any = False
+        if th >= 10.0:
+            for side in ("L", "R"):
+                if see[side]:
+                    g, q = drives(np.array([th]), np.array([dth]), w[side], p)
+                    gf_any |= bool(g[0] >= p.gf_threshold)
+                    par_any |= bool(q[0] >= p.parallel_threshold)
+        return gf_any, par_any
+
+    return _episode(stim, p, pathways)
+
+
+def run_quantized_teacher_episode(stim: Stimulus, table: DecisionTable) -> Outcome:
+    """The teacher as seen through the encoding: what an exact circuit will do."""
+    enc, p = table.encoding, table.params
+    see = dict(zip(("L", "R"), visible(stim.azimuth_deg)))
+
+    def pathways(th: float, dth: float) -> tuple[bool, bool]:
+        s, v = enc.size_bin(th), enc.speed_bin(dth)
+        gf_any = any(see[x] and table.eyes[x].gf[s, v] for x in ("L", "R"))
+        par_any = any(see[x] and table.eyes[x].par[s, v] for x in ("L", "R"))
+        return bool(gf_any), bool(par_any)
+
+    return _episode(stim, p, pathways)
+
+
+def encode_features(th: float, dth: float, azimuth_deg: float, enc: Encoding = DEFAULT_ENCODING) -> int:
+    """Sensory bits for one tick: size_L, speed_L, size_R, speed_R."""
     see_l, see_r = visible(azimuth_deg)
-    sb, vb = size_bin(th), speed_bin(dth)
+    sb, vb, b = enc.size_bin(th), enc.speed_bin(dth), enc.bits
     sl, vl = (sb, vb) if see_l else (0, 0)
     sr, vr = (sb, vb) if see_r else (0, 0)
-    return sl | vl << 3 | sr << 6 | vr << 9
+    return sl | vl << b | sr << 2 * b | vr << 3 * b
 
 
 def family(name: str) -> list[Stimulus]:

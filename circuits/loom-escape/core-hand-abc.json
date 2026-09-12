@@ -1,0 +1,689 @@
+{
+ "format": "c3s.circuit/1",
+ "name": "core-hand-abc",
+ "inputs": [
+  "size_L[0]",
+  "size_L[1]",
+  "size_L[2]",
+  "size_L[3]",
+  "speed_L[0]",
+  "speed_L[1]",
+  "speed_L[2]",
+  "speed_L[3]",
+  "size_R[0]",
+  "size_R[1]",
+  "size_R[2]",
+  "size_R[3]",
+  "speed_R[0]",
+  "speed_R[1]",
+  "speed_R[2]",
+  "speed_R[3]",
+  "standing"
+ ],
+ "outputs": [
+  "motor[0]",
+  "motor[1]"
+ ],
+ "metrics": {
+  "nand": 173,
+  "latch": 6,
+  "ref": 0,
+  "cells": 179,
+  "bytes": 1235,
+  "depth": 25
+ },
+ "netlist_sha256": "7c8eaf62495908c434206ff54aa1f3e9146b4295506f59584d6107d2104b2e52",
+ "tapeout_netlist_hex": "0x010000a5010000a7010000a9010000bf010000c1010000c300000013000013000000190000190000001900001a000000140000140000001b00001c0000001d00001d0000001e00001e0000001c00001f0000001500001500000021000021000000200000220000002300002300000016000016000000170000170000002500002600000027000027000000180000180000002800002900000007000007000000080000080000002b00002c0000000400000400000002000002000000030000030000002f000030000000310000310000002e0000320000002d0000330000000500002e00000004000006000000360000360000000500003100000037000038000000350000390000003a00003a0000003400003b0000000900003c0000000f00000f0000000c00000c0000000a00000b0000003f0000400000003e0000410000000a00000a0000000b00000b000000430000440000000e0000450000004600004600000042000047000000100000100000000c0000450000004a00004a0000000d00004b0000000f00004c0000004900004d0000004e00004e0000004800004f0000000d00000d000000450000450000003f0000520000000e00000e0000003f0000540000000f000055000000490000560000005300005700000051000058000000110000590000005a00005a0000005000005b0000004a0000510000004c00005d0000003e0000540000005f00005f00000049000060000000530000610000005e00006200000011000063000000050000050000000900000900000003000037000000660000670000003300006800000065000069000000040000310000000600006b0000000500006c000000070000080000006e00006e0000006d00006f000000660000700000006a0000710000003d00005c000000640000720000002a00002a00000012000075000000760000760000002400002400000073000078000000790000790000007700007a0000007b00007b000000240000730000007d00007d000000730000730000007400007f000000800000800000007e00007e0000008100008100000082000083000000770000840000008500008500000024000086000000870000870000007c00007c000000880000880000008900008a000000780000860000008c00008c000000130000140000008e00008e0000001500008f000000900000900000001400008e0000001300008e00000092000093000000150000900000008f000090000000950000960000009100009100000019000098000000130000910000009900009a00000094000098000000140000910000009c00009d00000097000098000000150000910000009f0000a00000008d00008d000000000000a20000008d00009b000000a30000a40000008d00009e000000a30000a60000008d0000a1000000a30000a800000017000025000000170000aa000000250000aa000000ab0000ac00000018000028000000180000ae000000280000ae000000af0000b000000075000075000000250000b200000016000075000000b30000b4000000ad0000b200000017000075000000b60000b7000000b10000b200000018000075000000b90000ba0000008b00008b000000b50000bc0000000100008b000000bd0000be000000b80000bc000000be0000c0000000bb0000bc000000be0000c2000000850000850000008900008a",
+ "policy": "policy-hand-abc",
+ "motor_codes": {
+  "0": "hold",
+  "1": "raising wings",
+  "2": "short-mode takeoff",
+  "3": "long-mode takeoff"
+ },
+ "state_layout": {
+  "raise_counter_bits": 3,
+  "refractory_bits": 3,
+  "order": "raise counter bits (LSB first), then refractory timer bits (LSB first)"
+ },
+ "step_relation_rows_checked": 8388608,
+ "step_relation_mismatches": 0,
+ "episode_fidelity": {
+  "train": {
+   "episodes": 35,
+   "circuit_equals_quantised_teacher": true,
+   "escape_agreement": 1.0,
+   "mode_agreement": 0.8286,
+   "mean_abs_takeoff_tick_difference": 0.8,
+   "max_abs_takeoff_tick_difference": 2,
+   "rows": [
+    {
+     "l_over_v_ms": 10.0,
+     "azimuth_deg": -60.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 16,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 15
+    },
+    {
+     "l_over_v_ms": 10.0,
+     "azimuth_deg": -20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 16,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 15
+    },
+    {
+     "l_over_v_ms": 10.0,
+     "azimuth_deg": 0.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 16,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 15
+    },
+    {
+     "l_over_v_ms": 10.0,
+     "azimuth_deg": 20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 16,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 15
+    },
+    {
+     "l_over_v_ms": 10.0,
+     "azimuth_deg": 60.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 17,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 17
+    },
+    {
+     "l_over_v_ms": 15.0,
+     "azimuth_deg": -60.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 25,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 25
+    },
+    {
+     "l_over_v_ms": 15.0,
+     "azimuth_deg": -20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 25,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 25
+    },
+    {
+     "l_over_v_ms": 15.0,
+     "azimuth_deg": 0.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 25,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 25
+    },
+    {
+     "l_over_v_ms": 15.0,
+     "azimuth_deg": 20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 25,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 25
+    },
+    {
+     "l_over_v_ms": 15.0,
+     "azimuth_deg": 60.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 27,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 27
+    },
+    {
+     "l_over_v_ms": 20.0,
+     "azimuth_deg": -60.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 34,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 33
+    },
+    {
+     "l_over_v_ms": 20.0,
+     "azimuth_deg": -20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 34,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 33
+    },
+    {
+     "l_over_v_ms": 20.0,
+     "azimuth_deg": 0.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 34,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 33
+    },
+    {
+     "l_over_v_ms": 20.0,
+     "azimuth_deg": 20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 34,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 33
+    },
+    {
+     "l_over_v_ms": 20.0,
+     "azimuth_deg": 60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 37,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 37
+    },
+    {
+     "l_over_v_ms": 30.0,
+     "azimuth_deg": -60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 54,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 53
+    },
+    {
+     "l_over_v_ms": 30.0,
+     "azimuth_deg": -20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 54,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 53
+    },
+    {
+     "l_over_v_ms": 30.0,
+     "azimuth_deg": 0.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 54,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 53
+    },
+    {
+     "l_over_v_ms": 30.0,
+     "azimuth_deg": 20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 54,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 53
+    },
+    {
+     "l_over_v_ms": 30.0,
+     "azimuth_deg": 60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 57,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 56
+    },
+    {
+     "l_over_v_ms": 40.0,
+     "azimuth_deg": -60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 73,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 73
+    },
+    {
+     "l_over_v_ms": 40.0,
+     "azimuth_deg": -20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 73,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 73
+    },
+    {
+     "l_over_v_ms": 40.0,
+     "azimuth_deg": 0.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 73,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 73
+    },
+    {
+     "l_over_v_ms": 40.0,
+     "azimuth_deg": 20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 73,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 73
+    },
+    {
+     "l_over_v_ms": 40.0,
+     "azimuth_deg": 60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 77,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 78
+    },
+    {
+     "l_over_v_ms": 60.0,
+     "azimuth_deg": -60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 113,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 114
+    },
+    {
+     "l_over_v_ms": 60.0,
+     "azimuth_deg": -20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 113,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 114
+    },
+    {
+     "l_over_v_ms": 60.0,
+     "azimuth_deg": 0.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 113,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 114
+    },
+    {
+     "l_over_v_ms": 60.0,
+     "azimuth_deg": 20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 113,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 114
+    },
+    {
+     "l_over_v_ms": 60.0,
+     "azimuth_deg": 60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 119,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 120
+    },
+    {
+     "l_over_v_ms": 80.0,
+     "azimuth_deg": -60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 154,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 156
+    },
+    {
+     "l_over_v_ms": 80.0,
+     "azimuth_deg": -20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 154,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 156
+    },
+    {
+     "l_over_v_ms": 80.0,
+     "azimuth_deg": 0.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 154,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 156
+    },
+    {
+     "l_over_v_ms": 80.0,
+     "azimuth_deg": 20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 154,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 156
+    },
+    {
+     "l_over_v_ms": 80.0,
+     "azimuth_deg": 60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 163,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 164
+    }
+   ]
+  },
+  "holdout": {
+   "episodes": 42,
+   "circuit_equals_quantised_teacher": true,
+   "escape_agreement": 1.0,
+   "mode_agreement": 0.9048,
+   "mean_abs_takeoff_tick_difference": 1.0,
+   "max_abs_takeoff_tick_difference": 4,
+   "rows": [
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": -75.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 19,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 19
+    },
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": -40.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 19,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 19
+    },
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": -10.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 19,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 19
+    },
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": 10.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 19,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 19
+    },
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": 40.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 21,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 21
+    },
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": 75.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 21,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 21
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 44,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 43
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 44,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 43
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 44,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 43
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 44,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 43
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 47,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 46
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 47,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 46
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 63,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 63
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 63,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 63
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 63,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 63
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 63,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 63
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 67,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 67
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 67,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 67
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 93,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 93
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 93,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 93
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 93,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 93
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 93,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 93
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 98,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 99
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 98,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 99
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 134,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 135
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 134,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 135
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 134,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 135
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 134,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 135
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 141,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 142
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 141,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 142
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 196,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 200
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 196,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 200
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 196,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 200
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 196,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 200
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 209,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 209
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 209,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 209
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 286,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 288
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 286,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 288
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 286,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 288
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 286,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 288
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 311,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 313
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 311,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 313
+    }
+   ]
+  }
+ }
+}

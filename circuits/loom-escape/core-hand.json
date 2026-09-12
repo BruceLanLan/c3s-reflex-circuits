@@ -1,0 +1,689 @@
+{
+ "format": "c3s.circuit/1",
+ "name": "core-hand",
+ "inputs": [
+  "size_L[0]",
+  "size_L[1]",
+  "size_L[2]",
+  "size_L[3]",
+  "speed_L[0]",
+  "speed_L[1]",
+  "speed_L[2]",
+  "speed_L[3]",
+  "size_R[0]",
+  "size_R[1]",
+  "size_R[2]",
+  "size_R[3]",
+  "speed_R[0]",
+  "speed_R[1]",
+  "speed_R[2]",
+  "speed_R[3]",
+  "standing"
+ ],
+ "outputs": [
+  "motor[0]",
+  "motor[1]"
+ ],
+ "metrics": {
+  "nand": 526,
+  "latch": 6,
+  "ref": 0,
+  "cells": 532,
+  "bytes": 3706,
+  "depth": 65
+ },
+ "netlist_sha256": "51bd79700faea4943eb3c4c3aed410ca05533de067c90568076326427c0e19b9",
+ "tapeout_netlist_hex": "0x01000206010002080100020a01000220010002220100022400000013000013000000190000190000001900001a000000140000140000001b00001c0000001d00001d0000001e00001e0000001c00001f000000150000150000002100002100000020000022000000230000230000001600001600000017000017000000250000260000002700002700000018000018000000280000290000000200000200000003000003000000050000050000002b00002c0000002e00002e0000000400002f000000300000300000002d000031000000320000320000000200002c0000003400003400000004000035000000360000360000002d000037000000380000380000000300002b0000003a00003a0000000400003b0000003c00003c0000002d00003d0000003e00003e000000020000030000004000004000000004000041000000420000420000002d0000430000004400004400000005000031000000460000460000003300003300000039000039000000480000490000004a00004a0000003f00003f0000004b00004c0000004d00004d000000450000450000004e00004f0000005000005000000047000047000000510000520000000400000400000035000054000000550000550000002d000056000000570000570000003b000054000000590000590000002d00005a0000005b00005b000000410000540000005d00005d0000002d00005e0000005f00005f00000005000037000000610000610000000500003d000000630000630000000500004300000065000065000000580000580000005c00005c0000006700006800000069000069000000600000600000006a00006b0000006c00006c000000620000620000006d00006e0000006f00006f00000064000064000000700000710000007200007200000066000066000000730000740000002f000054000000760000760000000500007700000078000078000000050000560000007a00007a0000000500005a0000007c00007c0000000500005e0000007e00007e0000004800006d0000008000008000000049000081000000820000820000004c000083000000840000840000004f000085000000860000860000007900007900000087000088000000890000890000007b00007b0000008a00008b0000008c00008c0000007d00007d0000008d00008e0000008f00008f0000007f00007f000000900000910000009200009200000052000093000000940000940000006e000095000000960000960000007100009700000098000098000000740000990000002d0000770000009b00009b000000530000530000000600009d0000009e00009e00000006000053000000060000a0000000530000a0000000a10000a2000000a30000a30000009f00009f000000a40000a4000000a50000a600000075000075000000070000a8000000a90000a900000007000075000000070000ab000000750000ab000000ac0000ad000000ae0000ae000000a70000af000000b00000b0000000aa0000aa000000b10000b1000000b20000b300000008000008000000b40000b5000000b60000b6000000b70000b7000000b50000b80000009a00009a000000090000ba000000bb0000bb0000000900009a000000090000bd0000009a0000bd000000be0000bf000000c00000c0000000b90000c1000000c20000c2000000bc0000bc000000c30000c3000000c40000c50000009c00009c000000c60000c7000000c80000c80000000b00000b0000000c00000c0000000d00000d0000000a0000ca000000cd0000cd000000cb0000ce000000cf0000cf000000cc0000d0000000d10000d10000000a00000a0000000b0000d3000000d40000d4000000cb0000d5000000d60000d6000000cc0000d7000000d80000d80000000a00000b000000da0000da000000cb0000db000000dc0000dc000000cc0000dd000000de0000de0000000d0000d0000000e00000e00000000d0000d7000000e20000e20000000c0000ce000000e40000e40000000d0000e5000000e60000e60000000c0000d5000000e80000e80000000d0000e9000000ea0000ea0000000c0000db000000ec0000ec0000000d0000ed000000ee0000ee000000d20000d2000000d90000d9000000f00000f1000000f20000f2000000df0000df000000f30000f4000000f50000f5000000e10000e1000000f60000f7000000f80000f8000000e30000e3000000f90000fa000000fb0000fb000000e70000e7000000fc0000fd000000fe0000fe000000eb0000eb000000ff00010000000101000101000000ef0000ef00000102000103000000ca0000d3000001050001050000000c00010600000107000107000000cc00010800000109000109000000cc0000e50000010b00010b000000cc0000e90000010d00010d000000cc0000ed0000010f00010f000000cb000106000001110001110000000d000112000001130001130000000d0000dd000001150001150000000d000108000001170001170000010a00010a000000f60001190000011a00011a0000010c00010c0000011b00011c0000011d00011d0000010e00010e0000011e00011f00000120000120000001100001100000012100012200000123000123000001140001140000012400012500000126000126000001160001160000012700012800000129000129000001180001180000012a00012b0000012c00012c000000fd00012d0000012e00012e0000010000012f0000013000013000000103000131000000f700012700000133000133000000fa0001340000013500013500000128000136000001370001370000012b00013800000139000139000000fd00013a0000013b00013b0000010000013c0000013d00013d0000010300013e000000cc00011200000140000140000001040001040000000e000142000001430001430000000e0001040000000e00014500000104000145000001460001470000014800014800000144000144000001490001490000014a00014b000001320001320000000f00014d0000014e00014e0000000f0001320000000f0001500000013200015000000151000152000001530001530000014c000154000001550001550000014f00014f0000015600015600000157000158000000100000100000015900015a0000015b00015b0000015c00015c0000015a00015d0000013f00013f0000001100015f000001600001600000001100013f000000110001620000013f00016200000163000164000001650001650000015e0001660000016700016700000161000161000001680001680000016900016a000001410001410000016b00016c0000016d00016d000000c90000c90000016e00016e0000004c00004f0000017100017100000088000172000001730001730000008b000174000001750001750000008e0001760000017700017700000091000178000001790001790000005200017a0000006e0000830000017c00017c0000007100017d0000017e00017e0000007400017f0000017b00017b00000006000181000001820001820000000600017b000000060001840000017b000184000001850001860000018700018700000183000183000001880001880000018900018a000000070001810000018c00018c0000000700017b0000000700018e0000017b00018e0000018f000190000001910001910000018b000192000001930001930000018d00018d000001940001940000019500019600000008000181000001980001980000000800017b0000000800019a0000017b00019a0000019b00019c0000019d00019d0000019700019e0000019f00019f00000199000199000001a00001a0000001a10001a200000180000180000000090001a4000001a50001a500000009000180000000090001a7000001800001a7000001a80001a9000001aa0001aa000001a30001ab000001ac0001ac000001a60001a6000001ad0001ad000001ae0001af000000c70001b0000001b10001b1000000fd00011b000001b30001b3000001000001b4000001b50001b5000001030001b6000001b70001b70000000e0001b8000001b90001b90000000e0001b70000000e0001bb000001b70001bb000001bc0001bd000001be0001be000001ba0001ba000001bf0001bf000001c00001c10000000f00000f000001c20001c3000001c40001c4000001c50001c5000001c30001c60000015a0001c7000001c80001c8000001c90001c90000015a0001ca000001660001cb000001cc0001cc000001cd0001cd000001690001ce0000016c0001cf000001d00001d0000001b20001b2000001d10001d10000016f000170000001d20001d30000002a00002a000000120001d6000001d70001d700000024000024000001d40001d9000001da0001da000001d80001db000001dc0001dc000000240001d4000001de0001de000001d40001d4000001d50001e0000001e10001e1000001df0001df000001e20001e2000001e30001e4000001d80001e5000001e60001e6000000240001e7000001e80001e8000001dd0001dd000001e90001e9000001ea0001eb000001d90001e7000001ed0001ed00000013000014000001ef0001ef000000150001f0000001f10001f1000000140001ef000000130001ef000001f30001f4000000150001f1000001f00001f1000001f60001f7000001f20001f2000000190001f9000000130001f2000001fa0001fb000001f50001f9000000140001f2000001fd0001fe000001f80001f9000000150001f200000200000201000001ee0001ee00000000000203000001ee0001fc00000204000205000001ee0001ff00000204000207000001ee00020200000204000209000000170000250000001700020b0000002500020b0000020c00020d000000180000280000001800020f0000002800020f00000210000211000001d60001d600000025000213000000160001d6000002140002150000020e000213000000170001d60000021700021800000212000213000000180001d60000021a00021b000001ec0001ec0000021600021d000000010001ec0000021e00021f0000021900021d0000021f0002210000021c00021d0000021f000223000001e60001e6000001ea0001eb",
+ "policy": "policy-hand",
+ "motor_codes": {
+  "0": "hold",
+  "1": "raising wings",
+  "2": "short-mode takeoff",
+  "3": "long-mode takeoff"
+ },
+ "state_layout": {
+  "raise_counter_bits": 3,
+  "refractory_bits": 3,
+  "order": "raise counter bits (LSB first), then refractory timer bits (LSB first)"
+ },
+ "step_relation_rows_checked": 8388608,
+ "step_relation_mismatches": 0,
+ "episode_fidelity": {
+  "train": {
+   "episodes": 35,
+   "circuit_equals_quantised_teacher": true,
+   "escape_agreement": 1.0,
+   "mode_agreement": 0.8286,
+   "mean_abs_takeoff_tick_difference": 0.8,
+   "max_abs_takeoff_tick_difference": 2,
+   "rows": [
+    {
+     "l_over_v_ms": 10.0,
+     "azimuth_deg": -60.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 16,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 15
+    },
+    {
+     "l_over_v_ms": 10.0,
+     "azimuth_deg": -20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 16,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 15
+    },
+    {
+     "l_over_v_ms": 10.0,
+     "azimuth_deg": 0.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 16,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 15
+    },
+    {
+     "l_over_v_ms": 10.0,
+     "azimuth_deg": 20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 16,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 15
+    },
+    {
+     "l_over_v_ms": 10.0,
+     "azimuth_deg": 60.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 17,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 17
+    },
+    {
+     "l_over_v_ms": 15.0,
+     "azimuth_deg": -60.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 25,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 25
+    },
+    {
+     "l_over_v_ms": 15.0,
+     "azimuth_deg": -20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 25,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 25
+    },
+    {
+     "l_over_v_ms": 15.0,
+     "azimuth_deg": 0.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 25,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 25
+    },
+    {
+     "l_over_v_ms": 15.0,
+     "azimuth_deg": 20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 25,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 25
+    },
+    {
+     "l_over_v_ms": 15.0,
+     "azimuth_deg": 60.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 27,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 27
+    },
+    {
+     "l_over_v_ms": 20.0,
+     "azimuth_deg": -60.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 34,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 33
+    },
+    {
+     "l_over_v_ms": 20.0,
+     "azimuth_deg": -20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 34,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 33
+    },
+    {
+     "l_over_v_ms": 20.0,
+     "azimuth_deg": 0.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 34,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 33
+    },
+    {
+     "l_over_v_ms": 20.0,
+     "azimuth_deg": 20.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 34,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 33
+    },
+    {
+     "l_over_v_ms": 20.0,
+     "azimuth_deg": 60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 37,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 37
+    },
+    {
+     "l_over_v_ms": 30.0,
+     "azimuth_deg": -60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 54,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 53
+    },
+    {
+     "l_over_v_ms": 30.0,
+     "azimuth_deg": -20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 54,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 53
+    },
+    {
+     "l_over_v_ms": 30.0,
+     "azimuth_deg": 0.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 54,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 53
+    },
+    {
+     "l_over_v_ms": 30.0,
+     "azimuth_deg": 20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 54,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 53
+    },
+    {
+     "l_over_v_ms": 30.0,
+     "azimuth_deg": 60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 57,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 56
+    },
+    {
+     "l_over_v_ms": 40.0,
+     "azimuth_deg": -60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 73,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 73
+    },
+    {
+     "l_over_v_ms": 40.0,
+     "azimuth_deg": -20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 73,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 73
+    },
+    {
+     "l_over_v_ms": 40.0,
+     "azimuth_deg": 0.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 73,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 73
+    },
+    {
+     "l_over_v_ms": 40.0,
+     "azimuth_deg": 20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 73,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 73
+    },
+    {
+     "l_over_v_ms": 40.0,
+     "azimuth_deg": 60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 77,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 78
+    },
+    {
+     "l_over_v_ms": 60.0,
+     "azimuth_deg": -60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 113,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 114
+    },
+    {
+     "l_over_v_ms": 60.0,
+     "azimuth_deg": -20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 113,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 114
+    },
+    {
+     "l_over_v_ms": 60.0,
+     "azimuth_deg": 0.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 113,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 114
+    },
+    {
+     "l_over_v_ms": 60.0,
+     "azimuth_deg": 20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 113,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 114
+    },
+    {
+     "l_over_v_ms": 60.0,
+     "azimuth_deg": 60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 119,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 120
+    },
+    {
+     "l_over_v_ms": 80.0,
+     "azimuth_deg": -60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 154,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 156
+    },
+    {
+     "l_over_v_ms": 80.0,
+     "azimuth_deg": -20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 154,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 156
+    },
+    {
+     "l_over_v_ms": 80.0,
+     "azimuth_deg": 0.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 154,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 156
+    },
+    {
+     "l_over_v_ms": 80.0,
+     "azimuth_deg": 20.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 154,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 156
+    },
+    {
+     "l_over_v_ms": 80.0,
+     "azimuth_deg": 60.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 163,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 164
+    }
+   ]
+  },
+  "holdout": {
+   "episodes": 42,
+   "circuit_equals_quantised_teacher": true,
+   "escape_agreement": 1.0,
+   "mode_agreement": 0.9048,
+   "mean_abs_takeoff_tick_difference": 1.0,
+   "max_abs_takeoff_tick_difference": 4,
+   "rows": [
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": -75.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 19,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 19
+    },
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": -40.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 19,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 19
+    },
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": -10.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 19,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 19
+    },
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": 10.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 19,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 19
+    },
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": 40.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 21,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 21
+    },
+    {
+     "l_over_v_ms": 12.0,
+     "azimuth_deg": 75.0,
+     "teacher": "short-mode takeoff",
+     "teacher_tick": 21,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 21
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 44,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 43
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 44,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 43
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 44,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 43
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 44,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 43
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 47,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 46
+    },
+    {
+     "l_over_v_ms": 25.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 47,
+     "circuit": "short-mode takeoff",
+     "circuit_tick": 46
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 63,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 63
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 63,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 63
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 63,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 63
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 63,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 63
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 67,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 67
+    },
+    {
+     "l_over_v_ms": 35.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 67,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 67
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 93,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 93
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 93,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 93
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 93,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 93
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 93,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 93
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 98,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 99
+    },
+    {
+     "l_over_v_ms": 50.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 98,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 99
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 134,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 135
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 134,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 135
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 134,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 135
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 134,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 135
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 141,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 142
+    },
+    {
+     "l_over_v_ms": 70.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 141,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 142
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 196,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 200
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 196,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 200
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 196,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 200
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 196,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 200
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 209,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 209
+    },
+    {
+     "l_over_v_ms": 100.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 209,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 209
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": -75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 286,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 288
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": -40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 286,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 288
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": -10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 286,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 288
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": 10.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 286,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 288
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": 40.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 311,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 313
+    },
+    {
+     "l_over_v_ms": 140.0,
+     "azimuth_deg": 75.0,
+     "teacher": "long-mode takeoff",
+     "teacher_tick": 311,
+     "circuit": "long-mode takeoff",
+     "circuit_tick": 313
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,178 @@
+{
+ "teacher_params": {
+  "size_mu_deg": 60.0,
+  "size_sigma_deg": 30.0,
+  "speed_scale_dps": 1000.0,
+  "gf_threshold": 4.25,
+  "parallel_threshold": 6.0,
+  "lesion": [],
+  "symmetric": false,
+  "samples_per_bin": 64,
+  "seed": 0,
+  "tick_ms": 5.0,
+  "wing_raise_ticks": 4,
+  "refractory_ticks": 7
+ },
+ "encoding": {
+  "name": "4bit-log",
+  "bits": 4,
+  "size_edges_deg": [
+   10.0,
+   12.125086,
+   14.701771,
+   17.826025,
+   21.614208,
+   26.207414,
+   31.776715,
+   38.529541,
+   46.717401,
+   56.645251,
+   68.682855,
+   83.278553,
+   100.975963,
+   122.434225,
+   148.452553,
+   180.0
+  ],
+  "speed_edges_dps": [
+   25.0,
+   37.892914,
+   57.434918,
+   87.055056,
+   131.950791,
+   200.0,
+   303.143313,
+   459.479342,
+   696.440451,
+   1055.606329,
+   1600.0,
+   2425.146506,
+   3675.834736,
+   5571.523605,
+   8444.850629,
+   12800.0
+  ],
+  "size_floor_deg": 1.0,
+  "speed_floor_dps": 5.0
+ },
+ "subgraph_sha256": "8dff72df950377a14e2b2243f13200c9c5780c28bdcf395a5732854d2d6bc2de",
+ "table_sha256": "f13579971b88e6e1079987b1a4210292aa01fc7da75b72ca5d90719d6d3b47aa",
+ "pathway_counts": {
+  "gf=0,parallel=0": 18447,
+  "gf=0,parallel=1": 7563,
+  "gf=1,parallel=1": 39526
+ },
+ "circuits": {
+  "policy-hand": {
+   "metrics": {
+    "nand": 427,
+    "latch": 0,
+    "ref": 0,
+    "cells": 427,
+    "bytes": 2989,
+    "depth": 51
+   },
+   "rows_differing_from_teacher": 0
+  },
+  "core-hand": {
+   "metrics": {
+    "nand": 526,
+    "latch": 6,
+    "ref": 0,
+    "cells": 532,
+    "bytes": 3706,
+    "depth": 65
+   },
+   "step_relation_rows_checked": 8388608,
+   "step_relation_mismatches": 0,
+   "episodes": {
+    "train": {
+     "circuit_equals_quantised_teacher": true,
+     "escape_agreement": 1.0,
+     "mode_agreement": 0.8286,
+     "mean_abs_takeoff_tick_difference": 0.8
+    },
+    "holdout": {
+     "circuit_equals_quantised_teacher": true,
+     "escape_agreement": 1.0,
+     "mode_agreement": 0.9048,
+     "mean_abs_takeoff_tick_difference": 1.0
+    }
+   }
+  },
+  "policy-hand-abc": {
+   "metrics": {
+    "nand": 74,
+    "latch": 0,
+    "ref": 0,
+    "cells": 74,
+    "bytes": 518,
+    "depth": 11
+   },
+   "rows_differing_from_teacher": 0
+  },
+  "core-hand-abc": {
+   "metrics": {
+    "nand": 173,
+    "latch": 6,
+    "ref": 0,
+    "cells": 179,
+    "bytes": 1235,
+    "depth": 25
+   },
+   "step_relation_rows_checked": 8388608,
+   "step_relation_mismatches": 0,
+   "episodes": {
+    "train": {
+     "circuit_equals_quantised_teacher": true,
+     "escape_agreement": 1.0,
+     "mode_agreement": 0.8286,
+     "mean_abs_takeoff_tick_difference": 0.8
+    },
+    "holdout": {
+     "circuit_equals_quantised_teacher": true,
+     "escape_agreement": 1.0,
+     "mode_agreement": 0.9048,
+     "mean_abs_takeoff_tick_difference": 1.0
+    }
+   }
+  },
+  "policy-table-abc": {
+   "metrics": {
+    "nand": 74,
+    "latch": 0,
+    "ref": 0,
+    "cells": 74,
+    "bytes": 518,
+    "depth": 11
+   },
+   "rows_differing_from_teacher": 0
+  },
+  "core-table-abc": {
+   "metrics": {
+    "nand": 173,
+    "latch": 6,
+    "ref": 0,
+    "cells": 179,
+    "bytes": 1235,
+    "depth": 25
+   },
+   "step_relation_rows_checked": 8388608,
+   "step_relation_mismatches": 0,
+   "episodes": {
+    "train": {
+     "circuit_equals_quantised_teacher": true,
+     "escape_agreement": 1.0,
+     "mode_agreement": 0.8286,
+     "mean_abs_takeoff_tick_difference": 0.8
+    },
+    "holdout": {
+     "circuit_equals_quantised_teacher": true,
+     "escape_agreement": 1.0,
+     "mode_agreement": 0.9048,
+     "mean_abs_takeoff_tick_difference": 1.0
+    }
+   }
+  }
+ }
+}
