@@ -1,0 +1,10 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/
+*.feather
+*.part
+contracts/out/
+contracts/cache/
+contracts/lib/
+.DS_Store
