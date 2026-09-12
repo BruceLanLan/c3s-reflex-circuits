@@ -58,8 +58,9 @@ def main() -> None:
     episodes = []
     for lv, az in EPISODES:
         stim = loom.Stimulus(lv, az)
+        samples = loom.stimulus_samples(stim, p)
         state, ticks = 0, []
-        for th, dth in loom.stimulus_samples(stim, p):
+        for th, dth in samples:
             x = loom.encode_features(th, dth, az, enc) | (1 << nf)
             row = x | (state << (nf + 1))
             motor, state = int(outs[row]), int(nxt[row])
@@ -67,7 +68,15 @@ def main() -> None:
             if motor in (loom.CORE_SHORT, loom.CORE_LONG):
                 break
         teacher = loom.run_teacher_episode(stim, weights, p)
-        episodes.append({"lv": lv, "azimuth": az, "ticks": ticks, "teacher": [teacher.action, teacher.tick]})
+        # The samples are embedded because libm and V8 differ in the last ulp, and the onset
+        # angle (10 degrees) sits exactly on the first size-bin edge.
+        episodes.append({
+            "lv": lv,
+            "azimuth": az,
+            "samples": [[th, dth] for th, dth in samples],
+            "ticks": ticks,
+            "teacher": [teacher.action, teacher.tick],
+        })
 
     data = {
         "format": "c3s.demo/1",

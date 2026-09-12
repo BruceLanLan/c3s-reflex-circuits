@@ -8,8 +8,8 @@
 # yosys-abc (or abc) on PATH, Foundry (forge) on PATH.
 #
 # Regenerated and compared byte for byte: teacher calibration, decision table,
-# encoding comparison, policy and core manifests, component manifests, EVM fixtures
-# (and, with --full, the connectome subgraph).
+# encoding comparison, policy and core manifests, component manifests, the data block
+# of the web demo, EVM fixtures (and, with --full, the connectome subgraph).
 # NOT regenerated here: DLGN runs (scripts/train_dlgn.py; a re-run of the 128-128-64
 # run reproduced its netlist byte for byte on torch 2.14 CPU), controls.json
 # (scripts/run_controls.py, about 25 minutes) and sealed-evaluation.json (needs the
