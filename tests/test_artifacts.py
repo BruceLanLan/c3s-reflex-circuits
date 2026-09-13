@@ -60,6 +60,14 @@ def test_published_sealed_spec_matches_the_preregistered_digest():
     assert len(json.loads(spec)["stimuli"]) == 48
 
 
+def test_demo_serves_the_pinned_three_js_itself():
+    # build/three.min.js of three@0.160.0 from npm, byte for byte the file jsDelivr serves
+    vendored = ROOT / "docs" / "demo" / "vendor" / "three-0.160.0.min.js"
+    assert hashlib.sha256(vendored.read_bytes()).hexdigest() == "170c6789f43217c96b3170f4b42fafe135de7f7cd48497a4218f9757ee1d49fa"
+    page = (ROOT / "docs" / "demo" / "index.html").read_text()
+    assert '<script src="vendor/three-0.160.0.min.js"></script>' in page
+
+
 def test_demo_embeds_the_committed_netlists():
     page = (ROOT / "docs" / "demo" / "index.html").read_text()
     block = page.split("<!-- DATA:BEGIN -->")[1].split("<!-- DATA:END -->")[0]

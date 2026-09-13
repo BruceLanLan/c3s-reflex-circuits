@@ -38,6 +38,12 @@ forge-std
 The Foundry test suite uses forge-std (MIT/Apache-2.0), installed into
 contracts/lib at test time and not committed.
 
+three.js
+--------
+docs/demo/vendor/three-0.160.0.min.js is build/three.min.js from the three npm
+package, version 0.160.0 (MIT License, copyright 2010-2023 three.js authors; see
+docs/demo/vendor/three-LICENSE). It is included unmodified.
+
 TapeOut netlist layout
 ----------------------
 The netlist byte layout and tick semantics implemented in c3s/netlist.py were
