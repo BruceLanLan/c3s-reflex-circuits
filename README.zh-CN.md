@@ -2,7 +2,7 @@
 
 **受连接组约束的电路综合：从果蝇巨纤维逃逸通路，到经过穷举验证、可以在链上运行的 NAND/LATCH 网表。**
 
-[English](README.md)
+[English](README.md) · [在线演示](https://brucelanlan.github.io/c3s-reflex-circuits/demo/) · [掌机仿真器](https://brucelanlan.github.io/c3s-reflex-circuits/sim/) · [Release v0.2.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0)
 
 这个仓库只问一个很窄的问题：**如果一个行为是由实测的神经连线塑造的，最少需要多小的一台确定机器才能复现它？这台机器有多少部分可以被证明，而不是被信任？**
 
@@ -33,7 +33,8 @@ MaleCNS v1.0 连接组 ─► 显式教师模型 ─► 16 位决策表
 
 * 开机自检：核对两份网表的 SHA-256；逐拍回放三个参考回合；在全部 131,072 个静止状态组合上核对核心与策略电路一致。结果显示在屏幕上，也打印到串口。
 * 自检之后，用键盘选 l/v 和方位角，发射逼近的圆盘。屏幕每拍显示 16 个感觉位、两条通路指示灯、6 个 LATCH 和运动指令，默认放慢 10 倍；串口每拍输出一行日志。
-* 刷机：`pio run -d firmware/cardputer -t upload`（需要 PlatformIO）。
+* 刷机：`pio run -d firmware/cardputer -t upload`（需要 PlatformIO）。不装 PlatformIO 也行：从 [v0.2.0 Release](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0) 下载 `c3s-escape-core-cardputer-adv-v0.2.0.bin`，`pip install esptool` 后运行 `python -m esptool --chip esp32s3 write_flash 0x0 c3s-escape-core-cardputer-adv-v0.2.0.bin`。
+* 2026-09-15 在 Cardputer ADV 真机上首次运行：自检 4.5 秒通过，串口记录的起飞拍与主机、WebAssembly 两个版本逐拍一致。
 * 没有设备也能看：[掌机仿真器](https://brucelanlan.github.io/c3s-reflex-circuits/sim/)把同一份 C 代码编译成 WebAssembly，在浏览器里运行，开机自检和按键与真机一致。
 * `tests/test_firmware.py` 对原生编译和 WebAssembly 两个版本，都在核心全部 8,388,608 个（输入, 状态）组合上与 Python 求值器逐行对照。
 

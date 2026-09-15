@@ -7,7 +7,7 @@ authors:
     website: "https://github.com/BruceLanLan"
 repository-code: "https://github.com/BruceLanLan/c3s-reflex-circuits"
 license: Apache-2.0
-version: 0.1.0
+version: 0.2.0
 keywords:
   - connectome
   - Drosophila

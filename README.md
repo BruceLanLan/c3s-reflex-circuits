@@ -4,7 +4,8 @@
 pathway to exhaustively verified NAND/LATCH netlists that run on chain.**
 
 [中文说明](README.zh-CN.md) · [Live demo](https://brucelanlan.github.io/c3s-reflex-circuits/demo/) ·
-[Release v0.1.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.1.0)
+[Handheld simulator](https://brucelanlan.github.io/c3s-reflex-circuits/sim/) ·
+[Release v0.2.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0)
 
 This repository asks a narrow question: *if a behaviour is shaped by measured
 wiring, how small a deterministic machine reproduces it, and how much of that
@@ -53,6 +54,12 @@ slowed down to be watchable, with a tick log on USB serial.
 ```sh
 pio run -d firmware/cardputer -t upload
 ```
+
+Without PlatformIO, write the image attached to the
+[v0.2.0 release](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0):
+`pip install esptool`, then
+`python -m esptool --chip esp32s3 write_flash 0x0 c3s-escape-core-cardputer-adv-v0.2.0.bin`.
+On 2026-09-15 the self-test passed on a Cardputer ADV in 4.5 s.
 
 Without the device, the
 [handheld simulator](https://brucelanlan.github.io/c3s-reflex-circuits/sim/) runs the

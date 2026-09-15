@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "c3s"
-version = "0.1.0"
+version = "0.2.0"
 description = "Connectome-constrained circuit synthesis: from a fly escape pathway to verified NAND/LATCH netlists"
 readme = "README.md"
 requires-python = ">=3.10"

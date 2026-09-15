@@ -41,7 +41,17 @@ download mode, then upload again.
 
 Pinned: `espressif32` 6.9.0 (Arduino-ESP32 2.0.17), M5Cardputer 1.1.1, M5Unified
 0.2.22, M5GFX 0.2.29. A build on 2026-09-15 used 48,700 bytes of RAM (14.9 %) and
-533,249 bytes of flash (16.0 %).
+532,769 bytes of flash (15.9 %). The prefix maps in `build_flags` keep the build
+machine's directories out of the image.
+
+Without PlatformIO, write the image attached to the
+[v0.2.0 release](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0)
+(bootloader, partition table, boot selector and application merged at offset 0):
+
+```sh
+pip install esptool
+python -m esptool --chip esp32s3 write_flash 0x0 c3s-escape-core-cardputer-adv-v0.2.0.bin
+```
 
 ## What the device checks at boot
 
