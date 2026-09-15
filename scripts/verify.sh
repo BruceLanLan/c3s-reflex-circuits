@@ -9,7 +9,8 @@
 #
 # Regenerated and compared byte for byte: teacher calibration, decision table,
 # encoding comparison, policy and core manifests, component manifests, the data block
-# of the web demo, EVM fixtures (and, with --full, the connectome subgraph).
+# of the web demo, the firmware's data files, EVM fixtures (and, with --full, the
+# connectome subgraph).
 # NOT regenerated here: DLGN runs (scripts/train_dlgn.py; a re-run of the 128-128-64
 # run reproduced its netlist byte for byte on torch 2.14 CPU), controls.json
 # (scripts/run_controls.py, about 25 minutes) and sealed-evaluation.json (needs the
@@ -36,9 +37,10 @@ step "rebuild LoomEscape-16 from scratch (calibration, table, circuits, cores)"
 "$PY" scripts/compare_encodings.py
 "$PY" scripts/export_components.py
 "$PY" scripts/build_demo.py
+"$PY" scripts/build_firmware.py
 
 step "committed artifacts must be reproduced byte for byte"
-git diff --exit-code -- circuits/ data/ docs/demo/
+git diff --exit-code -- circuits/ data/ docs/demo/ firmware/cardputer/lib/c3s_core/
 
 step "EVM evaluator over the full domain of every exported circuit"
 "$PY" scripts/export_evm_fixtures.py

@@ -27,6 +27,17 @@ MaleCNS v1.0 连接组 ─► 显式教师模型 ─► 16 位决策表
 * 页面每次加载都会核对嵌入网表的 SHA-256，并回放 Python 构建写入的参考回合；不一致会直接显示在页面上。
 * 页面里的 JavaScript 求值器已在完整定义域上与 Python 求值器、tapeout.net 公开求值器逐字节对照（见 [docs/CIRCUITS.md](docs/CIRCUITS.md#in-browser-evaluator-docsdemo)）。
 
+## 在 Cardputer ADV 上运行
+
+[`firmware/cardputer`](firmware/cardputer) 把同一个逃逸核心跑在 M5Stack Cardputer ADV（ESP32-S3）上。网表字节原样嵌入固件，由一个 C 求值器逐个单元求值，没有翻译成 C 逻辑，也没有重新综合。
+
+* 开机自检：核对两份网表的 SHA-256；逐拍回放三个参考回合；在全部 131,072 个静止状态组合上核对核心与策略电路一致。结果显示在屏幕上，也打印到串口。
+* 自检之后，用键盘选 l/v 和方位角，发射逼近的圆盘。屏幕每拍显示 16 个感觉位、两条通路指示灯、6 个 LATCH 和运动指令，默认放慢 10 倍；串口每拍输出一行日志。
+* 刷机：`pio run -d firmware/cardputer -t upload`（需要 PlatformIO）。
+* `tests/test_firmware.py` 用主机编译器编译同一份 C 代码，在核心全部 8,388,608 个（输入, 状态）组合上与 Python 求值器逐行对照。
+
+按键、串口格式和局限见 [docs/FIRMWARE.md](docs/FIRMWARE.md)。
+
 ## 结果一览
 
 | | |
@@ -51,7 +62,7 @@ git clone https://github.com/BruceLanLan/c3s-reflex-circuits.git
 cd c3s-reflex-circuits
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,learn]"
-pytest -q                                  # 50 个测试，含穷举等价检查
+pytest -q                                  # 94 个测试，含穷举等价检查
 ```
 
 在 Python 里拿起一个已提交的电路，喂一帧刺激：
@@ -94,6 +105,7 @@ scripts/verify.sh --full   # 另外重新下载并抽取 MaleCNS 子图（约 1.
 | `scripts/` | 各阶段入口脚本与 `verify.sh` | 想重建某一层 |
 | `circuits/` | 每个电路一个 JSON 清单：指标、SHA-256、网表字节、证据 | 想直接用电路 |
 | `contracts/` | `NandMachine`、`ReflexCore`（Solidity）与 Foundry 测试 | 想上链重放 |
+| `firmware/` | Cardputer ADV 固件（PlatformIO）；`lib/c3s_core` 是设备和主机测试共用的 C 求值器 | 想在设备上跑核心 |
 | `data/` | 连接组聚合数据（源数据 CC-BY） | 想核对生物学来源 |
 | `docs/` | 英文详细文档；`docs/demo/` 是网页演示 | 想看方法与局限 |
 | `tests/` | pytest 测试 | 改完代码先跑 |
@@ -162,6 +174,12 @@ python scripts/train_dlgn.py --widths 128,128,64 --epochs 200 --seed 0
 ### 更新网页演示
 
 重建电路后运行 `python scripts/build_demo.py`，它把核心网表、编码、教师参数和参考回合写进 `docs/demo/index.html` 的数据块；`scripts/verify.sh` 会检查这一步也能逐字节复现。页面本身是单个 HTML 文件，界面代码直接改这个文件。
+
+### 更新固件
+
+* 固件数据来自演示页的数据块：先 `python scripts/build_demo.py`，再 `python scripts/build_firmware.py`，后者重写 `firmware/cardputer/lib/c3s_core/c3s_data.{h,c}`。`scripts/verify.sh` 和 `tests/test_firmware.py` 都会核对它逐字节是最新的。
+* 求值器、几何与编码在 `lib/c3s_core/c3s_core.c`（C99，设备和主机测试共用）；屏幕、键盘和节拍调度在 `src/main.cpp`。换一块 ESP32 设备只需要改 `src/main.cpp` 和 `platformio.ini`。
+* `pio run -d firmware/cardputer -t upload` 编译并刷机；`pio device monitor -b 115200` 看逐拍日志。
 
 ## 常见问题
 

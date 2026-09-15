@@ -7,4 +7,5 @@ __pycache__/
 contracts/out/
 contracts/cache/
 contracts/lib/
+firmware/cardputer/.pio/
 .DS_Store

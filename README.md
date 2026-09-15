@@ -40,6 +40,24 @@ python -m http.server -d docs 8000     # then open http://localhost:8000/demo/
 GitHub Pages serves the page from `main` → `/docs`.
 `python scripts/build_demo.py` re-embeds the circuits after a rebuild.
 
+## On a Cardputer ADV
+
+[`firmware/cardputer`](firmware/cardputer) runs the same escape core on an M5Stack
+Cardputer ADV (ESP32-S3). The netlist bytes are embedded unchanged and evaluated cell
+by cell in C. At boot the device checks both netlists' SHA-256, replays the reference
+episodes tick by tick and checks the core against the policy on all 131,072 rows at
+rest. It then launches looming discs from the l/v and azimuth you pick on the keyboard
+and shows the sensory bits, pathway lamps, latches and motor command at every tick,
+slowed down to be watchable, with a tick log on USB serial.
+
+```sh
+pio run -d firmware/cardputer -t upload
+```
+
+`tests/test_firmware.py` compiles the same C code for the host and checks it against
+the Python engine on all 8,388,608 (input, state) rows of the core. Details, keys and
+limitations: [docs/FIRMWARE.md](docs/FIRMWARE.md).
+
 ## Results at a glance
 
 | | |
@@ -48,6 +66,7 @@ GitHub Pages serves the page from `main` → `/docs`.
 | **Policy circuit** | 16 sensory bits → 2 pathway bits in **74 NAND**, depth 11, exactly equal to the teacher on all 65,536 inputs |
 | **Stateful escape core** | **173 NAND + 6 LATCH** (1,235 bytes); step relation equal to its specification on all 8,388,608 (input, state) rows |
 | **Behaviour vs continuous teacher** | escape agreement 1.00; short/long-mode agreement 0.83 (train) and 0.90 (holdout); takeoff within ~1 tick (5 ms) |
+| **Firmware** | the Cardputer ADV firmware's C evaluator, compiled for the host, equals the Python engine on all 8,388,608 (input, state) rows of the core; the device itself checks the hashes, the reference episodes and 131,072 rows at rest on every boot |
 | **EVM** | full-domain differential test of 18 circuits passes; one tick of the core costs ~370k gas on the reference evaluator |
 | **TapeOut byte layout** | cross-checked against the public tapeout.net decoder and evaluator: 0 mismatches over 4,800 random ticks and the final circuits |
 | **Learned circuits (DLGN)** | 67–90 % row accuracy at 216–1,340 NAND: on a fully tabulable function, exact synthesis wins |
@@ -106,16 +125,18 @@ scripts/        extraction, build, encoding comparison, DLGN training, controls,
 data/           derived connectome aggregate (CC-BY source)
 circuits/       every circuit as a manifest: metrics, SHA-256, netlist bytes, evidence
 contracts/      NandMachine and ReflexCore (Solidity) with Foundry tests
-docs/           connectome, teacher, circuits, evaluation, limitations, references;
-                docs/demo/ is the web demo
+firmware/       Cardputer ADV firmware (PlatformIO) and the host driver for its test
+docs/           connectome, teacher, circuits, evaluation, firmware, limitations,
+                references; docs/demo/ is the web demo
 tests/          pytest suite
 ```
 
 ## Reproduce
 
 Requirements: Python ≥ 3.10 with `numpy`, `torch`, `pytest` (plus `pyarrow` and
-`pandas` to re-extract the connectome), Yosys 0.68 (for `yosys-abc`) and Foundry
-1.8.1 (solc 0.8.28). The committed artifacts were built with Yosys 0.68 and torch
+`pandas` to re-extract the connectome), Yosys 0.68 (for `yosys-abc`), Foundry
+1.8.1 (solc 0.8.28) and a C compiler (for `tests/test_firmware.py`, which is skipped
+without one). Building the firmware needs PlatformIO. The committed artifacts were built with Yosys 0.68 and torch
 2.14 on CPU; byte-for-byte identity is asserted for those versions (see
 [LIMITATIONS](docs/LIMITATIONS.md#known-limitations-of-the-circuits-and-evaluation)).
 
@@ -151,6 +172,7 @@ the ABC-produced netlists also reproduce byte for byte there.
 | Train a learned circuit | `python scripts/train_dlgn.py --widths 128,128,64` writes `circuits/loom-escape/dlgn-128x128x64-s0.json`. |
 | Use a circuit on chain | Every manifest carries `tapeout_netlist_hex`; `contracts/src/NandMachine.sol` evaluates any such netlist and `contracts/src/ReflexCore.sol` holds one core with per-caller state. Usage is in `contracts/test/`. |
 | Update the web demo | `python scripts/build_demo.py` after a rebuild. |
+| Run the core on a device | `pio run -d firmware/cardputer -t upload` ([docs/FIRMWARE.md](docs/FIRMWARE.md)). After a rebuild, run `python scripts/build_firmware.py` after `build_demo.py`. Only `src/main.cpp` and `platformio.ini` are specific to the Cardputer ADV. |
 
 Any change to the teacher, the encoding or the calibration voids the one-time sealed
 evaluation ([docs/EVALUATION.md](docs/EVALUATION.md)).
