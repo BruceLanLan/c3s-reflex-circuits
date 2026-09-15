@@ -1,0 +1,31 @@
+{
+  "module": "c3s_core.wasm",
+  "sha256": "2b65dcb5288786c5fe1fbaee24ba989b40510920cbf8e23038ca7b4512fe2bd2",
+  "bytes": 15683,
+  "compiler": "Homebrew clang version 23.1.1",
+  "flags": [
+    "--target=wasm32",
+    "-std=c99",
+    "-O2",
+    "-ffreestanding",
+    "-nostdlib",
+    "-mbulk-memory",
+    "-ffp-contract=off",
+    "-Wall",
+    "-Wextra",
+    "-Ifirmware/wasm/include",
+    "-Ifirmware/cardputer/lib/c3s_core",
+    "-Wl,--no-entry",
+    "-Wl,--strip-all",
+    "-Wl,-z,stack-size=65536"
+  ],
+  "sources": {
+    "firmware/cardputer/lib/c3s_core/c3s_core.c": "2769be21eac8fc98249102295083c0b8763fba90cd9aa0f0cc87bd76b59a0789",
+    "firmware/cardputer/lib/c3s_core/c3s_data.c": "1d37fcbc3a2c8f5ca6e4770ac30cde138c071970f7916e031fd0a1283e1f2347",
+    "firmware/wasm/sim.c": "fac3dadba6adb3a1b3849f9f25858d20ba1541f4a57e299c7c11020004ca4c4c",
+    "firmware/cardputer/lib/c3s_core/c3s_core.h": "ee18b8168cfcd10a428cce91e6bd574a7fff0d52e8e0affe9112abc21f93e83d",
+    "firmware/cardputer/lib/c3s_core/c3s_data.h": "35ae3dada389cee05ec8b4f359f8701b6ad9729057cc75378259af0a78a963b2",
+    "firmware/wasm/include/math.h": "a270df6814573daa042914ebb481f1e61b840701792e97949d0a0b622310ab1e",
+    "firmware/wasm/include/string.h": "61c5faa8b5d8f5e36f6e5e895a31ecd1ec7455a230c9610019b86e43fdc46e9b"
+  }
+}

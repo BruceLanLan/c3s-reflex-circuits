@@ -34,7 +34,8 @@ MaleCNS v1.0 连接组 ─► 显式教师模型 ─► 16 位决策表
 * 开机自检：核对两份网表的 SHA-256；逐拍回放三个参考回合；在全部 131,072 个静止状态组合上核对核心与策略电路一致。结果显示在屏幕上，也打印到串口。
 * 自检之后，用键盘选 l/v 和方位角，发射逼近的圆盘。屏幕每拍显示 16 个感觉位、两条通路指示灯、6 个 LATCH 和运动指令，默认放慢 10 倍；串口每拍输出一行日志。
 * 刷机：`pio run -d firmware/cardputer -t upload`（需要 PlatformIO）。
-* `tests/test_firmware.py` 用主机编译器编译同一份 C 代码，在核心全部 8,388,608 个（输入, 状态）组合上与 Python 求值器逐行对照。
+* 没有设备也能看：[掌机仿真器](https://brucelanlan.github.io/c3s-reflex-circuits/sim/)把同一份 C 代码编译成 WebAssembly，在浏览器里运行，开机自检和按键与真机一致。
+* `tests/test_firmware.py` 对原生编译和 WebAssembly 两个版本，都在核心全部 8,388,608 个（输入, 状态）组合上与 Python 求值器逐行对照。
 
 按键、串口格式和局限见 [docs/FIRMWARE.md](docs/FIRMWARE.md)。
 
@@ -62,7 +63,7 @@ git clone https://github.com/BruceLanLan/c3s-reflex-circuits.git
 cd c3s-reflex-circuits
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,learn]"
-pytest -q                                  # 94 个测试，含穷举等价检查
+pytest -q                                  # 100 个测试，含穷举等价检查
 ```
 
 在 Python 里拿起一个已提交的电路，喂一帧刺激：

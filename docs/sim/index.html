@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoomEscape Handheld</title>
+<meta name="description" content="The Cardputer ADV firmware of a fruit-fly escape reflex circuit, simulated in the browser: the firmware's own C evaluator compiled to WebAssembly runs 173 NAND gates and 6 latches tick by tick.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2315181C'/%3E%3Crect x='3' y='4' width='10' height='6' fill='%23F2A541'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Loaded without blocking rendering: where Google Fonts is unreachable the page keeps its fallback fonts. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&amp;family=Martian+Mono:wght@400;500&amp;family=Silkscreen&amp;display=swap" media="print" onload="this.media='all'">
+<style>
+  :root {
+    --screen: #E6ECF0;
+    --screen-deep: #C5D1D9;
+    --ink: #1A1E23;
+    --loom: #121417;
+    --rail: #15181C;
+    --rail-raised: #1C2025;
+    --line: #2B3037;
+    --paper: #ECE7DC;
+    --dim: #979CA3;
+    --faint: #5E646C;
+    --gf: #D0473A;
+    --par: #86BFA8;
+    --amber: #F2A541;
+    --bad: #E36A52;
+    --ok: #46C878;
+    --display: "Silkscreen", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --ui: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Noto Sans SC", sans-serif;
+    --mono: "Martian Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--rail);
+    color: var(--paper);
+    font-family: var(--ui);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  a { color: var(--amber); }
+
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) 400px; min-height: 100vh; min-height: 100dvh; }
+
+  /* ---------- bench ---------- */
+  .bench {
+    display: grid;
+    place-items: center;
+    padding-block: 32px;
+    padding-inline: 24px;
+    background: linear-gradient(180deg, #EEF2F4 0%, var(--screen) 55%, var(--screen-deep) 100%);
+    min-width: 0;
+  }
+  .device {
+    width: min(100%, 780px);
+    background: linear-gradient(180deg, #2E333A 0%, #202428 100%);
+    border-radius: 22px;
+    padding: 20px 20px 18px;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 24px 48px -20px rgba(18, 20, 23, 0.55);
+  }
+  .device-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0 4px 12px;
+    font-family: var(--display);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--faint);
+  }
+  .device-top b { color: var(--dim); font-weight: 400; }
+  .bezel { background: #07080A; border-radius: 10px; padding: clamp(8px, 2vw, 16px); }
+  #screen { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #0C0E12; }
+  .keys {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .key {
+    display: grid;
+    gap: 1px;
+    justify-items: center;
+    padding: 7px 2px 6px;
+    background: #353A42;
+    border: 1px solid #434952;
+    border-bottom-width: 3px;
+    border-radius: 7px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    min-width: 0;
+  }
+  .key b { font-family: var(--display); font-size: 15px; font-weight: 400; line-height: 1.1; }
+  .key span { font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .key.go { grid-column: span 2; background: var(--amber); border-color: #C9852F; color: var(--ink); }
+  .key.go span { color: rgba(26, 30, 35, 0.72); }
+  .key:active, .key.down { transform: translateY(1px); border-bottom-width: 2px; }
+  .key[aria-pressed="true"] { border-color: var(--amber); }
+  .key[aria-pressed="true"] span { color: var(--amber); }
+  .bench-note { margin: 14px 4px 0; color: #5B6068; font-size: 12.5px; max-width: 70ch; }
+
+  /* ---------- rail ---------- */
+  .rail {
+    border-left: 1px solid var(--line);
+    padding-block: 20px 28px;
+    padding-inline: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    min-width: 0;
+  }
+  .masthead { display: grid; gap: 6px; }
+  .masthead-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .wordmark { font-family: var(--display); font-size: 20px; letter-spacing: 0.02em; line-height: 1; margin: 0; font-weight: 400; }
+  .wordmark b { color: var(--amber); font-weight: 400; }
+  .lede { margin: 0; color: var(--dim); text-wrap: pretty; }
+  .lang { display: inline-flex; flex: none; border: 1px solid var(--line); }
+  .lang button { background: none; border: 0; padding: 3px 9px; font-size: 12px; color: var(--dim); cursor: pointer; white-space: nowrap; }
+  .lang button[aria-pressed="true"] { background: var(--rail-raised); color: var(--paper); }
+  h2 {
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+  .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 14px; margin: 0; font-size: 13px; }
+  .facts dt { color: var(--faint); }
+  .facts dd { margin: 0; overflow-wrap: anywhere; }
+  .facts code, .checks code { font-family: var(--mono); font-size: 11.5px; }
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+  .checks li { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+  .checks i { width: 9px; height: 9px; display: inline-block; background: var(--faint); }
+  .checks li.ok i { background: var(--ok); }
+  .checks li.bad i { background: var(--bad); }
+  .checks li.info i { background: var(--dim); }
+  #log {
+    margin: 0;
+    height: 220px;
+    overflow: auto;
+    background: var(--loom);
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    line-height: 1.55;
+    color: #C9CDD2;
+    white-space: pre;
+  }
+  .notes { margin: 0; padding-left: 18px; color: var(--dim); display: grid; gap: 4px; font-size: 13px; }
+  .foot { margin-top: auto; color: var(--faint); font-size: 12.5px; display: grid; gap: 4px; }
+  .foot a { color: var(--dim); }
+
+  @media (max-width: 960px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .rail { border-left: 0; border-top: 1px solid var(--line); }
+  }
+  @media (max-width: 560px) {
+    .bench { padding-block: 16px; padding-inline: 16px; }
+    .device { padding: 14px 12px 12px; border-radius: 16px; }
+    .keys { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    .rail { padding-inline: 16px; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <section class="bench" aria-label="Simulated device">
+    <div>
+      <div class="device">
+        <div class="device-top"><b>C3S ESCAPE CORE</b><span>240 × 135</span></div>
+        <div class="bezel"><canvas id="screen" width="960" height="540" role="img" aria-label="Simulated firmware screen"></canvas></div>
+        <div class="keys" id="keys"></div>
+      </div>
+      <p class="bench-note" data-i18n="benchNote">Click the keys, or type them: Enter launches a loom; the arrow keys or ; . , / change l/v and azimuth.</p>
+    </div>
+  </section>
+
+  <aside class="rail">
+    <header class="masthead">
+      <div class="masthead-top">
+        <h1 class="wordmark">LOOMESCAPE <b>HANDHELD</b></h1>
+        <div class="lang" role="group" aria-label="Language">
+          <button type="button" data-lang="en" aria-pressed="true">EN</button>
+          <button type="button" data-lang="zh" aria-pressed="false">中文</button>
+        </div>
+      </div>
+      <p class="lede" data-i18n="lede">The escape core's Cardputer ADV firmware, running in your browser. Decoding the netlist bytes, evaluating 173 NAND + 6 LATCH gate by gate, the looming geometry, the 16-bit sensory encoding and the boot self-test are the firmware's own C code compiled to WebAssembly. The screen is redrawn in JavaScript following the firmware's drawing code.</p>
+    </header>
+
+    <section>
+      <h2 data-i18n="bootTitle">Boot self-test</h2>
+      <ul class="checks" id="checks"><li class="info"><i></i><span data-i18n="loading">Loading the WebAssembly module…</span></li></ul>
+    </section>
+
+    <section>
+      <h2 data-i18n="runsTitle">What runs here</h2>
+      <dl class="facts" id="facts"></dl>
+    </section>
+
+    <section>
+      <h2 data-i18n="logTitle">Serial log</h2>
+      <pre id="log" aria-live="off"></pre>
+    </section>
+
+    <section>
+      <h2 data-i18n="diffTitle">Not the same as the device</h2>
+      <ul class="notes">
+        <li data-i18n="diff1">The screen follows firmware/cardputer/src/main.cpp but is not pixel-identical; text uses a browser font.</li>
+        <li data-i18n="diff2">atan and tan come from the browser's Math, not the ESP32's maths library, so a live episode can differ from the device by a tick at a bin edge. The self-test replays embedded samples, which does not depend on either.</li>
+        <li data-i18n="diff3">Ticks follow the browser's frame clock; the circuit's behaviour depends only on the tick sequence.</li>
+      </ul>
+    </section>
+
+    <footer class="foot">
+      <span><a href="../demo/" data-i18n="demoLink">Voxel-world web demo</a> · <a href="https://github.com/BruceLanLan/c3s-reflex-circuits/blob/main/docs/FIRMWARE.md" data-i18n="fwLink">Firmware notes</a> · <a href="https://github.com/BruceLanLan/c3s-reflex-circuits" data-i18n="repoLink">Source, proofs and docs</a></span>
+      <span><span data-i18n="author">Author</span> <a href="https://github.com/BruceLanLan">BruceBlue</a> · X <a href="https://x.com/BruceBlue">@BruceBlue</a></span>
+    </footer>
+  </aside>
+</main>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------- text
+
+const I18N = {
+  en: {},
+  zh: {
+    benchNote: "点按键，或者直接用键盘：Enter 发射逼近物；方向键或 ; . , / 调 l/v 和方位角。",
+    lede: "逃逸核心的 Cardputer ADV 固件，在浏览器里运行。解码网表字节、逐门求值 173 NAND + 6 LATCH、逼近几何、16 位感觉编码和开机自检，都是固件自己的 C 代码编译成的 WebAssembly；屏幕按固件的绘制代码用 JavaScript 重画。",
+    bootTitle: "开机自检",
+    loading: "正在加载 WebAssembly 模块…",
+    runsTitle: "这里运行的是什么",
+    logTitle: "串口日志",
+    diffTitle: "与真机的差别",
+    diff1: "屏幕按 firmware/cardputer/src/main.cpp 绘制，但不是逐像素一致；文字用的是浏览器字体。",
+    diff2: "atan 和 tan 用的是浏览器的 Math，不是 ESP32 的数学库，所以实时回合在分箱边界附近可能与真机差一拍。自检回放的是嵌入的采样值，不受两者影响。",
+    diff3: "节拍跟随浏览器的帧时钟；电路的行为只取决于节拍序列。",
+    demoLink: "方块世界网页演示",
+    fwLink: "固件说明",
+    repoLink: "源码、证明与文档",
+    author: "作者",
+    kGo: "发射", kLvUp: "l/v 增", kLvDown: "l/v 减", kAzL: "方位左", kAzR: "方位右",
+    kPause: "暂停", kStep: "单拍", kAuto: "自动", kSound: "声音", kTest: "自检", kHelp: "按键",
+    fNetlist: "核心网表", fPolicy: "策略网表", fModule: "模块", fScreen: "屏幕",
+    fScreenText: "JavaScript 重画，按 main.cpp 的坐标",
+    cHash: (n, h) => `${n} 的 SHA-256 ${h}… 与清单一致`,
+    cHashBad: (n, h) => `${n} 的 SHA-256 ${h}… 与清单不一致`,
+    cEpisodes: (a, b) => `参考回合 ${a}/${b} 逐拍一致`,
+    cRest: (a, b) => `静止状态 ${a}/${b} 行：核心与策略一致`,
+    cGeometry: (a, b) => `实时几何重现嵌入采样 ${a}/${b}（仅供参考）`,
+    cModule: (h) => `模块 SHA-256 ${h}… 与 build.json 一致`,
+    cModuleBad: "模块 SHA-256 与 build.json 不一致",
+    cModuleSkip: "此浏览器不支持在本页计算 SHA-256，未核对模块",
+    cTime: (ms) => `自检用时 ${ms} ms（本浏览器）`,
+    cDecode: (a, b) => `网表解码失败：核心 ${a}，策略 ${b}`,
+    loadFail: "无法加载 c3s_core.wasm。请通过 http(s) 打开本页，不要直接双击文件。",
+  },
+};
+Object.assign(I18N.en, {
+  kGo: "launch", kLvUp: "l/v up", kLvDown: "l/v down", kAzL: "az left", kAzR: "az right",
+  kPause: "pause", kStep: "tick", kAuto: "auto", kSound: "sound", kTest: "self-test", kHelp: "keys",
+  fNetlist: "Core netlist", fPolicy: "Policy netlist", fModule: "Module", fScreen: "Screen",
+  fScreenText: "redrawn in JavaScript at main.cpp's coordinates",
+  cHash: (n, h) => `${n} SHA-256 ${h}… matches its manifest`,
+  cHashBad: (n, h) => `${n} SHA-256 ${h}… does not match its manifest`,
+  cEpisodes: (a, b) => `${a}/${b} reference episodes tick-exact`,
+  cRest: (a, b) => `${a}/${b} rows at rest: core agrees with policy`,
+  cGeometry: (a, b) => `${a}/${b} live geometry reproduces the embedded samples (informational)`,
+  cModule: (h) => `module SHA-256 ${h}… matches build.json`,
+  cModuleBad: "module SHA-256 does not match build.json",
+  cModuleSkip: "this browser cannot hash here; module not checked",
+  cTime: (ms) => `self-test took ${ms} ms in this browser`,
+  cDecode: (a, b) => `netlist decode failed: core ${a}, policy ${b}`,
+  loadFail: "Could not load c3s_core.wasm. Open this page over http(s), not as a file.",
+});
+for (const el of document.querySelectorAll("[data-i18n]")) I18N.en[el.dataset.i18n] ??= el.textContent;
+
+let lang = "en";
+try { lang = localStorage.getItem("c3s-lang") || (navigator.language.startsWith("zh") ? "zh" : "en"); } catch { /* storage unavailable */ }
+const t = (key) => I18N[lang][key] ?? I18N.en[key];
+
+function applyLang() {
+  document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  for (const el of document.querySelectorAll("[data-i18n]")) el.textContent = t(el.dataset.i18n);
+  for (const b of document.querySelectorAll(".lang button")) b.setAttribute("aria-pressed", String(b.dataset.lang === lang));
+  renderKeys();
+  renderFacts();
+  renderChecks();
+}
+for (const b of document.querySelectorAll(".lang button")) {
+  b.addEventListener("click", () => {
+    lang = b.dataset.lang;
+    try { localStorage.setItem("c3s-lang", lang); } catch { /* storage unavailable */ }
+    applyLang();
+  });
+}
+
+// ---------------------------------------------------------------- module
+
+let w = null;      // WebAssembly exports: the firmware's C code
+let build = null;  // docs/sim/build.json
+let moduleHash = null;
+const cstr = (ptr) => {
+  const mem = new Uint8Array(w.memory.buffer);
+  let end = ptr;
+  while (mem[end]) end++;
+  return new TextDecoder().decode(mem.subarray(ptr, end));
+};
+const hexOf = (buf) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
+
+async function loadModule() {
+  const [b, m] = await Promise.all([fetch("build.json"), fetch("c3s_core.wasm")]);
+  if (!b.ok || !m.ok) throw new Error("fetch failed");
+  build = await b.json();
+  const bytes = await m.arrayBuffer();
+  if (window.crypto && crypto.subtle) moduleHash = hexOf(await crypto.subtle.digest("SHA-256", bytes));
+  const { instance } = await WebAssembly.instantiate(bytes, { env: { atan: Math.atan, tan: Math.tan } });
+  w = instance.exports;
+}
+
+// ---------------------------------------------------------------- firmware state (mirrors src/main.cpp)
+
+const kLv = [10, 12, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 100, 140];
+const kSlow = [1, 4, 10, 40];
+const MOTOR_RAISING = 1, MOTOR_SHORT = 2, MOTOR_LONG = 3;
+
+let lvIndex = 7, azimuth = 0, slowIndex = 2;
+let autoDemo = true, paused = false, sound = true;
+let page = "selftest", phase = "idle", pageUntil = 0;
+let last = null, haveTick = false, runLv = 40, runAz = 0, takeoffMotor = -1;
+let lastTickMs = 0, phaseMs = 0, dirty = true;
+let passed = false, runnable = false, selfTestMs = 0, report = null;
+const millis = () => performance.now();
+
+// ---------------------------------------------------------------- drawing primitives (240 x 135, M5GFX-like)
+
+const S = 4;
+const canvas = document.getElementById("screen");
+const ctx = canvas.getContext("2d");
+ctx.setTransform(S, 0, 0, S, 0, 0);
+const FONT = '600 8.2px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
+
+const rgb = (r, g, b) => `rgb(${r},${g},${b})`;
+const kBg = rgb(12, 14, 18), kPanel = rgb(28, 32, 40), kDim = rgb(60, 66, 76), kText = rgb(225, 228, 234);
+const kMuted = rgb(140, 148, 158), kSensory = rgb(80, 170, 255), kGf = rgb(255, 96, 72), kPar = rgb(255, 190, 60);
+const kLatch = rgb(170, 130, 255), kOk = rgb(70, 200, 120), kBad = rgb(240, 70, 70), kFly = rgb(236, 206, 150);
+const kLoomFill = rgb(74, 80, 94), kLoomEdge = rgb(190, 196, 208), kWing = rgb(150, 170, 190);
+const trunc = Math.trunc;
+
+function fillRect(x, y, wd, ht, c) { ctx.fillStyle = c; ctx.fillRect(x, y, wd, ht); }
+function drawRect(x, y, wd, ht, c) { ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, wd - 1, ht - 1); }
+function fillCircle(x, y, r, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, r + 0.5, 0, 2 * Math.PI); ctx.fill(); }
+function drawCircle(x, y, r, c) { ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + 0.5, y + 0.5, r, 0, 2 * Math.PI); ctx.stroke(); }
+function fillEllipse(x, y, rx, ry, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x + 0.5, y + 0.5, rx + 0.5, ry + 0.5, 0, 0, 2 * Math.PI); ctx.fill(); }
+function fillTriangle(x0, y0, x1, y1, x2, y2, c) {
+  ctx.fillStyle = c;
+  ctx.beginPath(); ctx.moveTo(x0 + 0.5, y0 + 0.5); ctx.lineTo(x1 + 0.5, y1 + 0.5); ctx.lineTo(x2 + 0.5, y2 + 0.5); ctx.closePath(); ctx.fill();
+}
+function drawLine(x0, y0, x1, y1, c) { ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0 + 0.5, y0 + 0.5); ctx.lineTo(x1 + 0.5, y1 + 0.5); ctx.stroke(); }
+// Font0 is a 6 x 8 cell; each character is placed on that grid so layouts match the device.
+function text(x, y, c, s) {
+  ctx.fillStyle = c; ctx.font = FONT; ctx.textBaseline = "top"; ctx.textAlign = "center";
+  for (let i = 0; i < s.length; i++) ctx.fillText(s[i], x + i * 6 + 2.5, y);
+}
+function lamp(x, y, on, c) {
+  if (on) fillRect(x, y, 7, 7, c);
+  else { fillRect(x, y, 7, 7, kPanel); drawRect(x, y, 7, 7, kDim); }
+}
+function bits(x, y, label, value, n, c) {
+  text(x, y, kMuted, label);
+  for (let i = 0; i < n; i++) lamp(x + 50 + i * 9, y, (value >> (n - 1 - i)) & 1, c);
+  text(x + 53 + n * 9, y, kText, String(value));
+}
+function motorColor(m) { return m === MOTOR_RAISING ? kLatch : m === MOTOR_SHORT ? kGf : m === MOTOR_LONG ? kPar : kMuted; }
+const motorName = (m) => cstr(w.sim_motor_name(m));
+const signed = (v) => (v >= 0 ? "+" : "") + v;
+const hex = (v, n) => v.toString(16).padStart(n, "0");
+
+// ---------------------------------------------------------------- simulation
+
+let audio = null;
+function beep(m) {
+  if (!sound || !audio) return;
+  const osc = audio.createOscillator(), gain = audio.createGain();
+  osc.frequency.value = m === MOTOR_SHORT ? 2400 : 1500;
+  gain.gain.value = 0.05;
+  osc.connect(gain).connect(audio.destination);
+  osc.start();
+  osc.stop(audio.currentTime + 0.06);
+}
+
+function launch() {
+  if (!runnable) return;
+  runLv = kLv[lvIndex];
+  runAz = azimuth;
+  w.sim_start(runLv, runAz);
+  phase = "looming";
+  haveTick = false;
+  takeoffMotor = -1;
+  paused = false;
+  lastTickMs = phaseMs = millis();
+  dirty = true;
+  log(`loom l/v ${runLv} ms, azimuth ${runAz} deg`);
+  renderKeys();
+}
+
+function advance() {
+  if (!w.sim_tick()) {
+    phase = "ended";
+    phaseMs = millis();
+    log("disc reached its end size without a takeoff");
+    dirty = true;
+    return;
+  }
+  last = { tick: w.sim_last(0), theta: w.sim_last(1), dtheta: w.sim_last(2), x: w.sim_last(3), pathways: w.sim_last(4), state: w.sim_last(5), motor: w.sim_last(6), next: w.sim_last(7) };
+  haveTick = true;
+  dirty = true;
+  log(`tick ${String(last.tick).padStart(3)} size ${last.theta.toFixed(3).padStart(7)} speed ${last.dtheta.toFixed(2).padStart(9)} x ${hex(last.x, 5)} gf ${last.pathways & 1} par ${last.pathways >> 1} latch ${hex(last.state, 2)} motor ${last.motor} ${motorName(last.motor)}`);
+  if (last.motor === MOTOR_SHORT || last.motor === MOTOR_LONG) {
+    takeoffMotor = last.motor;
+    phase = "tookoff";
+    phaseMs = millis();
+    beep(takeoffMotor);
+  }
+}
+
+function manual() { autoDemo = false; dirty = true; }
+
+// ---------------------------------------------------------------- screen (coordinates as in src/main.cpp)
+
+function drawTopBar() {
+  fillRect(0, 0, 240, 11, kPanel);
+  text(3, 2, kText, `${cstr(w.sim_name(0))} ${w.sim_info(0)} NAND+${w.sim_info(1)} LATCH`);
+  fillRect(206, 1, 33, 9, passed ? kOk : kBad);
+  text(211, 2, kBg, passed ? "PASS" : "FAIL");
+}
+
+function drawFly(cx, cy, dx, dy) {
+  let k = 0;
+  if (takeoffMotor >= 0) {
+    k = (millis() - phaseMs) / 700;
+    if (phase === "ended" || k > 1) k = 1;
+  }
+  const fx = cx - trunc(dx * 70 * k * k), fy = cy - trunc(dy * 70 * k * k);
+  const raise = haveTick ? last.next & 7 : 0;
+  let wing = takeoffMotor === MOTOR_LONG ? 1 : Math.min(raise, 4) / 4;
+  if (takeoffMotor === MOTOR_SHORT) wing = 0;  // short mode leaves without raising the wings
+  for (const s of [-1, 1]) {
+    const tipX = fx + s * trunc(3 + 11 * wing), tipY = fy + trunc(13 - 19 * wing);
+    fillTriangle(fx + s * 2, fy - 4, tipX, tipY, fx + s, fy + 3, kWing);
+  }
+  fillEllipse(fx, fy + 2, 4, 8, kFly);
+  fillCircle(fx, fy - 8, 4, kFly);
+  const left = haveTick && (last.x & 0xff), right = haveTick && ((last.x >> 8) & 0xff);
+  fillCircle(fx - 3, fy - 9, 2, left ? kSensory : kDim);
+  fillCircle(fx + 3, fy - 9, 2, right ? kSensory : kDim);
+  if (takeoffMotor >= 0 && k < 1) {
+    for (let i = 1; i <= 3; i++) drawCircle(fx, fy, 8 + i * 4, i === 1 ? motorColor(takeoffMotor) : kDim);
+  }
+}
+
+function drawArena() {
+  const ax = 0, ay = 12, aw = 106, ah = 111, cx = ax + 53, cy = ay + 66, dist = 38;
+  const az = phase === "idle" ? azimuth : runAz;
+  const a = (az * Math.PI) / 180, dx = Math.sin(a), dy = -Math.cos(a);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(ax, ay, aw, ah - 12); ctx.clip();
+  fillRect(ax, ay, aw, ah, kBg);
+  for (const s of [-1, 1]) {
+    const e = (s * 30 * Math.PI) / 180;
+    drawLine(cx, cy - 8, cx + trunc(90 * Math.sin(e)), cy - 8 - trunc(90 * Math.cos(e)), kPanel);
+  }
+  const lx = cx + trunc(dx * dist), ly = cy - 8 + trunc(dy * dist);
+  if (phase !== "idle" && haveTick) {
+    const r = Math.min(dist * Math.tan((last.theta * Math.PI) / 360), 120);
+    fillCircle(lx, ly, trunc(r), kLoomFill);
+    drawCircle(lx, ly, trunc(r), kLoomEdge);
+  } else {
+    drawCircle(lx, ly, 4, kLoomEdge);
+    drawLine(lx - trunc(dx * 8), ly - trunc(dy * 8), lx - trunc(dx * 20), ly - trunc(dy * 20), kDim);
+  }
+  drawFly(cx, cy, dx, dy);
+  ctx.restore();
+
+  let caption = "ready", color = kMuted;
+  if (takeoffMotor >= 0) { caption = motorName(takeoffMotor); color = motorColor(takeoffMotor); }
+  else if (phase === "ended") caption = "no takeoff";
+  else if (haveTick) { caption = motorName(last.motor); color = motorColor(last.motor); }
+  fillRect(ax, ay + ah - 11, aw, 11, kBg);
+  text(ax + 3, ay + ah - 10, color, caption);
+}
+
+function drawPanel() {
+  const x = 110, xs = haveTick ? last.x : 0;
+  text(x, 14, kText, `SENSORS ${hex(xs, 5)}`);
+  bits(x, 24, "size L", xs & 15, 4, kSensory);
+  bits(x, 33, "speed L", (xs >> 4) & 15, 4, kSensory);
+  bits(x, 42, "size R", (xs >> 8) & 15, 4, kSensory);
+  bits(x, 51, "speed R", (xs >> 12) & 15, 4, kSensory);
+  bits(x, 60, "standing", (xs >> w.sim_info(6)) & 1, 1, kSensory);
+
+  const path = haveTick ? last.pathways : 0;
+  text(x, 72, kText, "POLICY");
+  text(x + 50, 72, kMuted, "GF");
+  lamp(x + 64, 72, path & 1, kGf);
+  text(x + 80, 72, kMuted, "PAR");
+  lamp(x + 100, 72, path & 2, kPar);
+
+  const q = haveTick ? last.state : 0;
+  text(x, 84, kText, "LATCHES");
+  bits(x, 94, "raise", q & 7, 3, kLatch);
+  bits(x, 103, "refract", (q >> w.sim_info(7)) & 7, 3, kLatch);
+
+  const m = haveTick ? last.motor : 0;
+  text(x, 114, kText, "MOTOR");
+  lamp(x + 50, 114, m & 2, motorColor(m));
+  lamp(x + 59, 114, m & 1, motorColor(m));
+  text(x + 71, 114, kText, String(m));
+}
+
+function drawBottomBar() {
+  fillRect(0, 124, 240, 11, kPanel);
+  const s = phase === "idle" || (phase === "ended" && !autoDemo)
+    ? `l/v ${kLv[lvIndex]}ms az ${signed(azimuth)}  ENTER loom  h keys`
+    : `l/v ${runLv} az ${signed(runAz)} t${haveTick ? last.tick : 0} ${(haveTick ? last.theta : 10).toFixed(0)}deg ${kSlow[slowIndex]}x${paused ? " II" : ""}${autoDemo ? " A" : ""}`;
+  text(3, 126, kText, s);
+}
+
+function drawSelfTest() {
+  text(4, 4, kText, "SELF-TEST");
+  text(64, 4, passed ? kOk : kBad, passed ? "PASS" : "FAIL");
+  const r = report;
+  text(4, 20, kText, `${cstr(w.sim_name(0))} ${w.sim_info(2)} B`);
+  text(10, 30, r.coreHash ? kMuted : kBad, `sha256 ${r.coreSha.slice(0, 16)}.. ${r.coreHash ? "ok" : "BAD"}`);
+  text(4, 44, kText, `${cstr(w.sim_name(1))} ${w.sim_info(5)} B`);
+  text(10, 54, r.policyHash ? kMuted : kBad, `sha256 ${r.policySha.slice(0, 16)}.. ${r.policyHash ? "ok" : "BAD"}`);
+  text(4, 68, r.episodesOk === r.episodes ? kText : kBad, `reference episodes ${r.episodesOk}/${r.episodes} tick-exact`);
+  text(4, 80, r.restOk === r.restRows ? kText : kBad, `core vs policy at rest ${r.restOk}/${r.restRows}`);
+  text(4, 92, kMuted, `live geometry ${r.geometryOk}/${r.episodes} (informational)`);
+  if (r.coreDecode || r.policyDecode) text(4, 104, kBad, `decode error core ${r.coreDecode} policy ${r.policyDecode}`);
+  else text(4, 104, kMuted, `took ${selfTestMs} ms in this browser`);
+  text(4, 122, kMuted, "any key to continue");
+}
+
+function drawHelp() {
+  const lines = [
+    "KEYS",
+    "enter, space, G0   loom",
+    "; .   l/v up / down",
+    ", /   azimuth left / right",
+    "1-4   speed 1x 4x 10x 40x slower",
+    "p pause   n one tick when paused",
+    "a auto demo   m sound   t self-test",
+    "serial log is shown beside",
+    "any key to close",
+  ];
+  lines.forEach((l, i) => text(4, 4 + i * 14, i === 0 ? kText : kMuted, l));
+}
+
+function draw() {
+  fillRect(0, 0, 240, 135, kBg);
+  if (page === "selftest") drawSelfTest();
+  else if (page === "help") drawHelp();
+  else { drawTopBar(); drawArena(); drawPanel(); drawBottomBar(); }
+}
+
+// ---------------------------------------------------------------- input
+
+function onKey(c) {
+  switch (c) {
+    case ";": lvIndex = Math.min(lvIndex + 1, kLv.length - 1); manual(); break;
+    case ".": lvIndex = Math.max(lvIndex - 1, 0); manual(); break;
+    case ",": azimuth = azimuth > -90 ? azimuth - 10 : azimuth; manual(); break;
+    case "/": azimuth = azimuth < 90 ? azimuth + 10 : azimuth; manual(); break;
+    case "1": case "2": case "3": case "4": slowIndex = Number(c) - 1; break;
+    case "p": paused = !paused; lastTickMs = millis(); break;
+    case "n": if (paused && phase === "looming") advance(); break;
+    case "a": autoDemo = !autoDemo; phaseMs = millis(); break;
+    case "m": sound = !sound; break;
+    case "t": page = "selftest"; pageUntil = 0; break;
+    case "h": page = "help"; break;
+    default: break;
+  }
+  dirty = true;
+  renderKeys();
+}
+
+// A keyboard key: on the device, any key first closes the self-test or help page.
+function keyboard(c) {
+  if (!w) return;
+  if (!audio && window.AudioContext) audio = new AudioContext();
+  if (page !== "main") { page = "main"; dirty = true; return; }
+  if (c === "\n" || c === " ") { autoDemo = false; launch(); return; }
+  onKey(c);
+}
+// The G0 button.
+function buttonG0() {
+  if (!w) return;
+  if (!audio && window.AudioContext) audio = new AudioContext();
+  page = "main";
+  autoDemo = false;
+  launch();
+}
+
+const KEYS = [
+  { c: "G0", label: "kGo", go: true },
+  { c: ";", label: "kLvUp" }, { c: ".", label: "kLvDown" }, { c: ",", label: "kAzL" }, { c: "/", label: "kAzR" },
+  { c: "1", text: "1×" }, { c: "2", text: "4×" }, { c: "3", text: "10×" }, { c: "4", text: "40×" },
+  { c: "p", label: "kPause", on: () => paused }, { c: "n", label: "kStep" },
+  { c: "a", label: "kAuto", on: () => autoDemo }, { c: "m", label: "kSound", on: () => sound },
+  { c: "t", label: "kTest" }, { c: "h", label: "kHelp" },
+];
+const keysEl = document.getElementById("keys");
+function renderKeys() {
+  if (!keysEl.children.length) {
+    for (const k of KEYS) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "key" + (k.go ? " go" : "");
+      b.dataset.c = k.c;
+      b.innerHTML = "<b></b><span></span>";
+      b.querySelector("b").textContent = k.c;
+      b.addEventListener("click", () => (k.go ? buttonG0() : keyboard(k.c)));
+      keysEl.append(b);
+    }
+  }
+  KEYS.forEach((k, i) => {
+    const b = keysEl.children[i];
+    b.querySelector("span").textContent = k.text ?? t(k.label);
+    const pressed = k.on ? k.on() : /^[1-4]$/.test(k.c) ? Number(k.c) - 1 === slowIndex : null;
+    if (pressed === null) b.removeAttribute("aria-pressed");
+    else b.setAttribute("aria-pressed", String(pressed));
+  });
+}
+const ARROWS = { ArrowUp: ";", ArrowDown: ".", ArrowLeft: ",", ArrowRight: "/" };
+document.addEventListener("keydown", (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest(".lang")) return;
+  let c = ARROWS[e.key] ?? (e.key === "Enter" ? "\n" : e.key.length === 1 ? e.key.toLowerCase() : null);
+  if (c === null) return;
+  if (e.target.closest(".key") && (c === "\n" || c === " ")) return;  // the button's own click handles it
+  e.preventDefault();
+  const el = keysEl.querySelector(`[data-c="${CSS.escape(c)}"]`) ?? (c === "\n" || c === " " ? keysEl.firstElementChild : null);
+  if (el) { el.classList.add("down"); setTimeout(() => el.classList.remove("down"), 120); }
+  keyboard(c);
+});
+
+// ---------------------------------------------------------------- rail
+
+const logEl = document.getElementById("log");
+const logLines = [];
+function log(line) {
+  logLines.push(line);
+  if (logLines.length > 400) logLines.splice(0, logLines.length - 400);
+  const atEnd = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 4;
+  logEl.textContent = logLines.join("\n");
+  if (atEnd) logEl.scrollTop = logEl.scrollHeight;
+}
+
+function renderFacts() {
+  const el = document.getElementById("facts");
+  if (!w) return;
+  const rows = [
+    [t("fNetlist"), `<a href="https://github.com/BruceLanLan/c3s-reflex-circuits/blob/main/circuits/loom-escape/core-hand-abc.json">${cstr(w.sim_name(0))}</a> · ${w.sim_info(0)} NAND + ${w.sim_info(1)} LATCH · ${w.sim_info(2).toLocaleString("en")} B · depth ${w.sim_info(3)}`],
+    [t("fPolicy"), `<a href="https://github.com/BruceLanLan/c3s-reflex-circuits/blob/main/circuits/loom-escape/policy-hand-abc.json">${cstr(w.sim_name(1))}</a> · ${w.sim_info(4)} NAND · ${w.sim_info(5)} B`],
+    [t("fModule"), `<code>c3s_core.wasm</code> · ${build.bytes.toLocaleString("en")} B · ${build.compiler.replace(/^Homebrew /, "")}`],
+    [t("fScreen"), t("fScreenText")],
+  ];
+  el.innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+}
+
+let loadError = false;
+function renderChecks() {
+  const el = document.getElementById("checks");
+  if (loadError) { el.innerHTML = `<li class="bad"><i></i><span>${t("loadFail")}</span></li>`; return; }
+  if (!report) return;
+  const r = report, items = [];
+  const item = (cls, s) => items.push(`<li class="${cls}"><i></i><span>${s}</span></li>`);
+  if (r.coreDecode || r.policyDecode) item("bad", t("cDecode")(r.coreDecode, r.policyDecode));
+  item(r.coreHash ? "ok" : "bad", t(r.coreHash ? "cHash" : "cHashBad")(`<code>${cstr(w.sim_name(0))}</code>`, `<code>${r.coreSha.slice(0, 12)}</code>`));
+  item(r.policyHash ? "ok" : "bad", t(r.policyHash ? "cHash" : "cHashBad")(`<code>${cstr(w.sim_name(1))}</code>`, `<code>${r.policySha.slice(0, 12)}</code>`));
+  item(r.episodesOk === r.episodes ? "ok" : "bad", t("cEpisodes")(r.episodesOk, r.episodes));
+  item(r.restOk === r.restRows ? "ok" : "bad", t("cRest")(r.restOk.toLocaleString("en"), r.restRows.toLocaleString("en")));
+  item("info", t("cGeometry")(r.geometryOk, r.episodes));
+  if (moduleHash === null) item("info", t("cModuleSkip"));
+  else if (moduleHash === build.sha256) item("ok", t("cModule")(`<code>${moduleHash.slice(0, 12)}</code>`));
+  else item("bad", t("cModuleBad"));
+  item("info", t("cTime")(selfTestMs));
+  el.innerHTML = items.join("");
+}
+
+// ---------------------------------------------------------------- boot and loop
+
+function boot() {
+  const t0 = millis();
+  const ok = w.sim_boot() === 1;
+  selfTestMs = Math.max(1, Math.round(millis() - t0));
+  const R = (i) => w.sim_report(i);
+  report = {
+    coreDecode: R(1), policyDecode: R(2), coreHash: R(3) === 1, policyHash: R(4) === 1,
+    episodes: R(5), episodesOk: R(6), geometryOk: R(7), restRows: R(8), restOk: R(9),
+    coreSha: cstr(w.sim_sha256(0)), policySha: cstr(w.sim_sha256(1)),
+  };
+  passed = ok && (moduleHash === null || moduleHash === build.sha256);
+  runnable = report.coreDecode === 0 && report.policyDecode === 0;
+  pageUntil = passed ? millis() + 3500 : 0;
+  log(`c3s escape core on Cardputer: self-test ${passed ? "PASS" : "FAIL"} in ${selfTestMs} ms`);
+  log(`  ${cstr(w.sim_name(0))} sha256 ${report.coreSha} ${report.coreHash ? "ok" : "MISMATCH"}`);
+  log(`  ${cstr(w.sim_name(1))} sha256 ${report.policySha} ${report.policyHash ? "ok" : "MISMATCH"}`);
+  log(`  reference episodes ${report.episodesOk}/${report.episodes}, core vs policy at rest ${report.restOk}/${report.restRows}, live geometry ${report.geometryOk}/${report.episodes}`);
+  dirty = true;
+  applyLang();
+}
+
+function frame() {
+  const now = millis();
+  if (page === "selftest" && pageUntil && now > pageUntil) { page = "main"; phaseMs = now; dirty = true; }
+  if (phase === "looming" && !paused) {
+    const period = w.sim_info(9) * kSlow[slowIndex];
+    if (now - lastTickMs > 500) lastTickMs = now - period;  // after a stall, do not race to catch up
+    while (phase === "looming" && now - lastTickMs >= period) { lastTickMs += period; advance(); }
+  }
+  if (phase === "tookoff") {
+    dirty = true;
+    if (now - phaseMs > 700) { phase = "ended"; phaseMs = now; }
+  }
+  if (autoDemo && runnable && page === "main" && (phase === "idle" || phase === "ended") && now - phaseMs > 2000) {
+    lvIndex = Math.floor(Math.random() * kLv.length);
+    azimuth = (Math.floor(Math.random() * 19) - 9) * 10;
+    launch();
+  }
+  if (dirty) { draw(); dirty = false; }
+  requestAnimationFrame(frame);
+}
+
+function splash(lines, color) {
+  fillRect(0, 0, 240, 135, kBg);
+  lines.forEach((l, i) => text(4, 4 + i * 16, i === 0 ? kText : color, l));
+}
+
+applyLang();
+splash(["SELF-TEST", "hashing and replaying the netlists..."], kMuted);
+loadModule().then(
+  () => { renderFacts(); setTimeout(() => { boot(); requestAnimationFrame(frame); }, 60); },
+  () => { loadError = true; renderChecks(); splash(["SELF-TEST", "could not load c3s_core.wasm"], kBad); },
+);
+</script>
+</body>
+</html>
