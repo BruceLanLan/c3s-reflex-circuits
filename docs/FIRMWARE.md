@@ -144,5 +144,10 @@ byte for byte. Only `main.cpp` and `platformio.ini` are specific to this device.
   one ulp either side of a bin edge can land in the neighbouring bin, so a live episode
   can differ from Python by a tick near an edge; the tick-exact comparison on the
   device uses the embedded samples.
-- Status on 2026-09-15: built, and the host test passes; not yet run on hardware.
+- A device that ran other firmware before may log
+  `esp_core_dump_flash: Incorrect size of core dump image` once at boot. It refers to
+  data left in the core-dump partition and does not affect the firmware.
+- First run on hardware, 2026-09-15, Cardputer ADV (ESP32-S3 revision v0.2): self-test
+  PASS in 4,546 ms, both hashes ok, reference episodes 3/3, core against policy at
+  rest 131,072/131,072, live geometry 3/3.
 - Nothing here adds a claim about the fly. See [LIMITATIONS.md](LIMITATIONS.md).
