@@ -51,18 +51,29 @@ docker compose up -d
 docker compose exec agent bash           # run Claude Code or your MCP client in here
 ```
 
-**Start the console with `REFLEX_REQUIRE_AGENT_TOKEN=1`** when you run this recipe:
+**Bind the name, and start the console with `REFLEX_REQUIRE_AGENT_TOKEN=1`.** Two steps,
+and both are needed:
 
 ```sh
+python -c "import console; print(console.token_bind('claude-code:container', '$REFLEX_AGENT_TOKEN'))"
 REFLEX_REQUIRE_AGENT_TOKEN=1 python console.py
 ```
 
-Without it, the one call the container is allowed to make is a blank cheque on every
+(`c3s token bind --agent <name>` is the same thing from the CLI.)
+
+Without this, the one call the container is allowed to make is a blank cheque on every
 agent name *nobody has bound yet* — see "what the container can still do" below. With it,
-a request whose name has no token is refused instead of trusted, so the container can only
-ever speak as itself. It is off by default because I-3 promises in `docs/API.md` that an
-unbound name keeps working; a deployment that has put its agent in a container has no use
-for that promise.
+the console binds nothing over HTTP at all: a request for a name no person has bound is
+refused, whatever token it carries, and nothing is written, so the container cannot claim
+another name even by asking first. It is off by default because I-3 promises in
+`docs/API.md` that an unbound name keeps working; a deployment that has put its agent in a
+container has no use for that promise.
+
+The adversarial review is why it is shaped that way. Requiring merely *a* token was not
+enough: it sent `X-Reflex-Agent-Token: literally-anything` for a name nobody had bound,
+which bound the name on the way through and spent the confirm a person had left for it.
+Authenticating a name and creating one are different powers, and only a person holds the
+second.
 
 Inside the container, point the hooks at `/opt/reflex/adapters/claude_code_hook.py` and
 `claude_code_post_hook.py` exactly as `adapters/README.md` says; `REFLEX_CONSOLE` and
@@ -260,22 +271,34 @@ reachable through the gateway, so it cannot *read* what another agent has waitin
 have to guess the `reason` string, and a confirm is bound to one); and every one of those
 requests is in the transcript under the name it used.
 
-The fix is the one above: `REFLEX_REQUIRE_AGENT_TOKEN=1` on the console, plus binding every
-agent name you care about at install time so there is nothing left to squat. Proof, on a
-console started with it:
+All three are closed by the two steps above — `REFLEX_REQUIRE_AGENT_TOKEN=1` **and** binding
+the names with `c3s token bind`. The proofs below are the review's own attacks, re-run
+against a console in that mode with an empty store:
 
-```sh
-$ curl -s -X POST http://127.0.0.1:8855/api/request -H 'content-type: application/json' \
-    -d '{"agent":"someone-elses-name","class":"exec","intent":1,"reason":"[exec] not mine"}'
-{"error": "'someone-elses-name' is not bound to any token and this console requires one
-(REFLEX_REQUIRE_AGENT_TOKEN). Send that agent's REFLEX_AGENT_TOKEN in X-Reflex-Agent-Token;
-a person can drop a binding with `c3s token rotate --agent <name>`."}
-
-$ # with a token of its own, the first request still binds (trust on first use):
-$ curl … -H 'X-Reflex-Agent-Token: mine' … → http=200
-$ # and afterwards that name refuses any other token:
-{"error": "'someone-elses-name' is bound to its own agent token and this is not it. …"}
 ```
+a fresh console with REFLEX_REQUIRE_AGENT_TOKEN=1, nothing bound:
+  unbound name, no token           : http=403 'redteam-victim' is not a bound agent name, and this
+                                     console only answers to names a person has bound …
+  unbound name, ARBITRARY token    : http=403  (same refusal — this is the one that worked before)
+  one token, three names (a)       : http=403
+  one token, three names (b)       : http=403
+nothing was written:  log policies.json          <- no agents.json: no name was claimed
+
+a person binds one name out of band:
+  {'agent': 'bound-name', 'bound': True, 'replaced': False, …}
+  bound name, the wrong token      : http=403 'bound-name' is bound to its own agent token and this is not it
+  bound name, its own token        : http=200 granted=False tick=1
+
+and the confirm a person left for an unbound name survives the attack:
+  armed confirm for redteam-victim : [1]
+  attacker tries to spend it       : http=403
+  armed confirm after the attempt  : [1]
+```
+
+What remains, honestly: a person who binds nothing and runs with the switch off is where
+this section started; the switch without binding refuses every agent, including the real
+one; and a program that can read the container's environment still has the container's own
+token (limitation 2 of `SECURITY.md`, which is what the container is for).
 
 ## What this does not do
 
@@ -320,8 +343,11 @@ README 承认的那条限制（同一台机器、同一个用户下，agent 能�
 * **对抗审查在这个配方上找到的高危**：那唯一一条允许的请求里，agent 名字是 body 说的，
   而"没人绑过的名字任何人都能用"是 I-3 写在 `docs/API.md` 里的兼容承诺——于是容器里的 agent
   默认可以顶着别的**未绑定** agent 的名字发请求、花掉人给它留的 confirm（需要猜中那条
-  `reason`）、甚至抢先把名字绑走把真身锁在外面。修法：后台加 `REFLEX_REQUIRE_AGENT_TOKEN=1`
-  （上面"Run it"已写，带真实输出），并在安装时就把每个 agent 名绑定，别留可抢的名字。
+  `reason`）、甚至抢先把名字绑走把真身锁在外面。修法是**两步**：`c3s token bind` 先把名字绑好，
+  后台再带 `REFLEX_REQUIRE_AGENT_TOKEN=1` 启动——这个模式下后台**不再通过 HTTP 绑定任何名字**，
+  没被人绑过的名字带什么令牌都拒。只要求"带个令牌"是不够的：审查第二轮随便发一个
+  `X-Reflex-Agent-Token: literally-anything` 就顺手把受害者的名字绑了、confirm 也花掉了。
+  "证明"一节里贴的就是用它原样的 PoC 重跑的输出。
 * 还没解决的：容器**完全没有出网**，需要访问模型 API 的 agent 得自己加一层只放行模型域名的
   代理（未验证、未提供配置）；容器不是对抗内核逃逸的沙箱；挂进 `/work` 的东西 agent 仍然
   能改。

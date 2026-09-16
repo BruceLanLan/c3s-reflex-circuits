@@ -40,12 +40,27 @@ Per channel, because each channel is a different promise:
 | `adapters/bnbagent_boundary.py` | every `sign_transaction` / `sign_message` / `sign_typed_data` through that object; refuses wallets that broadcast through their own executor rather than handing them an ungated one | another key, a held reference to the inner wallet, a `twak` CLI, any SDK path that signs elsewhere |
 | the person's bits (`POST /api/tool`) | `confirm`, `confirm_b`, `blocked`, `heartbeat` need the operator token; the Cardputer writes them in-process, never over HTTP | — |
 | the rules (`POST /api/policy`), the task entrance (`POST /api/task`) | operator token | — |
-| the agent's own name (I-3) | once a name is **bound** to an agent token, a request under that name without it is refused *before any circuit is asked*, so it cannot spend that agent's confirm, move its cooldown or trip its breaker; the attempt is recorded as `kind: "spoof"` | an **unbound** name, which anything local may still speak for unless the console runs with `REFLEX_REQUIRE_AGENT_TOKEN=1`; and a program that can read the other agent's environment (see below) |
+| the agent's own name (I-3) | once a name is **bound** to an agent token, a request under that name without it is refused *before any circuit is asked*, so it cannot spend that agent's confirm, move its cooldown or trip its breaker; the attempt is recorded as `kind: "spoof"` | an **unbound** name, which anything local may still speak for — unless the names are bound with `c3s token bind` *and* the console runs with `REFLEX_REQUIRE_AGENT_TOKEN=1`; and a program that can read the other agent's environment (see below) |
 
 Two things hold all of that up, and both are checked by tests against the live console:
 a request under a foreign `Host` or `Origin` is refused (DNS rebinding, another site's
 page), and a body that is not `application/json` is refused (no form or `text/plain` post
 from a browser without a preflight this server never answers).
+
+**On a shared network.** A boundary on a shared network must not let a stranger tick your
+circuits or read what your agent is doing. So when a request does not come from this
+machine — which is possible only when the console is bound past loopback, as it is for the
+phone that scanned the pairing QR — the endpoints that need no token on this machine need
+one there: `POST /api/request` requires an agent name that a person has *already* bound,
+sending its own token (no unbound names and no first-use binding over the network: that
+would let a stranger claim a name before your agent ever ran), and `GET /api/state` /
+`GET /api/manifest` require either the operator token or a bound agent's token. Loopback
+behaviour is unchanged. Two consequences worth knowing: the phone's page must send
+`X-Reflex-Token` on those GETs (the pairing link carries the token in the URL *fragment*,
+which is never sent to a server and so never reaches a log — and the console redacts any
+query string it logs anyway), and `POST /api/tool` is deliberately *not* narrowed here,
+because the person's bits on it already need the operator token and a paired device has a
+token of its own.
 
 ## What the boundary does not stop
 
@@ -84,10 +99,15 @@ from a browser without a preflight this server never answers).
    not carry `/api/state`).
    Every one of those attempts is in the transcript under the name it used, and a squatted
    binding is recoverable with `c3s token rotate --agent <name>` — but neither is
-   prevention. **Prevention is `REFLEX_REQUIRE_AGENT_TOKEN=1`**, which refuses a request
-   whose name has no token instead of trusting it, plus binding every agent name at install
-   time so nothing is left to squat. It is off by default because it breaks the
-   compatibility clause on purpose; `docs/ISOLATION.md` turns it on.
+   prevention. **Prevention is two things together**: bind the names a person cares about
+   with `c3s token bind --agent <name>` at install time, *and* run the console with
+   `REFLEX_REQUIRE_AGENT_TOKEN=1`, in which mode the console binds nothing over HTTP at all
+   and refuses any name a person has not bound. Either half alone is not the fix: the
+   switch by itself only forced the attacker to send an arbitrary token and bind as it went
+   (the second pass of the review proved exactly that against the first version of this
+   paragraph), and binding by itself leaves every *other* name open. Both are off by
+   default because the compatibility clause is what `docs/API.md` promises;
+   `docs/ISOLATION.md` turns them on and carries the re-run proofs.
 5. **The tool layer's flags are only as honest as the tool layer.** "This call is
    irreversible" is decided by a pattern list in the hook and a name list in the proxy;
    "this failed" is the framework's own report. The circuit proves *"irreversible and no
@@ -188,13 +208,39 @@ time, and no token or hash leaked into an error, the transcript or `/api/state`)
    container's only power was "one endpoint".
 2. **Medium — `agents.json` failed open.** An unreadable store read as "nothing is bound",
    silently, while the console served on — the same mistake `Boundary._load` refuses to
-   make for the rules. Fixed: a store that is *present and unparseable* now refuses every
-   request with a plain error and logs it; an absent store still means nobody is bound.
+   make for the rules. Fixed: a store that is *present and unparseable* refuses every
+   `POST /api/request` with a plain error and one loud log line; an absent store still
+   means nobody is bound. Two honest limits on that fix, both found by the review's second
+   pass: `POST /api/tool` still answers while the store is broken (the adapter's bits and,
+   with the operator token, a person's — nothing can *tick*, so nothing is granted, but
+   "refuses every request" would be too strong a claim), and a single malformed *record*
+   now denies only that name rather than taking the whole store down.
 3. **Medium — transcript eviction** (limitation 8 above). Accepted with reason: not new
    with I-3, fails safe, and the shape of `pending` is the coordinator's.
 
 Its informational finding was the operator token in `ps eww` output — which is limitation 2,
 reproduced by the review in one command, as documented.
+
+**The same review, second pass.** Finding 2 was confirmed closed; finding 1 was **not**,
+and the second pass is why the paragraph above says "two things together". The first
+attempt at a fix required a token but still let a token *create* a binding, so
+`X-Reflex-Agent-Token: literally-anything` bound the victim's name and spent its confirm
+under the switch that was supposed to prevent it — and two summary sentences in these
+documents said otherwise while the proof block two screens below said the truth. What
+changed as a result: binding over HTTP is gone in that mode (`c3s token bind` is a
+person's command), rotation can now recover a store it cannot parse (it resets it and says
+so), a bad record denies one name instead of every name, and `token_bound` is `null` rather
+than `false` while the store is unreadable so a consumer cannot render "unbound" for a name
+that is bound. The re-run of the review's own attacks is in `docs/ISOLATION.md`.
+
+**Found while testing those fixes, not by the review.** The store was read-modify-written
+under a thread lock only, and the console and a second process (a test, or `c3s token
+bind`) write it from different processes: whichever read first wrote last, and a binding
+one of them had just made or dropped came back or disappeared. The dangerous direction is
+the lost *binding* — the name quietly becomes unbound again, which is the one state
+anything local may speak for. The store's read-modify-write now holds an `flock` on a
+sibling lock file, so the console, the CLI and anything else serialise; eight processes
+binding at once each keep their binding (`tests/test_console_agent_tokens.py`).
 
 ---
 
@@ -217,6 +263,16 @@ agent 名一旦绑定令牌（I-3），别人用这个名字发请求**在问电
 "不可逆"和"失败"这两个标签只有工具层那么诚实；`REFLEX_FAIL_OPEN=1` 会把边界关掉；拍不是时间；
 没有 TLS、没有长期审计日志；本程序不执行动作、不持私钥、不签名、不广播。
 
+**在共享网络上**：共享网络上的边界不能让陌生人推动你的电路、或看见你的 agent 在做什么。所以
+当请求不是来自本机时（只有后台绑到 loopback 之外才可能，比如扫码进来的手机），本机上免令牌的
+端点在那边都要令牌：`POST /api/request` 必须是**已经被人绑定过**的 agent 名并带自己的令牌
+（网络上不允许未绑定的名字、也不允许首次绑定——否则陌生人可以在你的 agent 第一次跑之前把名字
+抢走）；`GET /api/state` 与 `/api/manifest` 要么操作者令牌、要么某个已绑定 agent 的令牌。
+loopback 上的行为一字不变。两个已知后果：手机页面在这两个 GET 上必须带 `X-Reflex-Token`
+（配对链接把令牌放在 URL **fragment** 里，fragment 根本不会发给服务器，也就进不了日志；后台
+另外还会把日志里的 query string 打码）；`POST /api/tool` 故意没有收紧，因为上面人的位本来就
+要操作者令牌，配对过的设备也有自己的令牌。
+
 **建议**：把 agent 放进容器里跑（`docker-compose.yml` + `docs/ISOLATION.md`，含真实证据）。
 做不到的话，退一步的顺序是：换第二个系统用户跑 agent → 不要开 `REFLEX_FAIL_OPEN` → 给每个
 适配器独立的 `REFLEX_AGENT_TOKEN` → 把物理按键放进回路。
@@ -227,7 +283,13 @@ agent 名一旦绑定令牌（I-3），别人用这个名字发请求**在问电
 **对抗审查历史**：2026-09-16 第一轮最好的发现是钩子的模式检查被 `127.0.0.1:8765/api/to''ol`
 绕过（shell 拼回真路径，子串匹配看不出来）——真正堵住它的是操作者令牌，不是更长的名单；这就
 是"模式不是防线"的原型案例。同日 W6 针对 I-3 与隔离配方的只读审查：无 critical，一个 high
-（容器里可以顶着任何**未绑定**的 agent 名发请求，甚至花掉人给它留的 confirm——已用
-`REFLEX_REQUIRE_AGENT_TOKEN=1` 修掉，并把残留风险写进上面第 4 条和 `docs/ISOLATION.md`）、
-两个 medium（`agents.json` 读不出来时曾静默按"没人绑定"继续服务——已改成拒绝所有请求并打日志；
-流水 200 条上限可被灌满从而挤掉"等人处理"——接受，理由见上面第 8 条）。
+（容器里可以顶着任何**未绑定**的 agent 名发请求，甚至花掉人给它留的 confirm）、两个 medium
+（`agents.json` 读不出来时曾静默按"没人绑定"继续服务；流水 200 条上限可被灌满从而挤掉
+"等人处理"——后者接受，理由见上面第 8 条）。**第二轮复审推翻了我对 high 的第一版修法**：
+只要求"带令牌"没用，随便发一个 `X-Reflex-Agent-Token: literally-anything` 仍然会顺手绑定
+受害者的名字并花掉它的 confirm，而当时文档里两句总结写成了"已修好"。现在的修法是两件事一起：
+`c3s token bind` 由人把名字绑好 + 后台 `REFLEX_REQUIRE_AGENT_TOKEN=1`（该模式下 HTTP 完全
+不再创建绑定）。同时修了：损坏的存储现在只拒 `/api/request`（`/api/tool` 仍会应答，已如实
+写明）、单条坏记录只拒那一个名字、`token_rotate` 能救回读不出来的存储（重置并说明）、存储
+读不出来时 `token_bound` 返回 `null` 而不是 `false`。审查原样的 PoC 重跑输出见
+`docs/ISOLATION.md`。
