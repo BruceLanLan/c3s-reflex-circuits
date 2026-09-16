@@ -77,6 +77,46 @@ written by `scripts/build_demo.py`, and shows any mismatch on screen.
   3 long-mode takeoff; six latches hold a 3-bit wing-raise counter and a 3-bit
   refractory timer (LSB first).
 
+### Minimal cores (`circuits/loom-escape-min/`)
+
+How much of `core-hand-abc` is needed? It is the hand-written motor state machine
+with the ABC-synthesised policy inlined, so ABC never saw the core as one circuit.
+Of its 346 single stuck-at faults, 23 are undetectable on the full domain (on 21
+gates), and 6 NAND outputs are constant there.
+
+| Circuit | Inputs → outputs | NAND | LATCH | Depth | Bytes | Specification |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| `core-hand-abc-irr` | 17 → 2 | 113 | 6 | 18 | 815 | the step relation of `core-hand-abc` on every one of 8,388,608 rows |
+| `core-reach` | 17 → 2 | 113 | 6 | 18 | 815 | its behaviour from reset only; the 52 unreachable states are don't-cares |
+
+* Both come from one loop (`scripts/build_minimal_cores.py`): tie undetectable
+  stuck-at faults to their constants, then alternate an ABC pass with another
+  removal while the NAND count falls. Removal alone takes the core from 173 to 131
+  NAND; ABC on the latch cut then reaches 113, i.e. **34.7 % smaller** than
+  `core-hand-abc` with an identical step relation on all rows. Neither is a proven
+  minimum; each is a verified upper bound for its specification.
+* From reset only 12 of the 64 latch states occur: `(raise, refr)` ∈
+  {(0, 0..7), (1..4, 0)}. Relaxing the specification to those rows — and adding
+  ABC's `scorr` to the recipes — removed **nothing further**, so `core-reach` is
+  byte-identical to `core-hand-abc-irr`. Against the thresholds registered before
+  either core was synthesised (≥ 10 % smaller significant, ≤ 2 % weakened), the
+  reduction of 0 % **weakens** the hypothesis that reachable-state don't-cares
+  matter here.
+* That result is about this procedure. Don't-cares are exploited only by tying
+  undetectable faults to constants and by ABC's sequential signal correspondence;
+  a stronger don't-care synthesis could still find a smaller core. What is
+  established is that 35 % of the source core is redundant on its full domain, and
+  that the remaining 113 gates have no single stuck-at redundancy on either domain.
+* Checks: `core-hand-abc-irr` against all 8,388,608 rows of the step relation;
+  `core-reach` by product-machine search from reset (12 reachable state pairs ×
+  131,072 inputs = 1,572,864 rows), plus closure of its reachable set and 125
+  episodes (35 train, 42 holdout, 48 published sealed) identical tick by tick over
+  12,197 ticks. Both are in the EVM fixtures.
+* Bytes depend on the ABC build, so these artifacts are gated by equivalence
+  (`tests/test_minimal_cores.py`), not by byte reproduction, and
+  `scripts/verify.sh` does not rerun the build. The pre-registration is commit
+  `0aa2d94`, which precedes the synthesis.
+
 ### Components (`circuits/components/`)
 
 Reusable pure computations, each exhaustively checked against a Python reference
@@ -123,6 +163,10 @@ Python step tables ──(2^16 and 2^23 rows)──► in-browser JavaScript eva
 * **ABC is untrusted.** Its mapped BLIF is parsed back into the repository's IR
   and re-verified; a build stops if any recipe's result is not equivalent.
 * **Deterministic.** Two from-scratch builds produced byte-identical artifacts.
+* **Equivalence from reset** (the minimal cores) needs no shared state encoding: a
+  product-machine search visits every reachable pair of states and compares the
+  outputs for every input pattern there, and reports a counterexample trace from
+  reset when they differ (`c3s/reach.py`).
 
 ## EVM contracts (`contracts/`)
 

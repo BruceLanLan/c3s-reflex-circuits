@@ -23,7 +23,7 @@ def load(path: Path):
 
 
 def test_every_circuit_directory_has_manifests():
-    assert {p.parent.name for p in MANIFESTS} == {"components", "loom-escape"}
+    assert {p.parent.name for p in MANIFESTS} == {"components", "loom-escape", "loom-escape-min"}
     assert len(MANIFESTS) >= 20
 
 

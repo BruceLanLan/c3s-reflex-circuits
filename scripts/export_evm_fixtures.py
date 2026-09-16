@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LOOM = ROOT / "circuits" / "loom-escape"
 OUT = ROOT / "contracts" / "test" / "fixtures" / "circuits.json"
 LOOM_CIRCUITS = ("policy-hand-abc", "policy-table-abc", "core-hand-abc", "core-table-abc")
+MIN_CIRCUITS = ("core-hand-abc-irr", "core-reach")  # scripts/build_minimal_cores.py
 
 
 def _planes(values: np.ndarray, width: int, total: int) -> np.ndarray:
@@ -71,6 +72,9 @@ def main() -> None:
     circuits = [entry(n, c.build()) for n, c in sorted(CATALOG.items())]
     for name in LOOM_CIRCUITS:
         circuits.append(entry(name, load_manifest(LOOM / f"{name}.json")))
+        print("chained", name)
+    for name in MIN_CIRCUITS:
+        circuits.append(entry(name, load_manifest(ROOT / "circuits" / "loom-escape-min" / f"{name}.json")))
         print("chained", name)
 
     tj = json.loads((LOOM / "decision-table.json").read_text())

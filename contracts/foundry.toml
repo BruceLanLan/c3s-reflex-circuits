@@ -10,3 +10,4 @@ via_ir = true
 evm_version = "cancun"
 gas_limit = "18446744073709551615"
 fs_permissions = [{ access = "read", path = "./test/fixtures" }]
+memory_limit = 1073741824

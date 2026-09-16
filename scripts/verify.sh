@@ -15,8 +15,10 @@
 # NOT regenerated here: DLGN runs (scripts/train_dlgn.py; a re-run of the 128-128-64
 # run reproduced its netlist byte for byte on torch 2.14 CPU), controls.json
 # (scripts/run_controls.py, about 25 minutes), sealed-evaluation.json (needs the
-# unpublished sealed spec) and docs/sim/c3s_core.wasm (scripts/build_sim.py; another
-# clang may emit different bytes, so tests/test_firmware.py checks it by behaviour).
+# unpublished sealed spec), docs/sim/c3s_core.wasm (scripts/build_sim.py; another
+# clang may emit different bytes, so tests/test_firmware.py checks it by behaviour)
+# and the minimal cores (scripts/build_minimal_cores.py; the bytes depend on the ABC
+# build, so tests/test_minimal_cores.py checks them by equivalence).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"

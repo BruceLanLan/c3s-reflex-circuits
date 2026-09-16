@@ -57,6 +57,11 @@ repository's own fault-based removal, and a 3-latch counter showed that `scorr`
 output round-trips through mapped BLIF with latches. Neither core was synthesised
 before the commit that added this docstring.
 
+Correction, added with the artifacts: that 3-latch toy was hand-written and its
+covers did not implement the counter they were meant to, which a later Yosys
+induction run exposed. It was only ever used to see that a mapped BLIF with
+latches parses back, so the round-trip check it served still holds.
+
 Bytes depend on the ABC build, so the committed artifacts are gated by
 equivalence (tests/test_minimal_cores.py) rather than byte reproduction, and
 scripts/verify.sh does not rerun this script.

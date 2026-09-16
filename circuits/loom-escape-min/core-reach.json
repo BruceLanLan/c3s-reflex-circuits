@@ -1,0 +1,175 @@
+{
+ "format": "c3s.circuit/1",
+ "name": "core-reach",
+ "inputs": [
+  "size_L[0]",
+  "size_L[1]",
+  "size_L[2]",
+  "size_L[3]",
+  "speed_L[0]",
+  "speed_L[1]",
+  "speed_L[2]",
+  "speed_L[3]",
+  "size_R[0]",
+  "size_R[1]",
+  "size_R[2]",
+  "size_R[3]",
+  "speed_R[0]",
+  "speed_R[1]",
+  "speed_R[2]",
+  "speed_R[3]",
+  "standing"
+ ],
+ "outputs": [
+  "motor[0]",
+  "motor[1]"
+ ],
+ "metrics": {
+  "nand": 113,
+  "latch": 6,
+  "ref": 0,
+  "cells": 119,
+  "bytes": 815,
+  "depth": 18
+ },
+ "netlist_sha256": "5644abe9323732d4b377a8daac75c4fe5c73fd9839fe29c92006d010a1d55a90",
+ "tapeout_netlist_hex": "0x0100008201000083010000840100008501000086010000870000000900000900000002000002000000030000030000001a00001b0000000400001c0000000600001d0000000500001e00000007000008000000200000200000001f000021000000190000220000000500000500000004000006000000250000250000000300002600000019000027000000040000040000001c00001c0000002900002a0000002800002b0000002400002c0000002300002d0000000c00000c0000000a00000a0000000b00000b00000030000031000000320000320000002f0000330000000e00000e0000000f00000f000000100000100000003600003700000038000038000000350000390000003400003a0000000d00000d0000000c0000320000003c00003d0000003d00003d0000000d00003f0000003e0000400000003b000041000000110000420000002e0000430000001800001800000016000016000000170000170000004600004700000048000048000000450000490000004a00004a0000001200004b0000004c00004c0000004400004d0000004e00004e000000150000150000001f0000260000000700000700000008000008000000520000530000002b0000540000000500002900000055000056000000570000570000005100005800000009000059000000430000430000002f00003c0000000f00005c0000005d00005d0000004000005e0000003500005f0000000a00000b0000000d00002f000000620000620000003200006300000064000064000000610000650000003600006600000060000067000000370000680000005b0000690000005a00006a0000005000006b0000004f00006c0000006d00006d0000005000006e0000004f00006f000000130000130000006f00006f00000071000072000000140000140000007100007400000013000014000000750000760000007700007700000072000078000000760000760000007200007a0000004600004a00000018000049000000160000170000007d00007e0000007f00007f0000001800004800000073000073000000790000790000007b00007b0000007000007c00000070000080000000700000810000006d00006d00000070000070",
+ "policy": "policy-hand-abc",
+ "motor_codes": {
+  "0": "hold",
+  "1": "raising wings",
+  "2": "short-mode takeoff",
+  "3": "long-mode takeoff"
+ },
+ "state_layout": {
+  "raise_counter_bits": 3,
+  "refractory_bits": 3,
+  "order": "raise counter bits (LSB first), then refractory timer bits (LSB first)"
+ },
+ "source": {
+  "circuit": "core-hand-abc",
+  "netlist_sha256": "7c8eaf62495908c434206ff54aa1f3e9146b4295506f59584d6107d2104b2e52",
+  "started_from": "core-hand-abc-irr"
+ },
+ "specification": "behaviour of core-hand-abc from the all-zero reset state; unreachable states are don't-cares",
+ "equivalence": {
+  "method": "product-machine breadth-first search from reset, every input at every reachable state pair",
+  "reachable_state_pairs": 12,
+  "rows_checked": 1572864,
+  "mismatches": 0
+ },
+ "reachable_states": {
+  "latches": 6,
+  "states": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   8,
+   16,
+   24,
+   32,
+   40,
+   48,
+   56
+  ],
+  "closed": true
+ },
+ "state_encoding_matches_source": true,
+ "redundancy": {
+  "rows": 1572864,
+  "single_stuck_at_faults": 226,
+  "undetectable": 0,
+  "gates_with_undetectable_faults": 0,
+  "constant_nand_outputs": 0
+ },
+ "episodes": {
+  "families": {
+   "train": 35,
+   "holdout": 42,
+   "sealed (published spec)": 48
+  },
+  "ticks_compared": 12197,
+  "episodes_differing": 0
+ },
+ "hypothesis": {
+  "preregistered_in": "scripts/build_minimal_cores.py docstring",
+  "thresholds": {
+   "significant_min_reduction": 0.1,
+   "weakened_max_reduction": 0.02
+  },
+  "primary": {
+   "irr_nand": 113,
+   "reach_nand": 113,
+   "reduction": 0.0,
+   "verdict": "weakened"
+  },
+  "secondary": {
+   "source_nand": 173,
+   "reach_nand": 113,
+   "reduction": 0.3468,
+   "judged": false
+  }
+ },
+ "bound": "verified upper bound for this specification, not a proven minimum",
+ "synthesis": {
+  "abc": "UC Berkeley, ABC 1.01",
+  "history": [
+   {
+    "step": "redundancy removal",
+    "faults_tied": 0,
+    "nand": 113
+   },
+   {
+    "step": "ABC round 1",
+    "recipes": {
+     "cut+collapse": {
+      "nand": 186,
+      "meets_specification": true
+     },
+     "cut+compress2rs": {
+      "nand": 115,
+      "meets_specification": true
+     },
+     "cut+dch": {
+      "nand": 113,
+      "meets_specification": true
+     },
+     "cut+deep": {
+      "nand": 114,
+      "meets_specification": true
+     },
+     "cut+resyn2": {
+      "nand": 113,
+      "meets_specification": true
+     },
+     "scorr+collapse": {
+      "nand": 186,
+      "meets_specification": true
+     },
+     "scorr+compress2rs": {
+      "nand": 115,
+      "meets_specification": true
+     },
+     "scorr+dch": {
+      "nand": 113,
+      "meets_specification": true
+     },
+     "scorr+deep": {
+      "nand": 114,
+      "meets_specification": true
+     },
+     "scorr+resyn2": {
+      "nand": 113,
+      "meets_specification": true
+     }
+    },
+    "selected": "cut+dch",
+    "faults_tied_after": 0,
+    "nand": 113
+   }
+  ]
+ },
+ "bytes": "depend on the ABC build; the artifact is gated by equivalence"
+}

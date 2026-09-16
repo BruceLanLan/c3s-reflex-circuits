@@ -75,9 +75,10 @@ limitations: [docs/FIRMWARE.md](docs/FIRMWARE.md).
 | **Measured wiring** | LC4 + LPLC2 provide 99.61 % (right) and 99.86 % (left) of the giant fibers' visual-projection input synapses in MaleCNS v1.0 — but only 25.8 % of all their input synapses |
 | **Policy circuit** | 16 sensory bits → 2 pathway bits in **74 NAND**, depth 11, exactly equal to the teacher on all 65,536 inputs |
 | **Stateful escape core** | **173 NAND + 6 LATCH** (1,235 bytes); step relation equal to its specification on all 8,388,608 (input, state) rows |
+| **Minimal cores** | the same step relation in **113 NAND + 6 LATCH**, 35 % smaller, equal on all 8,388,608 rows; relaxing the specification to the 12 states reachable from reset removed nothing further, against thresholds registered beforehand |
 | **Behaviour vs continuous teacher** | escape agreement 1.00; short/long-mode agreement 0.83 (train) and 0.90 (holdout); takeoff within ~1 tick (5 ms) |
 | **Firmware** | the Cardputer ADV firmware's C evaluator, compiled for the host and to WebAssembly (the online simulator), equals the Python engine on all 8,388,608 (input, state) rows of the core; the device itself checks the hashes, the reference episodes and 131,072 rows at rest on every boot |
-| **EVM** | full-domain differential test of 18 circuits passes; one tick of the core costs ~370k gas on the reference evaluator |
+| **EVM** | full-domain differential test of 20 circuits passes; one tick of the core costs ~370k gas on the reference evaluator |
 | **TapeOut byte layout** | cross-checked against the public tapeout.net decoder and evaluator: 0 mismatches over 4,800 random ticks and the final circuits |
 | **Learned circuits (DLGN)** | 67–90 % row accuracy at 216–1,340 NAND: on a fully tabulable function, exact synthesis wins |
 | **Controls** | of 23 wrong assignments of the measured synapse counts, 18 admit no teacher parameters at all; the 5 that do all keep the parallel pathway's dominant LC4 count in place — the wiring constrains behaviour, but through one ordinal fact |
