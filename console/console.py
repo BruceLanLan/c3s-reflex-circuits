@@ -377,6 +377,219 @@ CHAIN = None  # set in __main__ when the chain second opinion is on
 TOKEN = None  # set in __main__: the operator secret gating the person's endpoints
 STARTED_AT = time.time()
 
+# ---- W3 · the task entrance (I-6) -------------------------------------------------------
+#
+# A person hands the agent a job, and the job gets a name. Everything the agent then does
+# still goes through the circuits one call at a time — that does not change, and must not:
+# the boundary is per call, not per task. What a task adds is a thread a person can read
+# along: this reply, that deletion and those two refusals belong to "clear out the phishing
+# mail", and the page can say what that job has spent.
+#
+# The one property this whole file has to keep is that **a task is not an authority**.
+# Naming a task cannot arm a bit, cannot enter a circuit's inputs, cannot touch a latch.
+# So a task id reaches `Boundary.request` as a label that is written onto the transcript
+# entry after the tick and nowhere else, and `tests/test_console_task.py` checks the
+# stronger statement: the same call with and without a task id leaves the same verdict,
+# the same `why`, the same inputs *and* the same circuit state behind it.
+#
+# A task can only ever subtract. It is refused (never granted) when it is closed or was
+# never filed, and `max_grants` closes the task on its own Nth grant so that the ceiling
+# a person set arrives as the same plain refusal as closing it by hand — one path, one
+# sentence, and no second refusal mechanism competing with the circuits.
+TASKS_FILE = Path(os.environ.get("REFLEX_TASKS_FILE", CONFIG_DIR / "tasks.json")).expanduser()
+KEEP_TASKS = 200
+TASK_TEXT_MAX, TASK_NOTE_MAX = 600, 200
+
+
+class Tasks:
+    """The person's filed jobs, kept next to the rules and read by anything local.
+
+    `state_file` None keeps them in memory only (the tests, and any Boundary built without
+    a file). A file that is there and does not parse stops the console, for the same reason
+    `Boundary._load` does: carrying on with an empty ledger would quietly turn "this job is
+    closed" into "no such job — file a new one", and a closed task is a refusal a person
+    put there on purpose."""
+
+    def __init__(self, state_file: Path | None = None) -> None:
+        self.lock = threading.Lock()
+        self.save_lock = threading.Lock()
+        self.state_file = state_file
+        self.tasks: dict[str, dict] = {}
+        for rec in self._load():
+            self.tasks[rec["task_id"]] = rec
+
+    # -- persistence ---------------------------------------------------------------
+
+    def _load(self) -> list[dict]:
+        if self.state_file is None or not self.state_file.exists():
+            return []
+        try:
+            data = json.loads(self.state_file.read_text())
+            tasks = data["tasks"]
+            if not isinstance(tasks, list):
+                raise ValueError("tasks is not a list")
+            for rec in tasks:
+                if not isinstance(rec, dict) or not isinstance(rec.get("task_id"), str):
+                    raise ValueError("a task with no id")
+                if rec.get("status") not in ("open", "closed"):
+                    raise ValueError(f"{rec['task_id']}: status is {rec.get('status')!r}")
+            return tasks
+        except Exception as e:
+            raise SystemExit(f"cannot read the saved tasks in {self.state_file} ({e}); refusing to start without "
+                             f"them. A closed task is a refusal a person put there, and starting with an empty "
+                             f"ledger would drop it. Fix or move the file to start from no tasks.")
+
+    def _save(self) -> None:
+        if self.state_file is None:
+            return
+        with self.lock:
+            # Newest first, capped. An open task is never dropped: forgetting one would
+            # turn its id into "no such task", which reads as a mistake rather than a job.
+            recent = sorted(self.tasks.values(), key=lambda r: r.get("filed_at", 0), reverse=True)
+            keep = [r for r in recent if r["status"] == "open"]
+            keep += [r for r in recent if r["status"] != "open"][:KEEP_TASKS]
+            body = json.dumps({"format": "c3s.console.tasks/1", "saved_at": time.time(),
+                               "tasks": sorted(keep, key=lambda r: r.get("filed_at", 0))}, indent=2)
+        with self.save_lock:
+            self.state_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.state_file.with_suffix(".tmp")
+            tmp.write_text(body)
+            try:
+                tmp.chmod(0o600)  # a person's own words about their own work
+            except OSError:
+                pass
+            tmp.replace(self.state_file)
+
+    # -- filing and closing (the person's acts) -------------------------------------
+
+    def _new_id(self) -> str:
+        while True:
+            task_id = "t_" + secrets.token_hex(2)
+            if task_id not in self.tasks:
+                return task_id
+
+    def file(self, text: str, classes: list[str] | None = None, max_grants: int | None = None,
+             extra: dict | None = None) -> dict:
+        """One filed job. `classes` is what the person expects it to need and `max_grants`
+        the ceiling they are willing to give it; everything else handed in (I-5's `runner`,
+        `agent`, `reply_to`, `cwd`) is stored verbatim and interpreted by nothing here."""
+        text = str(text or "").strip()
+        if not text:
+            raise ValueError("a task needs text: say what the job is, in your own words")
+        if len(text) > TASK_TEXT_MAX:
+            raise ValueError(f"the task text is longer than {TASK_TEXT_MAX} characters")
+        for cls in classes or []:
+            if cls not in TOOL_CLASSES:
+                raise ValueError(f"no such class: {cls!r}; one of {', '.join(TOOL_CLASSES)}")
+        if max_grants is not None:
+            if not isinstance(max_grants, int) or isinstance(max_grants, bool) or max_grants < 1:
+                raise ValueError("max_grants is a whole number of grants, at least 1, or leave it out for no ceiling")
+        with self.lock:
+            task_id = self._new_id()
+            rec = {
+                "task_id": task_id,
+                "text": text[:TASK_TEXT_MAX],
+                # A declaration a person reads, never a gate. Refusing a class this list
+                # does not mention would be a boundary nothing proved, and a person would
+                # soon trust it as one; the class's own circuit is the boundary. The page
+                # shows what the task actually spent beside what it said it would need.
+                "expects": sorted(set(classes or [])),
+                "max_grants": max_grants,
+                "status": "open",
+                "filed_at": time.time(),
+                "closed_at": None,
+                "closed_by": None,
+                "note": None,
+                "granted": 0,
+                "refused": 0,
+                "by_class": {},
+                **{k: v for k, v in (extra or {}).items()},
+            }
+            self.tasks[task_id] = rec
+            out = dict(rec)
+        self._save()
+        TRANSCRIPTS.appendleft({"at": out["filed_at"], "kind": "task", "task": task_id, "event": "filed",
+                                "text": out["text"], "expects": out["expects"], "max_grants": max_grants})
+        return out
+
+    def close(self, task_id: str, note: str | None = None, by: str = "person") -> dict:
+        """Closing is a person's act. It is also the only thing a task does to a request:
+        an id that is closed is refused, with the reason it closed."""
+        with self.lock:
+            rec = self.tasks.get(task_id)
+            if rec is None:
+                raise KeyError(task_id)
+            if rec["status"] != "open":
+                raise ValueError(f"{task_id} is already closed ({self._why_closed(rec)})")
+            rec["status"] = "closed"
+            rec["closed_at"] = time.time()
+            rec["closed_by"] = by
+            if note:
+                rec["note"] = str(note).strip()[:TASK_NOTE_MAX] or None
+            out = dict(rec)
+        self._save()
+        TRANSCRIPTS.appendleft({"at": out["closed_at"], "kind": "task", "task": task_id, "event": "closed",
+                                "text": out["text"], "closed_by": by, **({"note": out["note"]} if out["note"] else {})})
+        return out
+
+    @staticmethod
+    def _why_closed(rec: dict) -> str:
+        if rec.get("closed_by") == "limit":
+            return f"it reached the {rec.get('max_grants')} grant(s) it was filed with"
+        return "a person closed it"
+
+    # -- what a request may do with an id --------------------------------------------
+
+    def check(self, task_id: str) -> dict:
+        """The one gate: an id that is open passes, anything else raises. Called before the
+        circuits are asked, so a refusal here costs no tick — a task that is over is not
+        this agent's call being judged, it is a call that should not have been sent."""
+        with self.lock:
+            rec = self.tasks.get(task_id)
+            if rec is None:
+                raise ValueError(f"no task {task_id!r} was filed here: file one on the Tasks page, or send the "
+                                 f"call without a task — the boundary is per call, not per task")
+            if rec["status"] != "open":
+                raise ValueError(f"task {task_id} is closed ({self._why_closed(rec)}); a closed task takes no more "
+                                 f"calls. File a new one, or send the call without a task")
+            return dict(rec)
+
+    def record(self, task_id: str, cls: str, granted: bool) -> None:
+        """What the job spent, after the circuit has already answered. Counting cannot
+        change the verdict it counts: the tick is over. The Nth grant closes the task the
+        person capped, so the next call meets the ordinary closed-task refusal."""
+        hit_limit = False
+        with self.lock:
+            rec = self.tasks.get(task_id)
+            if rec is None:
+                return
+            rec["granted" if granted else "refused"] += 1
+            per = rec["by_class"].setdefault(cls, {"granted": 0, "refused": 0})
+            per["granted" if granted else "refused"] += 1
+            cap = rec.get("max_grants")
+            hit_limit = bool(cap) and rec["status"] == "open" and rec["granted"] >= cap
+        if hit_limit:
+            self.close(task_id, by="limit")
+        else:
+            self._save()
+
+    # -- reporting -------------------------------------------------------------------
+
+    def view(self, task_id: str) -> dict | None:
+        with self.lock:
+            rec = self.tasks.get(task_id)
+            return dict(rec) if rec else None
+
+    def listing(self, only_open: bool = False, limit: int | None = None) -> list[dict]:
+        with self.lock:
+            recs = sorted(self.tasks.values(), key=lambda r: r.get("filed_at", 0), reverse=True)
+            if only_open:
+                recs = [r for r in recs if r["status"] == "open"]
+            return [dict(r) for r in (recs[:limit] if limit else recs)]
+
+
+TASKS = Tasks(None)  # in memory until __main__ gives it the file next to the rules
+
 
 def _settings(policy: Policy) -> dict:
     return {
@@ -669,9 +882,13 @@ class Boundary:
         return grant, inp, why, decisive, gap
 
     def request(self, name: str, intent: int, reason: str, cls: str = DEFAULT_CLASS,
-                effect: dict | None = None) -> dict:
+                effect: dict | None = None, task: str | None = None) -> dict:
         """One tick: the agent asks, the shared halt circuit answers first, then the
-        class's circuit. Both verdicts are recorded; the class's is the decision."""
+        class's circuit. Both verdicts are recorded; the class's is the decision.
+
+        `task` (W3/I-6) is a label and nothing else. It is not read by any circuit, does
+        not reach `_tick`, and is written onto the entry after the verdict exists — so a
+        call that names a job is judged exactly as the same call without one."""
         if cls not in TOOL_CLASSES:
             raise ValueError(f"no such class: {cls!r}; one of {', '.join(TOOL_CLASSES)}")
         intent = int(bool(intent))
@@ -749,6 +966,9 @@ class Boundary:
                 # Carried through untouched (I-1): the adapter's description of what this
                 # call would do, for the card a person reads. It decided nothing.
                 **({"effect": effect} if effect is not None else {}),
+                # I-6: which job this call belongs to, for the person reading the thread.
+                # Written after the verdict above; no circuit ever saw it.
+                **({"task": task} if task else {}),
                 # Carried out of the lock so the chain re-evaluates the circuits that
                 # actually decided, not whichever are installed by the time it asks.
                 "_decisive": decisive,
@@ -820,6 +1040,11 @@ class Boundary:
             }
             if e.get("effect") is not None:
                 item["effect"] = e["effect"]
+            # I-6: the job this call was sent for, so the page, the device and the chat all
+            # say "this is part of that" without looking the call up again. A label on the
+            # entry the console already computed; it changes nothing about the entry.
+            if e.get("task"):
+                item["task"] = e["task"]
             items.append(item)
         live: set[tuple[str, str, str]] = set()
         taken = set(self.codes.values())
@@ -915,6 +1140,10 @@ class Boundary:
                 # I-2: one list of what waits for a person, for the page, the device and
                 # the chat bot alike. Nothing downstream derives it again.
                 "pending": self._pending(),
+                # I-6: the jobs a person has filed and not closed. Here rather than behind
+                # its own call because this is how an agent's adapter reads what it was
+                # asked to do — the same list the page draws, and reading it grants nothing.
+                "tasks": TASKS.listing(only_open=True),
                 "transcript": [{k: v for k, v in e.items() if not k.startswith("_")} for e in list(TRANSCRIPTS)[:60]],
                 "chain": {
                     "enabled": CHAIN is not None,
@@ -1592,6 +1821,57 @@ def api_write_claude_settings(h: "Handler", payload: dict) -> None:
 # ======= end W2 block ====================================================================
 
 
+# ======= W3 block: the task entrance over HTTP (I-6) =====================================
+#
+# Two person's acts and nothing else: file a job, close a job. There is deliberately no
+# endpoint here that runs anything, and none that an agent may call — an agent that could
+# file its own task would be writing the account a person reads, and one that could close a
+# task could lift the ceiling that task was filed with.
+
+# I-5's fields, accepted and stored verbatim so that a runner (which this workstream does
+# not build) files through this same endpoint and inherits the id, without this console
+# growing an opinion about what any of them mean.
+TASK_PASSTHROUGH = ("runner", "agent", "reply_to", "cwd")
+
+
+def api_task(h: "Handler", payload: dict) -> None:
+    path = h.path.split("?", 1)[0].rstrip("/")
+    if not h._has_token(payload):
+        self_says = ("filing a job" if path == "/api/task" else "closing a job")
+        h._json(403, {"error": f"{self_says} is the person's: send the token (see the console's log). An agent "
+                               f"may not file or close its own tasks."})
+        return
+    if path == "/api/task":
+        classes = payload.get("classes")
+        if classes is not None and not (isinstance(classes, list) and all(isinstance(c, str) for c in classes)):
+            h._json(400, {"error": "classes is a list of tool class names, or leave it out"})
+            return
+        extra = {k: payload[k] for k in TASK_PASSTHROUGH if payload.get(k) is not None}
+        try:
+            rec = TASKS.file(payload.get("text", ""), classes, payload.get("max_grants"), extra)
+        except ValueError as e:
+            h._json(400, {"error": str(e)})
+            return
+        cap = f" · at most {rec['max_grants']} grant(s)" if rec["max_grants"] else ""
+        print(f"task {rec['task_id']} filed by a person: {rec['text'][:80]!r}{cap}", flush=True)
+        h._json(200, rec)
+        return
+    if path.endswith("/close"):
+        task_id = path[len("/api/task/"):-len("/close")].strip("/")
+        try:
+            h._json(200, TASKS.close(task_id, payload.get("note")))
+        except KeyError:
+            h._json(404, {"error": f"no such task: {task_id}"})
+        except ValueError as e:
+            h._json(400, {"error": str(e)})
+        return
+    h._json(404, {"error": "no such path: a task is filed at POST /api/task and closed at "
+                           "POST /api/task/<id>/close"})
+
+
+# ======= end W3 block ====================================================================
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "reflex-console"
 
@@ -1680,10 +1960,12 @@ class Handler(BaseHTTPRequestHandler):
         return (self.headers.get("X-Reflex-Agent-Token") or "").strip()
 
     def _reader_may_look(self, path: str) -> bool:
-        """`GET /api/state` and `/api/manifest` are open on this machine and closed from
-        the network: over the LAN they need the operator's token (the phone that scanned
-        the QR has it) or an agent token that is actually bound (its own adapter)."""
-        if path != "/api/state" and not path.startswith("/api/manifest"):
+        """`GET /api/state`, `/api/manifest` and the task ledger are open on this machine
+        and closed from the network: over the LAN they need the operator's token (the phone
+        that scanned the QR has it) or an agent token that is actually bound (its own
+        adapter). The tasks are the person's own words about their own work, so they are
+        behind the same check as the rest of the state and not a step looser."""
+        if path not in ("/api/state", "/api/tasks") and not path.startswith(("/api/manifest", "/api/task/")):
             return True
         if self._from_loopback() or self._has_token({}) or bound_token_owner(self._agent_token()):
             return True
@@ -1703,6 +1985,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/classes":  # W2: the tool→class map (see the W2 block above)
             return api_classes_get(self)
+        if path == "/api/tasks":  # W3/I-6: every job, newest first, closed ones included
+            return self._json(200, {"tasks": TASKS.listing(limit=20)})
+        if path.startswith("/api/task/"):  # W3/I-6: one job and what it has spent
+            task_id = path[len("/api/task/"):].strip("/")
+            rec = TASKS.view(task_id)
+            return self._json(200, rec) if rec else self._json(404, {"error": f"no such task: {task_id}"})
         if path.startswith("/api/device/"):  # W11
             device_get(self, BOUNDARY)
         elif path in ("/", "/index.html"):
@@ -1796,6 +2084,11 @@ class Handler(BaseHTTPRequestHandler):
                              "every_rule_holds": summary["checked"]["every_rule_holds"]})
             TRANSCRIPTS.appendleft(note)
             self._json(200, summary)
+        elif self.path.split("?", 1)[0] == "/api/task" or self.path.split("?", 1)[0].startswith("/api/task/"):
+            # W3/I-6. Filing a job and closing one are both the person's: a task is how a
+            # person reads what their agent did, and an agent that could file or close its
+            # own would be writing that account itself. Neither grants anything.
+            return api_task(self, payload)
         elif self.path.startswith("/api/device/"):  # W11: pairing; nothing here writes a bit
             device_post(self, payload, BOUNDARY)
         elif self.path == "/api/tool":
@@ -1902,13 +2195,25 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(403, {"error": f"{why}. Send that agent's REFLEX_AGENT_TOKEN in X-Reflex-Agent-Token; "
                                           "a person can drop a binding with `c3s token rotate --agent <name>`."})
                 return
+            # I-6: which job this call belongs to, if the adapter knows. A call that names
+            # no task is an ordinary call — the boundary is per call, not per task — and a
+            # call that names one is judged by the same circuit in the same state. The only
+            # thing the id can do is stop the call: an id that is closed or was never filed
+            # is refused here, before any circuit is asked, so it costs no tick and moves
+            # no latch. Nothing about a task can make a verdict more permissive.
+            task = str(payload.get("task") or payload.get("task_id") or "")[:40] or None
             try:
                 cls = class_from(payload, TOOL_CLASSES)
+                if task is not None:
+                    TASKS.check(task)
                 entry = BOUNDARY.request(name, payload.get("intent", 0), str(payload.get("reason", ""))[:160], cls,
-                                         effect_from(payload))
+                                         effect_from(payload), task)
             except ValueError as e:
                 self._json(400, {"error": str(e)})
                 return
+            if task is not None:
+                # After the verdict, never before: counting cannot change what it counts.
+                TASKS.record(task, cls, bool(entry.get("granted")))
             decisive = entry.pop("_decisive", None) or {}
             if CHAIN is not None and decisive:
                 # The second opinion never holds up the decision: wait briefly so a quick
@@ -1927,6 +2232,11 @@ if __name__ == "__main__":
     print(f"compiling the default rules (the ones the fly circuit obeys) from {REPO} …", flush=True)
     BOUNDARY = Boundary(FLY_DEFAULT, STATE_FILE)
     print(f"rules are kept in {STATE_FILE}", flush=True)
+    # W3/I-6: the filed jobs, beside the rules. Like the rules, a file that will not parse
+    # stops the console here rather than starting with an empty ledger.
+    TASKS = Tasks(TASKS_FILE)
+    _open_tasks = TASKS.listing(only_open=True)
+    print(f"tasks are kept in {TASKS_FILE} ({len(_open_tasks)} open)", flush=True)
     for cls, compiled in BOUNDARY.policies.items():
         if compiled is not None and cls != DEFAULT_CLASS:
             print(f"  {cls}: {'denied outright' if compiled.deny_all else '; '.join(compiled.summary['rules'])}", flush=True)

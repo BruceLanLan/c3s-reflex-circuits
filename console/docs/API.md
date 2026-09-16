@@ -11,6 +11,8 @@ first: five workstreams read it. Endpoints are on `http://127.0.0.1:8765` by def
 | `POST /api/tool` — `irreversible`, `failed` | the adapters (the tool runner describing the call) | none |
 | `POST /api/tool` — `confirm`, `confirm_b`, `blocked`, `heartbeat` | **a person** (page, Cardputer, chat) | operator token |
 | `POST /api/policy`, `POST /api/task` | **a person** | operator token |
+| `POST /api/task/<id>/close` | **a person** | operator token |
+| `GET /api/tasks`, `GET /api/task/<id>` | read: **loopback** free · over the LAN: **a person** or a bound agent | as `GET /api/state` |
 | `POST /api/stop-all`, `POST /api/resume-all` | **a person** | operator token |
 | `GET/POST /api/classes` | read: **loopback** free · over the LAN and to write: **a person** | operator token except from loopback |
 | `POST /api/hooks/claude-code` | **a person**, loopback only | operator token |
@@ -163,6 +165,75 @@ POST /api/task/t_9f2a/cancel   (operator token)
   entrance grants nothing on its own**, and a task blocked on an approval simply waits.
 - `reply_to` is stored for the channel to consume; the console itself never sends to a chat.
 
+## I-6 · tasks as a ledger — shipped
+
+I-5 above describes the task entrance with a runner behind it. The runner is **not built**
+(W3, 2026-09-16); what is built is the half that makes a task mean something whether or not
+a subprocess ever exists: **a job a person files, and the thread their agent's calls are read
+along.** A runner, when one lands, files through this same endpoint and inherits the id, so
+nothing in I-5's request shape changed — `runner`, `agent`, `reply_to` and `cwd` are accepted
+and stored verbatim, interpreted by nothing.
+
+```json
+POST /api/task          (operator token)
+{"text": "把收件箱里骗 seed phrase 的邮件扔垃圾箱，给 Lena 回信说周四 15:00 可以",
+ "classes": ["files", "message"],      // what the person expects it to need — a note, not a gate
+ "max_grants": 4}                      // the ceiling they are willing to give it
+→ 200 {"task_id": "t_9f2a", "status": "open", "text": "…", "expects": ["files", "message"],
+       "max_grants": 4, "filed_at": …, "granted": 0, "refused": 0, "by_class": {}}
+
+GET  /api/tasks               → {"tasks": [ … the last 20, newest first, closed ones included ]}
+GET  /api/task/t_9f2a         → that one task and what it has spent
+POST /api/task/t_9f2a/close   (operator token) {"note": "the reply went out"}
+```
+
+`GET /api/state` gains `"tasks": [ … the open ones … ]`. That is deliberately where an
+agent's adapter reads its work: the same list the page draws, on a call that already exists,
+and reading it grants nothing.
+
+**Naming a task on a call.** `POST /api/request` takes an optional `task` (or `task_id`).
+The id is written onto the transcript entry and onto that call's `pending[]` item, so the
+page, the Cardputer and a chat channel can all say *this approval is part of that job*
+without a second lookup. A call that names **no** task works exactly as before: the boundary
+is per call, not per task — the task is how a person reads what happened.
+
+**A task is not an authority.** This is the property the endpoint exists to keep, so it is
+stated as a constraint rather than a hope:
+
+- The id never reaches a circuit. It is not an input, it moves no latch, and it is written
+  onto the entry *after* the verdict exists.
+- `tests/test_console_task.py::test_a_task_id_cannot_loosen_a_verdict` runs the same call
+  twice against the same circuit in the same state — once naming an open task, once naming
+  none — over a grant, an irreversible call with and without its confirm, a blocked agent, a
+  cooldown and a denied class, and requires the same `granted`, the same `why`, the same
+  `inputs` **and the same circuit state afterwards**. The HTTP path, where the counting
+  happens, gets the same test.
+- The only thing a task can do to a call is **stop** it: an id that is closed, or that was
+  never filed, is refused with `400` and a sentence saying which, **before any circuit is
+  asked** — so it costs no tick and moves no latch. Stricter, never looser.
+
+**`max_grants` is a brake, not a rule.** The Nth granted call naming the task closes the
+task (`closed_by: "limit"`), so the call after it meets the ordinary closed-task refusal —
+one path and one sentence, rather than a second refusal mechanism competing with the
+circuits. Refused calls cost nothing against it. A real ceiling on an agent is `max_grants`
+on the class, under Boundaries, where a circuit proves it.
+
+**`classes` is a declaration.** It is shown beside what the job actually spent, and it gates
+nothing: refusing a class the person did not list would be a boundary nothing proved, and one
+a person would soon trust as if it were. The class's own circuit is the boundary.
+
+Tasks persist in `~/.c3s-circuit-agent/tasks.json` (`REFLEX_TASKS_FILE`, mode 600), beside
+the rules and with the same refusal: **a file that will not parse stops the console** rather
+than starting with an empty ledger, because a closed task is a refusal a person put there and
+starting empty would turn it back into "no such task". Open tasks are never dropped; closed
+ones keep the last 200.
+
+**What it deliberately does not do.** It runs nothing — no subprocess, no model, no tool — and
+holds no key. It never sends to a chat: `reply_to` is stored for a channel to consume. It
+cannot make any call more likely to be granted. It is not a queue the agent may write to: an
+agent can read the open tasks but may neither file nor close one, because a task is the account
+a person reads and an agent that could write it could also lift the ceiling it was filed with.
+
 ## Stop everything · `POST /api/stop-all` / `POST /api/resume-all`
 
 Operator token. Optional `note` (≤ 200) and `source` (≤ 20, default `"page"`); returns
@@ -242,7 +313,7 @@ reads it), and **a token-carrying poll is the heartbeat** — none of which `/ap
 
 | status | when |
 | --- | --- |
-| 400 | malformed body, unknown class, unknown runner, bad `effect` shape |
+| 400 | malformed body, unknown class, unknown runner, bad `effect` shape, a task that is closed or was never filed, a task already closed |
 | 403 | missing/wrong operator token, wrong `code`, wrong agent token, bad `Host`/`Origin` |
 | 404 | no such path or task |
 | 415 | `Content-Type` is not `application/json` |

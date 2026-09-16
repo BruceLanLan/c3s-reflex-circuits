@@ -18,9 +18,10 @@
   .c-agent { color: var(--agent); } .c-tool { color: var(--tool); }
   button { font: inherit; cursor: pointer; }
   button:disabled { opacity: .5; cursor: not-allowed; }
-  input, select { background: #14171a; border: 1px solid var(--line); color: var(--text); padding: 6px 8px; font: inherit; font-size: 13px; border-radius: 6px; min-width: 0; }
+  input, select, textarea { background: #14171a; border: 1px solid var(--line); color: var(--text); padding: 6px 8px; font: inherit; font-size: 13px; border-radius: 6px; min-width: 0; }
   input[type=number] { font-family: var(--mono); }
-  input:focus, select:focus { outline: 1px solid var(--amber); border-color: var(--amber); }
+  textarea { width: 100%; resize: vertical; line-height: 1.5; }
+  input:focus, select:focus, textarea:focus { outline: 1px solid var(--amber); border-color: var(--amber); }
 
   /* shell */
   .shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100vh; }
@@ -190,11 +191,23 @@
   .togl button { white-space: nowrap; }
   .handled { display: grid; gap: 6px; }
 
+  /* a filed job (I-6): the person's words, then what the circuits did with them */
+  .task { background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--agent); border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+  .task .top { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+  .task .said { color: var(--text); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+  .task .spent { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+  .task .spent .g { color: var(--ok); } .task .spent .r { color: var(--bad); }
+  .task .btns { display: flex; flex-direction: column; gap: 8px; min-width: 140px; }
+  .task .btns button { white-space: nowrap; min-height: 44px; }
+  .tid { font-family: var(--mono); font-size: 11.5px; color: var(--agent); background: rgba(111,168,220,.12); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+  @media (max-width: 700px) { .task { grid-template-columns: 1fr; } .task .btns { min-width: 0; } }
+
   /* log */
   .log { display: grid; gap: 6px; }
   .e { display: grid; grid-template-columns: 62px 1fr; gap: 10px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-left-width: 3px; border-radius: 6px; font-size: 13px; min-width: 0; }
   .e.ok { border-left-color: var(--ok); } .e.no { border-left-color: var(--faint); } .e.tool { border-left-color: var(--tool); } .e.policy { border-left-color: var(--agent); } .e.err { border-left-color: var(--bad); }
   .e.spoof { border-left-color: var(--bad); border-left-style: double; } .e.spoof .verdict { background: rgba(227,106,82,.14); color: var(--bad); }
+  .e.task-e { border-left-color: var(--agent); border-left-style: dashed; } .e.task-e .verdict { background: rgba(111,168,220,.14); color: var(--agent); }
   .e .t { font-family: var(--mono); font-size: 12px; color: var(--faint); padding-top: 2px; }
   .e .h { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-width: 0; }
   .e .h .agent { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
@@ -259,6 +272,7 @@
   <button class="nav-item" data-view="overview"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg><span class="lab" data-i18n="nav.overview"></span></button>
   <button class="nav-item" data-view="boundaries"><svg viewBox="0 0 16 16"><path d="M8 1.5 13.5 3.5v4c0 3.2-2.3 5.6-5.5 7-3.2-1.4-5.5-3.8-5.5-7v-4z"></path></svg><span class="lab" data-i18n="nav.boundaries"></span></button>
   <button class="nav-item" data-view="approvals"><svg viewBox="0 0 16 16"><path d="M2 9h3.5l1 2h3l1-2H14"></path><path d="M3.5 3.5h9L14 9v3.5H2V9z"></path></svg><span class="lab" data-i18n="nav.approvals"></span><span class="cnt" id="nav-pending"></span></button>
+  <button class="nav-item" data-view="tasks"><svg viewBox="0 0 16 16"><path d="M5 2.5h6a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z"></path><path d="M6.5 6h3M6.5 8.5h3M6.5 11h2"></path></svg><span class="lab" data-i18n="nav.tasks"></span><span class="cnt" id="nav-tasks"></span></button>
   <button class="nav-item" data-view="activity"><svg viewBox="0 0 16 16"><path d="M1.5 8h3l2-5 3 10 2-5h3"></path></svg><span class="lab" data-i18n="nav.activity"></span></button>
   <button class="nav-item" data-view="agents"><svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.5"></rect><path d="M6 1.5v2.5M10 1.5v2.5M6 12v2.5M10 12v2.5M1.5 6h2.5M1.5 10h2.5M12 6h2.5M12 10h2.5"></path></svg><span class="lab" data-i18n="nav.agents"></span></button>
   <button class="nav-item" data-view="connect"><svg viewBox="0 0 16 16"><path d="M6.5 9.5 9.5 6.5"></path><path d="M7 4.5 8.5 3a2.5 2.5 0 0 1 3.5 3.5L10.5 8"></path><path d="M9 11.5 7.5 13a2.5 2.5 0 0 1-3.5-3.5L5.5 8"></path></svg><span class="lab" data-i18n="nav.connect"></span></button>
@@ -360,6 +374,37 @@
       <div class="note" style="border-top:1px solid var(--line);padding-top:10px" data-i18n="ap.cardputer"></div>
       <div class="msg" id="ap-msg"></div>
     </div>
+  </div>
+</section>
+
+<!-- ===== Tasks ===== -->
+<!-- A job a person hands the agent. The calls it is made of are still judged one at a
+     time by the circuits — filing a job grants nothing — so this view is an account, not
+     a control: what was asked for, what it has spent, and the one act that is a person's
+     (closing it). -->
+<section data-view="tasks">
+  <p class="lead" id="tk-lead"></p>
+  <div class="split a">
+    <div style="display:grid;gap:16px;min-width:0">
+      <div class="card"><div class="h2"><span data-i18n="tk.open"></span><span class="sub" id="tk-open-sub"></span></div><div id="tk-list" style="display:grid;gap:10px"></div></div>
+      <div class="card"><div class="h2"><span data-i18n="tk.done"></span><span class="sub" data-i18n="tk.done.sub"></span></div><div class="wrap"><table id="tk-closed"><tbody></tbody></table></div></div>
+    </div>
+    <form class="card" id="tk-file" autocomplete="off">
+      <div class="h2"><span data-i18n="tk.file"></span><span class="sub" data-i18n="tk.file.sub"></span></div>
+      <textarea id="tk-text" maxlength="600" rows="4" spellcheck="false"></textarea>
+      <div class="note" data-i18n="tk.text.note"></div>
+      <div class="h2" style="margin-top:4px"><span data-i18n="tk.expects"></span></div>
+      <div class="tester" id="tk-classes"></div>
+      <div class="note" data-i18n="tk.expects.note"></div>
+      <div class="tester" style="margin-top:4px">
+        <label><input type="checkbox" id="tk-cap-on"><span data-i18n="tk.cap"></span></label>
+        <input type="number" id="tk-cap" min="1" max="999" step="1" value="5" style="width:80px" disabled>
+      </div>
+      <div class="note" data-i18n="tk.cap.note"></div>
+      <div class="actions"><button class="go" type="submit" id="tk-go" data-i18n="tk.go"></button></div>
+      <div class="msg" id="tk-msg"></div>
+      <div class="note" style="border-top:1px solid var(--line);padding-top:10px" data-i18n="tk.grants.nothing"></div>
+    </form>
   </div>
 </section>
 
@@ -508,7 +553,7 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const N = (v) => Number(v) || 0;
-const VIEWS = ["overview", "boundaries", "approvals", "activity", "agents", "connect"];
+const VIEWS = ["overview", "boundaries", "approvals", "tasks", "activity", "agents", "connect"];
 const TOOL_CLASSES = ["spend", "message", "exec", "files"], HALT = "halt", ALL_CLASSES = TOOL_CLASSES.concat([HALT]);
 const TOOL_BITS = ["blocked", "confirm", "irreversible", "failed", "heartbeat", "confirm_b"];
 const AGENT_BITS = ["request", "intent"];
@@ -516,10 +561,10 @@ const AGENT_BITS = ["request", "intent"];
 // ---------- text ----------
 const T = {
   zh: {
-    "nav.overview": "Overview · 总览", "nav.boundaries": "Boundaries · 边界", "nav.approvals": "Approvals · 待确认", "nav.activity": "Activity · 流水", "nav.agents": "Agents", "nav.connect": "Connect · 接入",
+    "nav.overview": "Overview · 总览", "nav.boundaries": "Boundaries · 边界", "nav.approvals": "Approvals · 待确认", "nav.tasks": "Tasks · 任务", "nav.activity": "Activity · 流水", "nav.agents": "Agents", "nav.connect": "Connect · 接入",
     "nav.foot": "拍不是时间。\n标志位是工具层的承诺。\n链上只复算，不部署。",
     "title.overview": "总览", "sub.overview": "", "title.boundaries": "边界", "sub.boundaries": "规则 → 电路 → 逐行核对 → 遍历证明",
-    "title.approvals": "待确认", "sub.approvals": "", "title.activity": "流水", "sub.activity": "每条决策都带电路原话与链上复算",
+    "title.approvals": "待确认", "sub.approvals": "", "title.tasks": "任务", "sub.tasks": "交一件事给它做；每次调用照旧一条一条过电路", "title.activity": "流水", "sub.activity": "每条决策都带电路原话与链上复算",
     "title.agents": "Agents", "sub.agents": "一个名字，四张电路各一份状态", "title.connect": "接入", "sub.connect": "你的模型、你的工具、你的链——边界都在同一张电路上",
     "svc.ok": "服务已连接", "svc.bad": "服务无响应", "svc.wait": "连接中…",
     "chain.off": "链上复核已关闭", "chain.idle": "链上复核就绪（BSC 只读，未部署）", "chain.ok": "链上复核一致 · 未部署", "chain.pend": "链上复核进行中", "chain.err": "链上节点不可用，仅本地裁决", "chain.dis": "链上复核不一致！",
@@ -599,11 +644,31 @@ const T = {
     "sw.blocked": "电平，持续到你放下", "sw.confirm": "一次；下一次请求用掉", "sw.irreversible": "标注下一次动作不可逆", "sw.failed": "上报一次失败（钩子会自动）", "sw.heartbeat": "打一次心跳", "sw.confirm_b": "第二个人的钥匙",
     "sw.on": "拉高", "sw.off": "放下", "sw.once": "给一次", "sw.unread": "这个 agent 的电路不读它",
     "ap.done": "已写 {agent}：{bits}", "ap.noagent": "还没有 agent。",
+    // tasks (I-6)
+    "tk.lead": "任务是<b>你交给它的一件事</b>，也是你之后按这条线读回来的凭据。任务本身<b>不是权限</b>：它做的每次调用照旧一条一条过电路，该确认的还得你确认。",
+    "tk.file": "交一件事", "tk.file.sub": "只有你能交，也只有你能关",
+    "tk.text.note": "用你自己的话写。适配器会读到这段文字，知道自己在做哪件事。",
+    "tk.expects": "预计会用到", "tk.expects.note": "只是你的说明，<b>不是闸门</b>：真正裁决的是那一类工具自己的电路。写下来，是为了它真用了别的类时你一眼看得出。",
+    "tk.cap": "最多放行", "tk.cap.note": "到这个数就自动关掉这件事——是一道刹车，不是一条规则：它只会让调用更早被拒，永远不会让谁多放一次。真正的上限请在「边界」里装 max_grants。",
+    "tk.go": "交给它", "tk.grants.nothing": "交一件事不会放行任何东西：这一页只是账，电路才是边界。",
+    "tk.open": "在做的事", "tk.open.sub": "{n} 件", "tk.open.none": "现在没有在做的事。交一件给它 →",
+    "tk.done": "关掉的事", "tk.done.sub": "关掉之后，再拿这个编号来的调用会被拒", "tk.done.none": "还没有关掉过任何事。",
+    "tk.spent": "放行 <span class=\"g\">{g}</span> · 拒绝 <span class=\"r\">{r}</span>",
+    "tk.spent.none": "还没有一次调用挂在这件事上",
+    "tk.cap.left": "还剩 {n} 次（共 {m} 次）", "tk.cap.none": "没有上限",
+    "tk.expects.says": "说会用：{cls}", "tk.expects.any": "没说会用哪类",
+    "tk.used": "实际用了：{cls}", "tk.close": "关掉这件事", "tk.closing": "关掉中…",
+    "tk.closed.by.person": "由你关掉", "tk.closed.by.limit": "到了 {n} 次放行，自动关掉",
+    "tk.filed": "{time} 交的", "tk.note": "备注：{note}",
+    "tk.th.id": "编号", "tk.th.text": "交的是什么", "tk.th.spent": "放行/拒绝", "tk.th.why": "怎么关的", "tk.th.at": "关掉时间",
+    "tk.filed.ok": "已交：{id}。适配器下一次调用就能带上它。", "tk.closed.ok": "{id} 已关掉：再拿这个编号来的调用会被拒。",
+    "tk.need.text": "先写一句：这件事是什么。", "tk.belongs": "属于任务",
     // activity
     "ac.tester": "发一条请求", "ac.tester.sub": "演示用：这里两栏都是你在按，所以只是演示", "ac.intent": "intent 为高", "ac.send": "发出（1 拍）",
     "ac.log": "决策流水", "ac.sub": "最近 {n} 条 · 放行 {g} · 拒绝 {r}", "ac.none": "还没有记录。",
     "f.all": "全部", "f.granted": "放行", "f.refused": "拒绝", "f.tool": "工具层", "f.policy": "规则",
-    "v.grant": "放行", "v.refuse": "拒绝", "v.tool": "工具层", "v.policy": "规则", "v.spoof": "冒名",
+    "v.grant": "放行", "v.refuse": "拒绝", "v.tool": "工具层", "v.policy": "规则", "v.spoof": "冒名", "v.task": "任务",
+    "e.task.filed": "你交了一件事", "e.task.closed": "这件事关掉了", "e.task.cap": "上限 {n} 次放行",
     "e.spoof.missing": "这个名字已绑定令牌，请求却没带令牌 —— 没问任何电路就拒了。", "e.spoof.wrong": "这个名字已绑定令牌，请求带的不是它的令牌 —— 没问任何电路就拒了。",
     "e.tick": "第 {n} 拍", "e.gap": "距上次放行 {n} 拍", "e.why": "拒绝原因（电路原话）：", "e.granted": "每条检查都过，电路输出 grant = 1。",
     "e.ungated": "这一类没有电路：未设限。", "e.halt.no": "共享停机电路拒绝", "e.halt.ok": "共享停机电路放行",
@@ -635,10 +700,10 @@ const T = {
     "d.gmail": "读 · 搜 免费 · send / trash / label 归 message 类，send_* 要一次确认", "d.slack": "读频道 免费 · post / react 归 message 类", "d.cal": "查日程 免费 · create / update / delete 归 message 类", "d.fs": "read / list 免费 · write_* / move_* / delete_* 归 files 类", "d.sh": "Claude Code 内建 Bash 走钩子 → exec 类；rm · git push · --force · sudo 标不可逆",
   },
   en: {
-    "nav.overview": "Overview", "nav.boundaries": "Boundaries", "nav.approvals": "Approvals", "nav.activity": "Activity", "nav.agents": "Agents", "nav.connect": "Connect",
+    "nav.overview": "Overview", "nav.boundaries": "Boundaries", "nav.approvals": "Approvals", "nav.tasks": "Tasks", "nav.activity": "Activity", "nav.agents": "Agents", "nav.connect": "Connect",
     "nav.foot": "Ticks are not time.\nFlags are the tool layer's promise.\nOn chain: replayed, never deployed.",
     "title.overview": "Overview", "sub.overview": "", "title.boundaries": "Boundaries", "sub.boundaries": "rules → circuit → every row checked → every rule proven",
-    "title.approvals": "Approvals", "sub.approvals": "", "title.activity": "Activity", "sub.activity": "every decision with the circuit's words and the chain re-check",
+    "title.approvals": "Approvals", "sub.approvals": "", "title.tasks": "Tasks", "sub.tasks": "hand it a job; its calls still go through the circuits one at a time", "title.activity": "Activity", "sub.activity": "every decision with the circuit's words and the chain re-check",
     "title.agents": "Agents", "sub.agents": "one name, one state per circuit", "title.connect": "Connect", "sub.connect": "your model, your tools, your chain — the boundary is the same circuit",
     "svc.ok": "service connected", "svc.bad": "service not responding", "svc.wait": "connecting…",
     "chain.off": "chain check off", "chain.idle": "chain check ready (BSC, read-only, nothing deployed)", "chain.ok": "chain check agrees · nothing deployed", "chain.pend": "chain re-check running", "chain.err": "chain node unavailable, local verdict only", "chain.dis": "chain check DISAGREES",
@@ -714,10 +779,30 @@ const T = {
     "sw.blocked": "a level; stays until lowered", "sw.confirm": "once; spent by the next request", "sw.irreversible": "mark the next action irreversible", "sw.failed": "report one failure (the hook does this)", "sw.heartbeat": "beat once", "sw.confirm_b": "the second person's key",
     "sw.on": "raise", "sw.off": "lower", "sw.once": "give once", "sw.unread": "not read by this agent's circuits",
     "ap.done": "wrote {agent}: {bits}", "ap.noagent": "No agents yet.",
+    // tasks (I-6)
+    "tk.lead": "A task is <b>one job you hand the agent</b>, and the thread you read it back along afterwards. A task is <b>not an authority</b>: every call it makes still goes through the circuits one at a time, and anything that needs your confirm still needs it.",
+    "tk.file": "Hand it a job", "tk.file.sub": "only you can file one, and only you can close one",
+    "tk.text.note": "In your own words. The adapter reads this text, so the agent knows which job it is on.",
+    "tk.expects": "Expected to need", "tk.expects.note": "Your description, <b>not a gate</b>: the class's own circuit is what decides. It is written down so that a job reaching for another class is something you can see.",
+    "tk.cap": "At most this many grants", "tk.cap.note": "Reaching it closes the job — a brake, not a rule: it can only make a call refused sooner, never grant one more. For a real ceiling install max_grants under Boundaries.",
+    "tk.go": "Hand it over", "tk.grants.nothing": "Filing a job grants nothing: this page is the account, the circuits are the boundary.",
+    "tk.open": "Open jobs", "tk.open.sub": "{n}", "tk.open.none": "Nothing open. Hand it a job →",
+    "tk.done": "Closed", "tk.done.sub": "once closed, a call naming that id is refused", "tk.done.none": "Nothing has been closed yet.",
+    "tk.spent": "granted <span class=\"g\">{g}</span> · refused <span class=\"r\">{r}</span>",
+    "tk.spent.none": "no call has named this job yet",
+    "tk.cap.left": "{n} of {m} grants left", "tk.cap.none": "no ceiling",
+    "tk.expects.says": "said it needs: {cls}", "tk.expects.any": "did not say which classes",
+    "tk.used": "actually used: {cls}", "tk.close": "Close this job", "tk.closing": "closing…",
+    "tk.closed.by.person": "you closed it", "tk.closed.by.limit": "closed itself at {n} grants",
+    "tk.filed": "filed {time}", "tk.note": "note: {note}",
+    "tk.th.id": "id", "tk.th.text": "the job", "tk.th.spent": "granted/refused", "tk.th.why": "how it closed", "tk.th.at": "closed",
+    "tk.filed.ok": "Filed {id}. The adapter can name it on its next call.", "tk.closed.ok": "{id} is closed: a call naming it is refused.",
+    "tk.need.text": "Say what the job is, in one line.", "tk.belongs": "part of",
     "ac.tester": "Send a request", "ac.tester.sub": "for demos: you press both channels here, so it is only a demonstration", "ac.intent": "intent high", "ac.send": "Send (1 tick)",
     "ac.log": "Decision log", "ac.sub": "last {n} · {g} granted · {r} refused", "ac.none": "No entries yet.",
     "f.all": "all", "f.granted": "granted", "f.refused": "refused", "f.tool": "tool layer", "f.policy": "rules",
-    "v.grant": "GRANTED", "v.refuse": "REFUSED", "v.tool": "TOOL LAYER", "v.policy": "RULES", "v.spoof": "NOT ITS TOKEN",
+    "v.grant": "GRANTED", "v.refuse": "REFUSED", "v.tool": "TOOL LAYER", "v.policy": "RULES", "v.spoof": "NOT ITS TOKEN", "v.task": "TASK",
+    "e.task.filed": "you filed a job", "e.task.closed": "the job was closed", "e.task.cap": "a ceiling of {n} grants",
     "e.spoof.missing": "This name is bound to a token and the request sent none — refused before any circuit was asked.", "e.spoof.wrong": "This name is bound to a token and the request sent a different one — refused before any circuit was asked.",
     "e.tick": "tick {n}", "e.gap": "{n} ticks since the previous grant", "e.why": "refused because (the circuit's own words):", "e.granted": "every check passed; the circuit output grant = 1.",
     "e.ungated": "no circuit for this class: not gated.", "e.halt.no": "shared halt circuit refused", "e.halt.ok": "shared halt circuit granted",
@@ -748,7 +833,8 @@ const T = {
   },
 };
 const HTML_KEYS = new Set(["r.commit.hint", "r.blocked.hint", "r.max.hint", "r.confirm.hint", "r.sticky.hint", "r.heartbeat.hint", "r.irrev.hint", "r.trip.hint", "r.twokey.hint",
-                           "ev.match.body", "ev.holds.body", "ap.lead", "cn.s1", "cn.s2", "cn.s3", "e.tool", "ap.h.tool", "ap.done"]);
+                           "ev.match.body", "ev.holds.body", "ap.lead", "cn.s1", "cn.s2", "cn.s3", "e.tool", "ap.h.tool", "ap.done",
+                           "tk.lead", "tk.expects.note", "tk.grants.nothing"]);
 let lang = "zh";
 try { lang = localStorage.getItem("reflex.lang") || (navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en"); } catch (e) { /* storage unavailable */ }
 if (!T[lang]) lang = "zh";
@@ -901,10 +987,13 @@ function render(s) {
   $("models-dot").className = `dot ${models.length ? "ok" : ""}`; $("models").textContent = models.length ? t("models.n", { n: models.length }) : t("models.none");
   const { pending } = pendingItems(s);
   $("nav-pending").textContent = pending.length ? String(pending.length) : "";
+  const open = s.tasks || [];
+  $("nav-tasks").textContent = open.length ? String(open.length) : "";
   renderStop(s);  // the stop is on every screen, so its label follows the state everywhere
   if (view === "overview") renderOverview(s, models, pending);
   else if (view === "boundaries") renderBoundaries(s);
   else if (view === "approvals") renderApprovals(s);
+  else if (view === "tasks") renderTasks(s);
   else if (view === "activity") renderActivity(s);
   else if (view === "agents") renderAgents(s);
   else if (view === "connect") renderConnect(s);
@@ -1091,7 +1180,7 @@ function renderApprovals(s) {
          <button class="danger" type="button" data-arm="blocked" data-agent="${esc(p.agent)}" data-note="${nid}">${t("ap.block")}</button>`;
     return `<div class="pend${wait ? " wait" : ""}"><div style="display:grid;gap:5px;min-width:0">
       ${p.effect ? effectCard(p.effect) : ""}
-      <div class="who"><b>${esc(p.agent)}</b>${chipFor(p.class || "exec")}<span class="mono muted">tick ${num(p.tick)} · ${clock(p.at)}</span>${wait ? "" : code}</div>
+      <div class="who"><b>${esc(p.agent)}</b>${chipFor(p.class || "exec")}${p.task ? `<span class="mono muted">${t("tk.belongs")} <span class="tid">${esc(p.task)}</span></span>` : ""}<span class="mono muted">tick ${num(p.tick)} · ${clock(p.at)}</span>${wait ? "" : code}</div>
       ${p.reason ? `<div class="call">${esc(p.reason)}</div>` : ""}
       <ul class="why">${(p.why || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>
       <div class="note">${t(p.armed ? "ap.approved.note" : itemNote(p))}</div>
@@ -1145,6 +1234,107 @@ async function arm(agent, bit, v, btn, forReason, code, note) {
     const d = await post("/api/tool", body, { token: true });  // confirm/blocked/heartbeat need the operator token
     $("ap-msg").innerHTML = d.error ? `<span class="bad">${esc(d.error)}</span>` : `<span class="c-tool">${t("ap.done", { agent: esc(agent), bits: armedHtml(d.armed || {}, shownBits(d.armed)) })}</span>`;
   } catch (err) { $("ap-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
+  await refresh();
+}
+
+// -- tasks (I-6) --
+// A job a person handed the agent. The open ones ride along in /api/state — the same list
+// an adapter reads to know which job it is on — so they follow the poll like everything
+// else; the closed ones are fetched once and again after anything changes, because a
+// ledger nobody is looking at does not need polling.
+//
+// Nothing on this view can grant anything. The only button that writes is "close", and
+// closing only ever refuses calls that come afterwards.
+let TK_ALL = null, TK_BUSY = false;
+async function tkFetchAll() {
+  TK_BUSY = true;
+  try {
+    // The token goes on this read for the same reason /api/state carries it: over the LAN
+    // the console closes the ledger, because it is the person's own words about their work.
+    const r = await fetch("/api/tasks", { cache: "no-store", headers: TOKEN ? { "x-reflex-token": TOKEN } : {} });
+    if (!r.ok) throw new Error(r.status);
+    TK_ALL = (await r.json()).tasks || [];
+    tkRenderClosed();
+  } catch (e) { TK_ALL = null; }
+  TK_BUSY = false;
+}
+const tkTime = (unix) => new Date(N(unix) * 1000).toLocaleString(locale(), { hour12: false });
+const tkExpects = (tk) => ((tk.expects || []).length
+  ? t("tk.expects.says", { cls: (tk.expects || []).map(chipFor).join(" ") })
+  : `<span class="muted">${t("tk.expects.any")}</span>`);
+function tkSpentLine(tk) {
+  const used = Object.keys(tk.by_class || {});
+  if (!used.length && !N(tk.granted) && !N(tk.refused)) return `<span class="muted">${t("tk.spent.none")}</span>`;
+  const per = used.map((c) => `${chipFor(c)} <span class="g">${num(tk.by_class[c].granted)}</span>/<span class="r">${num(tk.by_class[c].refused)}</span>`).join(" ");
+  return `${t("tk.spent", { g: num(tk.granted), r: num(tk.refused) })}${per ? " · " + per : ""}`;
+}
+function tkCapLine(tk) {
+  return N(tk.max_grants)
+    ? t("tk.cap.left", { n: num(Math.max(0, N(tk.max_grants) - N(tk.granted))), m: num(tk.max_grants) })
+    : `<span class="muted">${t("tk.cap.none")}</span>`;
+}
+function taskCard(tk) {
+  return `<div class="task"><div style="display:grid;gap:5px;min-width:0">
+    <div class="top"><span class="tid">${esc(tk.task_id)}</span><span class="mono muted">${t("tk.filed", { time: esc(tkTime(tk.filed_at)) })}</span></div>
+    <div class="said">${esc(tk.text)}</div>
+    <div class="spent">${tkSpentLine(tk)}</div>
+    <div class="note">${tkExpects(tk)} · ${tkCapLine(tk)}</div>
+    </div><div class="btns"><button class="pre" type="button" data-close="${esc(tk.task_id)}">${t("tk.close")}</button></div></div>`;
+}
+function tkRenderClosed() {
+  const tb = $("tk-closed").querySelector("tbody");
+  const closed = (TK_ALL || []).filter((tk) => tk.status !== "open");
+  if (!closed.length) { tb.innerHTML = `<tr><td class="muted">${t("tk.done.none")}</td></tr>`; return; }
+  tb.innerHTML = `<tr>${["tk.th.id", "tk.th.text", "tk.th.spent", "tk.th.why", "tk.th.at"].map((k) => `<th>${t(k)}</th>`).join("")}</tr>` +
+    closed.map((tk) => {
+      const why = tk.closed_by === "limit" ? t("tk.closed.by.limit", { n: num(tk.max_grants) }) : t("tk.closed.by.person");
+      return `<tr><td class="num"><span class="tid">${esc(tk.task_id)}</span></td><td class="name">${esc(tk.text)}` +
+        (tk.note ? `<div class="note">${t("tk.note", { note: esc(tk.note) })}</div>` : "") +
+        `</td><td class="num"><span class="ok">${num(tk.granted)}</span>/<span class="bad">${num(tk.refused)}</span></td>` +
+        `<td>${why}</td><td class="num">${esc(tkTime(tk.closed_at))}</td></tr>`;
+    }).join("");
+}
+function renderTasks(s) {
+  $("tk-lead").innerHTML = t("tk.lead");
+  const open = s.tasks || [];
+  $("tk-open-sub").textContent = t("tk.open.sub", { n: num(open.length) });
+  const box = $("tk-classes");
+  if (!box.children.length) {  // the four classes the circuits answer for, not a free-text field
+    box.innerHTML = TOOL_CLASSES.map((c) => `<label><input type="checkbox" data-tkc="${c}">${chipFor(c)}</label>`).join("");
+  }
+  $("tk-list").innerHTML = open.length ? open.map(taskCard).join("") : `<div class="muted">${t("tk.open.none")}</div>`;
+  $("tk-list").querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => closeTask(b.dataset.close, b)));
+  if (!TK_ALL && !TK_BUSY) tkFetchAll(); else tkRenderClosed();
+}
+$("tk-cap-on").addEventListener("change", () => { $("tk-cap").disabled = !$("tk-cap-on").checked; });
+$("tk-file").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const text = $("tk-text").value.trim();
+  if (!text) { $("tk-msg").innerHTML = `<span class="bad">${t("tk.need.text")}</span>`; return; }
+  const classes = [...$("tk-classes").querySelectorAll("[data-tkc]")].filter((b) => b.checked).map((b) => b.dataset.tkc);
+  const body = { text, classes };
+  if ($("tk-cap-on").checked) body.max_grants = Math.max(1, N($("tk-cap").value));
+  $("tk-go").disabled = true;
+  try {
+    const d = await post("/api/task", body, { token: true });  // filing a job is the person's
+    if (d.error) $("tk-msg").innerHTML = `<span class="bad">${esc(d.error)}</span>`;
+    else {
+      $("tk-msg").innerHTML = `<span class="c-agent">${t("tk.filed.ok", { id: esc(d.task_id) })}</span>`;
+      $("tk-text").value = "";
+      TK_ALL = null;
+    }
+  } catch (err) { $("tk-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
+  $("tk-go").disabled = false;
+  await refresh();
+});
+async function closeTask(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = t("tk.closing"); }
+  try {
+    const d = await post(`/api/task/${encodeURIComponent(id)}/close`, {}, { token: true });
+    $("tk-msg").innerHTML = d.error ? `<span class="bad">${esc(d.error)}</span>`
+      : `<span class="c-agent">${t("tk.closed.ok", { id: esc(id) })}</span>`;
+    TK_ALL = null;
+  } catch (err) { $("tk-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
   await refresh();
 }
 
@@ -1227,7 +1417,7 @@ function renderActivity(s) {
   $("ac-filters").querySelectorAll("[data-fk]").forEach((b) => b.addEventListener("click", () => { FILTER_KIND = b.dataset.fk; renderActivity(STATE); }));
   const rows = tr.filter((e) => {
     if (FILTER_CLS !== "all" && (e.kind === "request" || e.kind === "policy" || e.kind === "spoof") && (e.class || "exec") !== FILTER_CLS) return false;
-    if (FILTER_CLS !== "all" && e.kind === "tool") return false;
+    if (FILTER_CLS !== "all" && (e.kind === "tool" || e.kind === "task")) return false;
     if (FILTER_KIND === "granted") return e.kind === "request" && e.granted;
     if (FILTER_KIND === "refused") return (e.kind === "request" && !e.granted) || e.kind === "spoof";
     if (FILTER_KIND === "tool") return e.kind === "tool";
@@ -1248,6 +1438,14 @@ function entryHtml(e, compact) {
     const cz = e.circuit;
     return `<div class="e policy">${at}<div><div class="h"><span class="verdict">${t("v.policy")}</span>${chipFor(e.class || "exec")}<span class="agent">${cz ? t("e.policy", { cls: esc(e.class || "exec"), rules: esc((e.rules || []).join("; ")) }) : t("e.policy.none", { cls: esc(e.class || "exec") })}</span></div>` +
       (cz ? `<div class="d">${t("e.policy.s", { nand: num(cz.nand), latch: num(cz.latch), rows: num(e.rows), holds: `<span class="${e.every_rule_holds ? "ok" : "bad"}">${t(e.every_rule_holds ? "holds" : "fails")}</span>` })}</div>` : "") + `</div></div>`;
+  }
+  if (e.kind === "task") {
+    // A person filing or closing a job. No circuit was asked — nothing was decided here.
+    return `<div class="e task-e">${at}<div><div class="h"><span class="verdict">${t("v.task")}</span><span class="tid">${esc(e.task)}</span>` +
+      `<span class="agent">${t(e.event === "closed" ? "e.task.closed" : "e.task.filed")}</span></div>` +
+      `<div class="d reason">${esc(e.text || "")}</div>` +
+      (N(e.max_grants) ? `<div class="d">${t("e.task.cap", { n: num(e.max_grants) })}</div>` : "") +
+      (e.note ? `<div class="d">${t("tk.note", { note: esc(e.note) })}</div>` : "") + `</div></div>`;
   }
   if (e.kind === "spoof") {
     // A request under a bound name without that name's token: refused before any circuit
@@ -1280,7 +1478,8 @@ function entryHtml(e, compact) {
     if (e.reason) body += `<div class="d">${esc(e.reason)}</div>`;
     if (!ok && (e.why || []).length) body += `<ul class="why"><li>${esc(e.why.join("; "))}</li></ul>`;
   }
-  return `<div class="e ${ok ? "ok" : "no"}">${at}<div><div class="h"><span class="verdict">${t(ok ? "v.grant" : "v.refuse")}</span><span class="agent">${esc(e.agent)}</span>${chipFor(e.class || "exec")}<span class="mono muted">tick ${num(e.tick)}</span>` +
+  return `<div class="e ${ok ? "ok" : "no"}">${at}<div><div class="h"><span class="verdict">${t(ok ? "v.grant" : "v.refuse")}</span><span class="agent">${esc(e.agent)}</span>${chipFor(e.class || "exec")}` +
+    (e.task ? `<span class="tid">${esc(e.task)}</span>` : "") + `<span class="mono muted">tick ${num(e.tick)}</span>` +
     (compact ? "" : `<span class="bits">${bits}</span>` + (e.reason ? `<span class="reason">${esc(e.reason)}</span>` : "")) + chain + `</div>${body}</div></div>`;
 }
 function showLast(e) {
