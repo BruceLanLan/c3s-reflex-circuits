@@ -92,3 +92,15 @@ def test_a_saved_state_is_not_loaded_into_a_different_circuit(tmp_path):
     again = console.Boundary(console.FLY_DEFAULT, state)
     payer = next(a for a in again.status()["agents"] if a["agent"] == "payer")
     assert payer["by_class"]["spend"]["ticks"] == 0  # a different circuit starts from reset, as an install does
+
+
+def test_forgetting_old_agents_never_unblocks_one(tmp_path, monkeypatch):
+    state = tmp_path / "policies.json"
+    b = console.Boundary(console.FLY_DEFAULT, state)
+    b.arm("old-blocked", {"blocked": 1})
+    b.request("old-free", 1, "x", "exec")
+    for name in ("old-blocked", "old-free"):
+        b.agents[name]["seen"] = 0  # long ago
+    b.request("new", 1, "x", "exec")  # triggers a save
+    kept = json.loads(state.read_text())["agents"]
+    assert "old-blocked" in kept and "new" in kept and "old-free" not in kept
