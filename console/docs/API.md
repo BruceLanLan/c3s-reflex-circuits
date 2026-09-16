@@ -12,7 +12,8 @@ first: five workstreams read it. Endpoints are on `http://127.0.0.1:8765` by def
 | `POST /api/tool` — `confirm`, `confirm_b`, `blocked`, `heartbeat` | **a person** (page, Cardputer, chat) | operator token |
 | `POST /api/policy`, `POST /api/task` | **a person** | operator token |
 | `POST /api/stop-all`, `POST /api/resume-all` | **a person** | operator token |
-| `GET/POST /api/classes` | read: anything local · write: **a person** | operator token to write |
+| `GET/POST /api/classes` | read: **loopback** free · over the LAN and to write: **a person** | operator token except from loopback |
+| `POST /api/hooks/claude-code` | **a person**, loopback only | operator token |
 | `GET /api/device/frame`, `POST /api/tool` from a device | a **paired Cardputer** over the LAN | device token, and only as below |
 | `POST /api/device/pair` | a device claiming an open window | **none by design** — see below |
 | `POST /api/device/pair/begin\|confirm`, `POST /api/device/forget` | **a person** | operator token |
@@ -177,7 +178,29 @@ confirm can lift a block.
 every tool name this console has actually seen (harvested from `reason` prefixes), each with
 its class and whether it counts as irreversible. `POST` (operator token) writes the override
 files the adapters already parse; the adapters are short-lived processes and pick the change up
-on their next call. The class decides **which circuit answers**; `irreversible` decides
+on their next call. Two deviations from this document's first draft, both endorsed (W2, 2026-09-16):
+
+- **`GET` is free from loopback but needs the operator token over the LAN**, because the
+  response names local absolute paths (the interpreter, the rule files, the user's
+  `settings.json`). Stricter than the table's first draft on purpose.
+- **The override files have default locations**: with no `REFLEX_CLASS_FILE` /
+  `REFLEX_IRREVERSIBLE_TOOLS_FILE` set, the adapters now read
+  `$REFLEX_CONFIG_DIR/tool-classes.txt` and `.../irreversible-tools.txt` when those exist, so
+  an edit made on the page takes effect without anyone exporting a variable. The cost is
+  explicit: **any deployment with those files present has adapters that follow them.** W4 must
+  know they exist before checking `send_*` / `trash_*` classification.
+- `load_rules` returns a live view of the file (stat-throttled), not a snapshot, because the
+  MCP proxy is a long-lived process and loaded its rules once at start-up — the hook, being a
+  fresh process per call, was already correct. A missing file falls back to the built-ins,
+  never to an empty list.
+
+**`POST /api/hooks/claude-code`** (operator token, loopback only) previews and writes the two
+hook blocks into one path fixed at start-up (`REFLEX_CLAUDE_SETTINGS`, default
+`~/.claude/settings.json`): it backs the file up first, replaces atomically, is idempotent, and
+**refuses a file it cannot parse** rather than touching it. Writing a user's file is a separate
+concern from describing tool classes, so it is a separate endpoint.
+
+The class decides **which circuit answers**; `irreversible` decides
 **whether a person must confirm**. Both are the tool layer's promise, not something the circuit
 proves.
 
