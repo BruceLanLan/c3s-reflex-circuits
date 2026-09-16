@@ -167,6 +167,29 @@ $ curl -s -X POST http://reflex-gateway:8080/api/request \
  "granted": false, "tick": 1, "why": ["commitment: 0 of 4 consecutive intent ticks"], …}
 ```
 
+**The path cannot carry a person's authority.** Sending the operator token, a foreign
+`Origin` and a `Host` of the container's choosing *through* the gateway, and recording what
+reaches the upstream (a copy of this same nginx config with a recorder in the console's
+place, so the headers can be read):
+
+```
+$ curl -X POST http://<gateway>/api/request -H 'X-Reflex-Token: test-operator-token' \
+    -H 'X-Reflex-Agent-Token: w6-container-token' -H 'Origin: https://evil.example' \
+    -d '{"agent":"redteam-check","class":"exec","intent":1,"reason":"x","token":"test-operator-token"}'
+http=200
+
+what arrived upstream:
+  path: /api/request
+  Host: '127.0.0.1:8765'          <- rewritten, so the console's own check passes
+  Origin: None                    <- cleared
+  X-Reflex-Token: None            <- stripped: a person's token cannot travel this way
+  X-Reflex-Agent-Token: 'w6-container-token'   <- the agent's own, passed through
+```
+
+Note the `"token"` field still in the body: header stripping is not body filtering, and
+that is precisely why `/api/tool` — the only endpoint that reads a token out of a body — is
+not on this path.
+
 **The name belongs to the token, not to the container.** The same name with another token,
 from the same place, is refused before any circuit is asked, and the attempt is in the
 transcript as `kind: "spoof"`:
