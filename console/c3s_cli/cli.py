@@ -283,8 +283,46 @@ def cmd_down(args) -> int:
     return 0
 
 
+def _console_module():
+    """Import the checkout's console.py without starting a server.
+
+    Only for the few things the console defines for a command line to call — today
+    `token_rotate(agent)` (I-3), which needs no console running because the binding lives
+    in a file. Importing it puts the circuits repository on sys.path and compiles nothing.
+    """
+    import importlib.util
+
+    path = paths.console_dir() / "console.py"
+    spec = importlib.util.spec_from_file_location("reflex_console_module", path)
+    if spec is None or spec.loader is None:
+        raise paths.Missing(f"cannot import {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.path.insert(0, str(path.parent))
+    sys.modules[spec.name] = module          # @dataclass looks the module up while it runs
+    spec.loader.exec_module(module)
+    return module
+
+
 def cmd_token(args) -> int:
     token = client.operator_token()
+    if getattr(args, "agent", None):
+        # I-3: rotating an *agent's* token is dropping the binding, not issuing a secret —
+        # the console only ever held the hash, and the next token is whatever that agent's
+        # own environment says. console.py owns that file; this only calls it.
+        if args.rotate != "rotate":
+            return bad("--agent goes with rotate: `c3s token rotate --agent <name>`.")
+        try:
+            rotate = getattr(_console_module(), "token_rotate", None)
+        except paths.Missing as e:
+            return bad(str(e), 2)
+        if rotate is None:
+            return bad("this checkout's console.py has no token_rotate(): update it (I-3 in docs/API.md).")
+        result = rotate(args.agent)
+        if result.get("rotated"):
+            say(f"dropped the binding for {args.agent}: {result.get('next')}")
+        else:
+            say(f"{args.agent}: {result.get('why')}")
+        return 0
     if args.rotate == "rotate":
         import secrets
 
@@ -442,6 +480,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     token = subs.add_parser("token", help="show the operator token")
     token.add_argument("rotate", nargs="?", choices=["rotate"], help="replace it with a new one")
+    token.add_argument("--agent", metavar="NAME",
+                       help="rotate that agent's own token instead (I-3): drop the binding, "
+                            "so its next request with a token binds the name again")
     token.set_defaults(func=cmd_token)
 
     pair = subs.add_parser("pair", help="print the pairing QR again")
