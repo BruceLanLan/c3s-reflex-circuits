@@ -63,6 +63,13 @@ from c3s import exhaust  # noqa: E402
 from c3s.netlist import to_bytes  # noqa: E402
 from c3s.policy import AGENT_WRITABLE, MUST_COME_FROM_THE_TOOL_LAYER, Policy  # noqa: E402
 
+# W11 · the Cardputer over Wi-Fi. The device's whole side lives in cardputer_relay.py —
+# the token store, the pairing, the frame it polls and the one write it may make — so the
+# console keeps a line per hook: `/api/device/*` below, a device token on `/api/tool`, and
+# the device's presence as a heartbeat source in __main__. A device token is never an
+# operator token: where one is present, the device's rules apply and nothing falls through.
+from cardputer_relay import device_get, device_post, device_tool, install_device_presence  # noqa: E402
+
 # Of the tool layer's bits, only `blocked` is a level that stays where it was put. The
 # rest are events, each consumed by the one tick it applies to: a confirm (either key)
 # authorises the next request; `irreversible` describes the next request; a heartbeat
@@ -1778,7 +1785,12 @@ class Handler(BaseHTTPRequestHandler):
                              "every_rule_holds": summary["checked"]["every_rule_holds"]})
             TRANSCRIPTS.appendleft(note)
             self._json(200, summary)
+        elif self.path.startswith("/api/device/"):  # W11: pairing; nothing here writes a bit
+            device_post(self, payload, BOUNDARY)
         elif self.path == "/api/tool":
+            if self.headers.get("X-Reflex-Device-Token"):  # W11: a key press that came over Wi-Fi
+                device_tool(self, payload, BOUNDARY)
+                return
             bits = {k: v for k, v in payload.items() if k not in ("agent", "for_reason", "token", "code", "note")}
             # The person's bits need the operator token; the adapter's own (irreversible,
             # failed) do not, because setting either can only make a decision stricter.
@@ -1923,6 +1935,7 @@ if __name__ == "__main__":
         from cardputer_relay import Relay
 
         Relay(BOUNDARY, os.environ["REFLEX_CARDPUTER"], log=lambda m: print(m, flush=True)).start()
+    install_device_presence(BOUNDARY)  # W11: a device present over Wi-Fi is a heartbeat too
     TOKEN = operator_token()
     print(f"\noperator token (the person's key to install rules and confirm/block over HTTP):\n"
           f"  {TOKEN}\n"
