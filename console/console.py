@@ -1282,6 +1282,36 @@ class Boundary:
             }
 
 
+def status_for_agent(status: dict, name: str) -> dict:
+    """`GET /api/state` as one agent's own token sees it over the network (F2, 2026-09-17).
+
+    An agent token was introduced so a name could authenticate its own requests (I-3). The
+    LAN rule then let any bound token read the whole console, and the red team read
+    `treasury-bot`'s pending `[exec] wire 50000 USDC to 0xBEEF` back with `reader`'s token —
+    the exact `reason` string a confirm binds to, which docs/ISOLATION.md argues a contained
+    agent cannot obtain. So an agent identity gets its own rows: its agent record, its
+    pending calls, and the transcript entries that are about it or about the rules. The rules
+    and what was checked about them are not secret and stay. Other agents' calls, notes and
+    armed bits go; a `stop` entry keeps the fact of the press and loses the list of names.
+    The open tasks stay: they are the person's jobs for the agent to read (I-6), not another
+    agent's call. `view` says the reply was narrowed, so a consumer never mistakes it for the
+    whole console. Loopback and the operator keep the full view."""
+    out = dict(status)
+    out["agents"] = [a for a in status.get("agents", []) if a.get("agent") == name]
+    out["pending"] = [p for p in status.get("pending", []) if p.get("agent") == name]
+    kept = []
+    for e in status.get("transcript", []):
+        if e.get("agent") == name:
+            kept.append(e)
+        elif e.get("kind") == "policy":
+            kept.append(e)
+        elif e.get("kind") == "stop":
+            kept.append({k: v for k, v in e.items() if k != "agents"})
+    out["transcript"] = kept
+    out["view"] = {"scope": "agent", "agent": name}
+    return out
+
+
 class Chain:
     """A public node asked to re-evaluate one row, read-only, with nothing deployed.
 
@@ -2079,6 +2109,27 @@ class Handler(BaseHTTPRequestHandler):
     def _agent_token(self) -> str:
         return (self.headers.get("X-Reflex-Agent-Token") or "").strip()
 
+    def _reader_identity(self) -> tuple[str | None, str | None]:
+        """Who is reading, for the GETs that are open on this machine and closed from the
+        network. One of:
+
+        `("local", None)`      a connection from loopback — this machine's own page and programs;
+        `("operator", None)`   the operator token, wherever it came from;
+        `("agent", name)`      a bound agent's own token (I-3) — that agent's adapter;
+        `(None, None)`         nobody the console can name.
+
+        Asked in that order, so a request that carries two credentials is read as the more
+        powerful one. The reply a reader gets depends on which of these they are: the
+        first two see the whole console, an agent sees its own rows (F2, 2026-09-17)."""
+        if self._from_loopback():
+            return "local", None
+        if self._has_token({}):
+            return "operator", None
+        owner = bound_token_owner(self._agent_token())
+        if owner:
+            return "agent", owner
+        return None, None
+
     def _reader_may_look(self, path: str) -> bool:
         """`GET /api/state`, `/api/manifest` and the task ledger are open on this machine
         and closed from the network: over the LAN they need the operator's token (the phone
@@ -2087,7 +2138,7 @@ class Handler(BaseHTTPRequestHandler):
         behind the same check as the rest of the state and not a step looser."""
         if path not in ("/api/state", "/api/tasks") and not path.startswith(("/api/manifest", "/api/task/")):
             return True
-        if self._from_loopback() or self._has_token({}) or bound_token_owner(self._agent_token()):
+        if self._reader_identity()[0] is not None:
             return True
         self._json(403, {"error": "reading the console over the network needs a token: the operator token "
                                   "(X-Reflex-Token — the pairing link carries it) or a bound agent's own "
@@ -2116,7 +2167,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path in ("/", "/index.html"):
             self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         elif path == "/api/state":
-            self._json(200, BOUNDARY.status())
+            who, name = self._reader_identity()
+            status = BOUNDARY.status()
+            self._json(200, status_for_agent(status, name) if who == "agent" else status)
         elif path.startswith("/api/manifest"):
             self._manifest()
         elif path == "/favicon.ico":
