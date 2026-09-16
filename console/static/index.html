@@ -415,6 +415,7 @@ const T = {
     "ap.lead": "这里是 <code>confirm</code> 通道。模型碰不到这一页。列出来的是电路因为「缺一个人的一次点头」而拒绝的请求；点一下就是写一位，下一次请求会读到它。",
     "ap.pending": "等一个人来点", "ap.pending.sub": "{n} 条 · 按到达顺序", "ap.none": "没有等人的请求。",
     "ap.confirm": "确认一次", "ap.confirm_b": "给第二把钥匙", "ap.block": "封锁该 agent",
+    "ap.approved": "已批准这一次调用", "ap.approved.note": "确认只对上面这一次调用有效，等 agent 原样重发；它先发别的调用不会用掉这次确认。",
     "ap.wait.note": "这不是确认能解的——只能等。列在这里是让你知道它在等。",
     "ap.irrev.note": "工具层把这条标成了不可逆；电路要一次未用掉的确认才放。确认只放这一次。",
     "ap.halt.note": "停机中。一次 confirm 解除，解除那一拍本身不放行。", "ap.break.note": "熔断已跳。一次 confirm 复位。", "ap.win.note": "需要一次当拍的 confirm。", "ap.key.note": "缺第二把钥匙。",
@@ -513,6 +514,7 @@ const T = {
     "ap.lead": "This is the <code>confirm</code> channel. The model cannot reach this page. Listed here are requests the circuit refused for want of one person's nod; a click writes one bit, and the next request reads it.",
     "ap.pending": "Awaiting a person", "ap.pending.sub": "{n} · in order of arrival", "ap.none": "Nothing waits on a person.",
     "ap.confirm": "confirm once", "ap.confirm_b": "give the second key", "ap.block": "block this agent",
+    "ap.approved": "approved for this call", "ap.approved.note": "The confirm is for the call above only and waits for the agent to send it again; anything else it sends first does not spend it.",
     "ap.wait.note": "Not something a confirm can fix — only waiting. Listed so you know it is waiting.",
     "ap.irrev.note": "The tool layer marked this call irreversible; the circuit wants one unspent confirm. A confirm grants this once.",
     "ap.halt.note": "Halted. One confirm lifts it; the lifting tick itself grants nothing.", "ap.break.note": "Breaker tripped. One confirm resets it.", "ap.win.note": "Needs a confirm on the same tick.", "ap.key.note": "The second key is missing.",
@@ -855,14 +857,19 @@ function renderApprovals(s) {
   $("ap-pending-sub").textContent = t("ap.pending.sub", { n: num(pending.length + waiting.length) });
   const item = (x, wait) => {
     const e = x.e;
-    const btns = wait
+    // Already approved: a confirm bound to this very call is waiting for the agent to send it again.
+    const ag = s.agents.find((a) => a.agent === e.agent) || {};
+    const approved = !wait && N((ag.armed || {})[x.bit]) && ((ag.bound || {})[x.bit] || "") === (e.reason || "");
+    const btns = approved
+      ? `<span class="c-tool mono">${t("ap.approved")}</span>`
+      : wait
       ? `<button class="go tool" type="button" disabled>${t("ap.confirm")}</button><button class="danger" type="button" disabled>${t("ap.block")}</button>`
       : `<button class="go tool" type="button" data-arm="${esc(x.bit)}" data-agent="${esc(e.agent)}" data-for="${esc(e.reason || "")}">${t(x.bit === "confirm_b" ? "ap.confirm_b" : "ap.confirm")}</button><button class="danger" type="button" data-arm="blocked" data-agent="${esc(e.agent)}">${t("ap.block")}</button>`;
     return `<div class="pend${wait ? " wait" : ""}"><div style="display:grid;gap:4px;min-width:0">
       <div class="who"><b>${esc(e.agent)}</b>${chipFor(e.class || "exec")}<span class="mono muted">tick ${num(e.tick)} · ${clock(e.at)}</span></div>
       ${e.reason ? `<div class="call">${esc(e.reason)}</div>` : ""}
       <ul class="why">${(e.why || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>
-      <div class="note">${t(wait ? "ap.wait.note" : x.note)}</div></div><div class="btns">${btns}</div></div>`;
+      <div class="note">${t(approved ? "ap.approved.note" : wait ? "ap.wait.note" : x.note)}</div></div><div class="btns">${btns}</div></div>`;
   };
   $("ap-list").innerHTML = (pending.length + waiting.length) ? pending.map((x) => item(x, false)).join("") + waiting.map((x) => item(x, true)).join("") : `<div class="muted">${t("ap.none")}</div>`;
   $("ap-list").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => arm(b.dataset.agent, b.dataset.arm, 1, b, b.dataset.for)));
