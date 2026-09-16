@@ -599,5 +599,9 @@ if __name__ == "__main__":
             print(f"second opinion: {BSC_RPC} — read-only eth_call, nothing deployed, no wallet", flush=True)
         except Exception as e:
             print(f"no second opinion ({e}); decisions are checked locally only", flush=True)
+    if os.environ.get("REFLEX_CARDPUTER"):
+        from cardputer_relay import Relay
+
+        Relay(BOUNDARY, os.environ["REFLEX_CARDPUTER"], log=lambda m: print(m, flush=True)).start()
     print(f"boundary console on http://{HOST}:{PORT}  (no wallet, no key, nothing signed)", flush=True)
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
