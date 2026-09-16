@@ -24,7 +24,7 @@ DEFAULT_CLASS = "exec"
 # (glob on the bare tool name, class). Order matters: first match wins.
 DEFAULT_RULES: tuple[tuple[str, str], ...] = (
     ("*transfer*", "spend"), ("*pay*", "spend"), ("*swap*", "spend"),
-    ("*send_transaction*", "spend"), ("*sign*", "spend"), ("*withdraw*", "spend"),
+    ("*send_transaction*", "spend"), ("*sign*", "spend"), ("*withdraw*", "spend"), ("approve*", "spend"),
     ("send_*", "message"), ("reply*", "message"), ("post_*", "message"),
     ("create_message*", "message"), ("publish*", "message"), ("*send_email*", "message"),
     ("*send_message*", "message"),
@@ -32,6 +32,41 @@ DEFAULT_RULES: tuple[tuple[str, str], ...] = (
     ("create_file*", "files"), ("edit_file*", "files"), ("create_directory*", "files"),
     ("Write", "files"), ("Edit", "files"), ("MultiEdit", "files"), ("NotebookEdit", "files"),
 )
+
+
+# Tool names whose effect cannot be taken back once it happens: a sent message, a
+# deleted or moved file, money that left. Matched on the bare name, like the classes.
+# The adapters arm the tool-layer bit `irreversible` for these before asking, so a
+# policy with `confirm_per_irreversible` needs a person's confirm for each one. A
+# heuristic on names, as everything in this file is: extend it with a file
+# (REFLEX_IRREVERSIBLE_TOOLS_FILE, one glob per line, `!default` keeps these).
+DEFAULT_IRREVERSIBLE_TOOLS: tuple[str, ...] = (
+    "send_*", "reply*", "post_*", "publish*", "create_message*", "*send_email*", "*send_message*",
+    "forward*", "*_send", "delete_*", "trash_*", "move_*", "remove_*", "*transfer*", "*withdraw*",
+    "*swap*", "*pay*", "*send_transaction*", "*sign_transaction*", "approve*",
+)
+
+
+def load_irreversible_tools(path: str | None) -> tuple[str, ...]:
+    if not path:
+        return DEFAULT_IRREVERSIBLE_TOOLS
+    own, keep_default = [], False
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.split("#", 1)[0].strip()
+                if line == "!default":
+                    keep_default = True
+                elif line:
+                    own.append(line)
+    except OSError:
+        return DEFAULT_IRREVERSIBLE_TOOLS  # unreadable must not mean "nothing is irreversible"
+    return tuple(own) + (DEFAULT_IRREVERSIBLE_TOOLS if keep_default else ())
+
+
+def is_irreversible_tool(tool_name: str, patterns: tuple[str, ...] = DEFAULT_IRREVERSIBLE_TOOLS) -> bool:
+    name = bare_name(tool_name).lower()
+    return any(fnmatch.fnmatchcase(name, p.lower()) for p in patterns)
 
 
 def bare_name(tool_name: str) -> str:
