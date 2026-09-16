@@ -6,6 +6,8 @@
     c3s status        is it running, what is waiting for a person, where is the log
     c3s pair          print the pairing QR again
     c3s token         show the operator token; `c3s token rotate` replaces it
+    c3s token bind --agent NAME   bind an agent name to its token from this machine (I-3);
+                      `c3s token list` shows what is bound, `rotate --agent NAME` drops one
     c3s stop-all      block every agent the console knows (needs the operator token)
     c3s down          stop it (`--service` also unloads the launchd agent)
     c3s demo          the simulated workbench: mailbox, calendar, files, and one chore
@@ -338,14 +340,124 @@ def _console_module():
     return module
 
 
+def _when(ts) -> str:
+    try:
+        return time.strftime("%Y-%m-%d %H:%M", time.localtime(float(ts)))
+    except (TypeError, ValueError):
+        return "unknown time"
+
+
+def _agent_token_to_bind(args) -> tuple[str, str] | None:
+    """The token `c3s token bind` binds, and where it came from — never a command-line
+    argument, because an argument lands in the shell's history and a token in a history
+    file is a token anything on this machine can read. Three sources, tried in order:
+
+    * `REFLEX_AGENT_TOKEN` in this shell — the same variable the agent's adapters read, so
+      binding from the agent's own environment binds exactly what it will send;
+    * `--stdin`: one line piped in (a password manager, `cat` of a 600 file);
+    * neither: a fresh token is generated here and shown once, for the person to put in
+      that agent's environment. It is not written anywhere by this command.
+    """
+    env = (os.environ.get("REFLEX_AGENT_TOKEN") or "").strip()
+    if env:
+        return env, "env"
+    if getattr(args, "stdin", False):
+        line = sys.stdin.readline().strip()
+        if not line:
+            return None
+        return line, "stdin"
+    import secrets
+
+    return secrets.token_urlsafe(24), "generated"
+
+
+def _cmd_token_bind(args) -> int:
+    """`c3s token bind --agent NAME`: bind a name from a person's hand, before any agent
+    runs. This is what makes REFLEX_REQUIRE_AGENT_TOKEN=1 usable: in that mode the console
+    binds nothing over HTTP, so without this command the switch could not be thrown."""
+    if not args.agent:
+        return bad("bind needs the name: `c3s token bind --agent <name>`.")
+    try:
+        module = _console_module()
+    except paths.Missing as e:
+        return bad(str(e), 2)
+    bind = getattr(module, "token_bind", None)
+    if bind is None:
+        return bad("this checkout's console.py has no token_bind(): update it (I-3 in docs/API.md).")
+    picked = _agent_token_to_bind(args)
+    if picked is None:
+        return bad("--stdin was given and nothing came in on it: pipe the token as one line.")
+    token, origin = picked
+    try:
+        result = bind(args.agent, token)
+    except ValueError as e:
+        return bad(str(e))
+    say(f"{'re-bound' if result.get('replaced') else 'bound'} {args.agent}"
+        + (" (the previous binding for this name is replaced; whatever used it is now refused)" if result.get("replaced") else ""))
+    if origin == "env":
+        say("  to the token in REFLEX_AGENT_TOKEN of this shell. Start the agent with that same variable.")
+        say("  (If that variable belongs to a different agent, rotate this binding and bind again from the right shell.)")
+    elif origin == "stdin":
+        say("  to the token read from stdin. Start the agent with it in REFLEX_AGENT_TOKEN.")
+    else:
+        say("  to a token generated now and shown ONCE below; it is written nowhere by this command.")
+        say("  Put it in that agent's environment, and nothing else's:")
+        say(f"    export REFLEX_AGENT_TOKEN={token}")
+    say(f"  the console keeps only its SHA-256, in {getattr(module, 'AGENTS_FILE', paths.CONFIG_DIR / 'agents.json')}; "
+        "a running console sees the binding on its next request.")
+    say("  `c3s token list` shows what is bound; `c3s token rotate --agent <name>` drops it.")
+    return 0
+
+
+def _cmd_token_list(args) -> int:
+    """`c3s token list`: which names are bound — never what would match them."""
+    try:
+        module = _console_module()
+    except paths.Missing as e:
+        return bad(str(e), 2)
+    listing = getattr(module, "token_list", None)
+    if listing is None:
+        return bad("this checkout's console.py has no token_list(): update it (I-3 in docs/API.md).")
+    result = listing()
+    if result.get("store_error"):
+        return bad(f"the binding store cannot be read: {result['store_error']}\n"
+                   "  every request is being refused until it is fixed; `c3s token rotate --agent <any>` resets it.")
+    bound = result.get("bound") or []
+    if not bound:
+        say(f"no agent name is bound ({result.get('file')} does not exist or is empty).")
+    else:
+        say(f"{len(bound)} bound name(s) in {result.get('file')}:")
+        for rec in bound:
+            flag = "  (record unreadable: this name refuses everything)" if rec.get("unreadable") else ""
+            say(f"  {rec['agent']:<40} bound {_when(rec.get('bound_at'))}{flag}")
+    # What the running console makes of it, when one is up: with the switch off an unbound
+    # name is still trusted, and a person reading this list should know which world they are in.
+    try:
+        required = bool(client.state(args.port, timeout=2.0).get("agent_tokens", {}).get("required"))
+    except Exception:
+        say("  (no console is answering here, so whether it requires tokens is not known)")
+        return 0
+    if required:
+        say("  the console requires tokens (REFLEX_REQUIRE_AGENT_TOKEN): a name not in this list is refused.")
+    else:
+        say("  the console does not require tokens: a name not in this list is trusted on first use, and\n"
+            "  the first request that brings a token binds it. REFLEX_REQUIRE_AGENT_TOKEN=1 closes that door.")
+    return 0
+
+
 def cmd_token(args) -> int:
+    action = getattr(args, "action", None)
+    if action == "bind":
+        return _cmd_token_bind(args)
+    if action == "list":
+        return _cmd_token_list(args)
     token = client.operator_token()
     if getattr(args, "agent", None):
         # I-3: rotating an *agent's* token is dropping the binding, not issuing a secret —
         # the console only ever held the hash, and the next token is whatever that agent's
         # own environment says. console.py owns that file; this only calls it.
-        if args.rotate != "rotate":
-            return bad("--agent goes with rotate: `c3s token rotate --agent <name>`.")
+        if action != "rotate":
+            return bad("--agent goes with rotate or bind: `c3s token rotate --agent <name>`, `c3s token bind --agent <name>`.")
         try:
             rotate = getattr(_console_module(), "token_rotate", None)
         except paths.Missing as e:
@@ -358,7 +470,7 @@ def cmd_token(args) -> int:
         else:
             say(f"{args.agent}: {result.get('why')}")
         return 0
-    if args.rotate == "rotate":
+    if action == "rotate":
         import secrets
 
         if os.environ.get("REFLEX_OPERATOR_TOKEN"):
@@ -863,11 +975,18 @@ def build_parser() -> argparse.ArgumentParser:
     down.add_argument("--service", action="store_true", help="also unload and remove the launchd agent")
     down.set_defaults(func=cmd_down)
 
-    token = subs.add_parser("token", help="show the operator token")
-    token.add_argument("rotate", nargs="?", choices=["rotate"], help="replace it with a new one")
+    token = subs.add_parser("token", help="show the operator token; bind, list or rotate agent names (I-3)")
+    token.add_argument("action", nargs="?", choices=["rotate", "bind", "list"],
+                       help="rotate: replace the operator token (or, with --agent, drop that agent's binding); "
+                            "bind --agent NAME: bind a name to its token from this machine, which is what "
+                            "REFLEX_REQUIRE_AGENT_TOKEN=1 needs; list: which names are bound")
     token.add_argument("--agent", metavar="NAME",
-                       help="rotate that agent's own token instead (I-3): drop the binding, "
-                            "so its next request with a token binds the name again")
+                       help="with rotate: drop that agent's binding so its next request with a token binds the "
+                            "name again; with bind: the name to bind")
+    token.add_argument("--stdin", action="store_true",
+                       help="with bind: read the token as one line from stdin. Without it, REFLEX_AGENT_TOKEN "
+                            "in this shell is used, or a fresh token is generated and shown once. A token is never "
+                            "taken as an argument, so it cannot land in the shell's history")
     token.set_defaults(func=cmd_token)
 
     pair = subs.add_parser("pair", help="print the pairing QR again")
