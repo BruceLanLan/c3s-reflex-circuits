@@ -1,21 +1,46 @@
-# Boundary console
+# C3S Circuit Agent — console
 
-A duty console for an agent whose actions a compiled, verified rule-set has to allow.
+The local back office of C3S Circuit Agent: you write the rules an agent must obey, they
+compile to a NAND/LATCH circuit checked on every row and proven over every reachable
+state, your own model is plugged in through an adapter, and every call it makes is
+granted or refused by that circuit — with a person holding the keys, on this page, on a
+Cardputer on the desk, or in a Telegram chat. [中文](README.zh-CN.md)
 
-You write the rules — a cooldown, a commitment, a forbidding flag, a budget, a
-confirmation window. They are compiled to a NAND/LATCH circuit, checked against a
-plain-Python statement of the same rules on **every row** of the circuit's domain, and
-then proven: a search from reset visits every state the circuit can reach under every
-input, with monitors that count independently of its latches. Only then does the
-circuit become the thing that answers requests. This is the watching end of that
-arrangement: a small local service that keeps one circuit state per agent, records
-every request and every verdict with the reason in the rules' own words, and shows it
-on one page. A Telegram relay is included.
+## Start here
+
+```sh
+export C3S_REPO=~/work/c3s-reflex                 # the circuits repository (c3s.policy)
+python console.py                                 # http://127.0.0.1:8765
+REFLEX_CARDPUTER=1 python console.py              # the same, with a Cardputer on USB as the confirm key
+```
+
+1. **Boundaries** — pick a template per class of tool: *no transfers* (spend, refused
+   outright), *no deletes without a person* (files), *messages need a person* (message),
+   *stop after failures* (exec), *halt + heartbeat* (shared). Compile and install; the
+   evidence panel shows the gates, the rows checked and every rule holding.
+2. **Connect** — plug your model in:
+   * Claude Code: `adapters/claude_code_hook.py` as a PreToolUse hook (plus the
+     PostToolUse hook for failures) — covers Bash, Write, Edit and every MCP tool.
+   * Any MCP client: `adapters/mcp_proxy.py -- <your MCP server>` — gate the calls that
+     change something; reads pass.
+   * BNBAgent SDK (BNB Agent Studio): wrap the wallet in
+     `adapters/bnbagent_boundary.BoundaryWalletProvider` — nothing is signed unless the
+     spend circuit grants.
+3. **Approvals** — what waits for a person, in the circuit's own words. A confirm is for
+   that call only. The same list is on the Cardputer (menu 3) and in Telegram
+   (`bot_telegram.py`, a person's chat listed in `TOOL_LAYER_CHATS`).
+4. **Activity** — every decision, the bits the circuit read, and a read-only
+   re-evaluation on BNB Smart Chain with nothing deployed.
+5. **Publish** — Connect → step 4 builds an ERC-8004 boundary manifest anyone can
+   re-check and score (`c3s-reflex/scripts/validate_boundary.py`); the on-chain Safe
+   module is yours to deploy (`c3s-reflex/docs/ONCHAIN-SELF-DEPLOY.md`).
+
+A worked run with a real agent and a pretend mailbox is in `examples/README.md`.
 
 Deliberately a **separate** project from the circuits repository, and deliberately
 local by default. The circuits repository is a static, auditable thing that cannot
-spend or store anything; this one has a process, a port and, if you turn the relay
-on, a token. Keeping them apart is the point.
+spend or store anything; this one has a process, a port and, if you turn the relays
+on, a serial device and a token. Keeping them apart is the point.
 
 ## Two channels, because a rule is only as good as who can satisfy it
 
@@ -80,14 +105,20 @@ export CONSOLE_URL=http://127.0.0.1:8765
 python bot_telegram.py
 ```
 
-`/ask`, `/intent`, `/rules` and `/state` work in any chat. `/block` and `/confirm` are
-refused unless that chat's id is listed in `TOOL_LAYER_CHATS`, because a chat is the
-agent's own channel and a boundary whoever is typing can satisfy is not a boundary.
+`/ask`, `/intent`, `/rules` and `/state` work in any chat. `/pending`, `/confirm`,
+`/block`, `/stop` and `/resume` work only in a chat listed in `TOOL_LAYER_CHATS`, which
+is also told when something starts waiting — because a chat the agent can type into is
+the agent's own channel, and a boundary whoever is typing can satisfy is not a boundary.
 
 ## Layout
 
 ```
-console.py         the service: compiles rules, keeps circuit state, answers requests
-bot_telegram.py    long-polling relay; token from the environment only
-static/index.html  the duty page, served by console.py
+console.py           the service: one circuit per class, decisions, approvals, manifests
+static/index.html    the console page (Overview, Boundaries, Approvals, Activity, Agents, Connect)
+adapters/            Claude Code hooks, MCP proxy, BNBAgent SDK wallet, tool classes
+cardputer_relay.py   the Cardputer as a confirm key and stop button, over USB serial
+bot_telegram.py      Telegram: ask from any chat; approve, block and stop from a person's chat
+examples/            a pretend mailbox and a recorded run with a real agent
+design/              the approved design canvas the page was built from
+docs/                the product plan
 ```
