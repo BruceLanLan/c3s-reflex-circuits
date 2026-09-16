@@ -1,0 +1,61 @@
+{
+  "format": "c3s.pattern/1",
+  "id": "p004-takeoff-on-the-first-tick",
+  "title": "Takeoff on the very first tick",
+  "question": "How early can the reflex arc take off? The first tick of an episode is the loom's onset at 10 degrees, with the state at reset, so tick 0 is the earliest a takeoff can possibly happen - and it can only be a short-mode one, because long mode needs four raising ticks first. Which stimuli manage it, and what is the slowest of them?",
+  "how_found": "Exhaustive search of l/v in {0.10, 0.15, ..., 40.00} ms at azimuth 0: 799 episodes, of which exactly 15 - every l/v from 0.10 to 0.80 ms - end on tick 0. The largest of those. Widening the search to azimuth in {-90, -89, ..., 90} degrees does not raise the maximum.",
+  "discoverer": "c3s-reflex maintainers",
+  "date": "2026-09-16",
+  "circuit": {
+    "name": "core-hand-abc",
+    "policy": "policy-hand-abc",
+    "netlist_sha256": "7c8eaf62495908c434206ff54aa1f3e9146b4295506f59584d6107d2104b2e52",
+    "domain_chain_sha256": "0x477aee38d33c82b3c223961f040a99b186ebb49edcb36cd7f17f3548fba1e1ea",
+    "encoding": "4bit-log",
+    "tick_ms": 5.0
+  },
+  "stimulus": {
+    "kind": "loom",
+    "l_over_v_ms": 0.8,
+    "azimuth_deg": 0.0,
+    "start_deg": 10.0,
+    "end_deg": 170.0
+  },
+  "result": {
+    "ticks": 1,
+    "ended": "short-mode takeoff",
+    "takeoff_tick": 0,
+    "states_entered": [0]
+  },
+  "trace": {
+    "fields": [
+      "tick",
+      "sensory",
+      "policy",
+      "state",
+      "motor",
+      "next_state"
+    ],
+    "sha256": "f35d7c6df685ec2a58c3b4554d9954ea9c41440b5758d6dcf0f7d13ed481addc",
+    "rows": [
+      [0, 106913, 3, 0, 2, 56]
+    ]
+  },
+  "geometry": {
+    "informational": true,
+    "note": "Angular size and expansion speed at the first and last tick, in degrees and degrees per second. Each host computes these with its own atan and tan, so they are compared with a tolerance and are not part of trace.sha256.",
+    "fields": [
+      "tick",
+      "theta_deg",
+      "dtheta_dps"
+    ],
+    "first_tick": [0, 10.0, 1088.064542151],
+    "last_tick": [0, 10.0, 1088.064542151]
+  },
+  "replay": "scripts/pattern_replay.py patterns/records/p004-takeoff-on-the-first-tick.json",
+  "notes": [
+    "One tick earlier is not possible, so this record sits on the floor of the circuit's temporal domain.",
+    "At 0.85 ms, the next step of the grid, tick 0 is a raising tick instead and the short-mode takeoff arrives on tick 1.",
+    "l/v of 0.8 ms is an extreme stimulus: a fly-sized disc at that ratio covers 10 to 170 degrees in two 5 ms ticks. The record is about the circuit's earliest possible response, not about a physically usual approach."
+  ]
+}

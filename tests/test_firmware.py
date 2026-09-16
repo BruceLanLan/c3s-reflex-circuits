@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import shutil
 import subprocess
 import sys
@@ -200,6 +201,20 @@ def test_whole_domain_digest_equals_the_evm_fixture_chain(evaluator, name, rows)
     got_rows, got = run(evaluator, "digest", name).split()
     assert int(got_rows) == rows
     assert got == want
+
+
+def test_the_fingerprint_panel_names_the_committed_digest():
+    """docs/sim/index.html's "One fingerprint, many hosts" panel compares the browser's
+    own digest with a constant, because the EVM fixtures live outside docs/ and the page
+    cannot fetch them. That constant must still be the fixture's value."""
+    page = (SIM / "index.html").read_text()
+    m = re.search(r'FIXTURE_DIGEST = "(0x[0-9a-f]{64})"', page)
+    assert m, "the page no longer declares FIXTURE_DIGEST"
+    fixtures = json.loads((ROOT / "contracts" / "test" / "fixtures" / "circuits.json").read_text())
+    want = next(c["domain_chain_sha256"] for c in fixtures["circuits"] if c["name"] == "core-hand-abc")
+    assert m.group(1) == want
+    rows = re.search(r"DOMAIN_ROWS = ([0-9]+)", page)
+    assert rows and int(rows.group(1)) == 2**23
 
 
 def test_encoding_equals_python_at_every_edge(evaluator, setup):
