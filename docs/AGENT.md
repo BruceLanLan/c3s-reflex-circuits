@@ -26,6 +26,9 @@ circuit itself commands a takeoff.
 * `contracts/src/ReflexGuard.sol` — the same verdict on chain, one call per tick,
   with the caller's latch state kept per address. It evaluates through the same
   `NandMachine` and the same netlist bytes, and the constructor checks their SHA-256.
+* `contracts/src/ReflexModule.sol` — a compiled policy as a Safe module: the agent acts
+  through a human-owned Safe only on ticks the circuit grants, and writes none of the
+  bits it reads. [ONCHAIN-SELF-DEPLOY.md](ONCHAIN-SELF-DEPLOY.md) is the self-deploy flow.
 
 ## Rules you write, compiled and proven
 
