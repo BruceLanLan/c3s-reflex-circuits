@@ -70,8 +70,15 @@ def _console_env(repo: Path, host: str, port: int, cardputer: str | None) -> dic
 
 
 def _pid_on_port(port: int) -> int | None:
-    """Whoever is listening on that port, ours or not."""
-    done = subprocess.run(["lsof", "-ti", f":{port}", "-sTCP:LISTEN"], capture_output=True, text=True)
+    """Whoever is listening on that port, ours or not — None if we cannot tell.
+
+    `lsof` is not on every machine and is not always allowed to answer. Not knowing who
+    holds a port is a normal answer here; a traceback out of `c3s status` would read as
+    "the console is broken", which is a worse lie than "nobody is listening"."""
+    try:
+        done = subprocess.run(["lsof", "-ti", f":{port}", "-sTCP:LISTEN"], capture_output=True, text=True)
+    except (OSError, subprocess.SubprocessError):
+        return None
     for line in done.stdout.split():
         try:
             return int(line)
@@ -193,7 +200,7 @@ def cmd_up(args) -> int:
         if client.is_up(port):
             say(f"a console is already answering on http://127.0.0.1:{port} (pid {running}"
                 f"{', console.py' if ours else ', not console.py'}).")
-            say("  leave it as it is, `c3s down` to stop it, or `c3s up --port <other>` beside it.")
+            say("  leave it as it is, `c3s down` to stop it, or `c3s --port <other> up` beside it.")
             if args.service:
                 # Never silently skip --service: how the console starts is exactly what the
                 # person asked to change, and rewriting the plist under a running console
@@ -844,7 +851,7 @@ def _demo_person(port: int, agent: str, token: str | None, headless: bool, wait_
 def _demo_install(port: int, token: str) -> int:
     say("2. the circuits, compiled from rules and checked on every row of their domain:")
     say("   (this replaces the rules on these four classes and resets every agent's circuit state "
-        "on this console. If something real is using it, `c3s demo --port <other>` instead.)")
+        "on this console. If something real is using it, `c3s --port <other> demo` instead.)")
     for cls, rules in DEMO_POLICIES.items():
         status, body = client._call("POST", "/api/policy", port, body={"class": cls, **rules}, token=token)
         if status != 200:
