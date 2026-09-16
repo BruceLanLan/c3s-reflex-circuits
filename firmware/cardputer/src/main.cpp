@@ -40,7 +40,7 @@ bool autoDemo = true;
 bool paused = false;
 bool sound = true;
 
-enum class Page { Main, SelfTest, Help, Digest, Lattice, Agent };
+enum class Page { Main, SelfTest, Help, Digest, Lattice, Agent, Menu };
 enum class Phase { Idle, Looming, TookOff, Ended };
 Page page = Page::SelfTest;
 Phase phase = Phase::Idle;
@@ -54,6 +54,12 @@ int runAz = 0;
 int takeoffMotor = -1;
 uint32_t lastTickMs = 0, phaseMs = 0, lastDrawMs = 0;
 bool dirty = true;
+
+// Set by frames from the boundary console (agent page below).
+uint32_t hostSeenMs = 0;
+bool hostEver = false;
+int waitingCount = 0;
+bool hostLive() { return hostEver && millis() - hostSeenMs < 4000; }
 
 uint32_t rgb(uint8_t r, uint8_t g, uint8_t b) { return (uint32_t)r << 16 | (uint32_t)g << 8 | b; }
 const uint32_t kBg = rgb(12, 14, 18);
@@ -159,6 +165,10 @@ void drawTopBar() {
   canvas.fillRect(0, 0, 240, 11, kPanel);
   snprintf(buf, sizeof buf, "%s %d NAND+%d LATCH", C3S_CORE_NAME, C3S_CORE_NAND, C3S_CORE_LATCHES);
   text(3, 2, kText, buf);
+  if (hostLive() && waitingCount) {
+    snprintf(buf, sizeof buf, "%d wait", waitingCount);
+    text(164, 2, kPar, buf);
+  }
   canvas.fillRect(206, 1, 33, 9, passed ? kOk : kBad);
   canvas.setTextColor(kBg);
   canvas.drawString(passed ? "PASS" : "FAIL", 211, 2);
@@ -304,7 +314,7 @@ void drawSelfTest() {
     snprintf(buf, sizeof buf, "took %lu ms on this device", (unsigned long)selfTestMs);
     text(4, 104, kMuted, buf);
   }
-  text(4, 122, kMuted, "any key to continue");
+  text(4, 122, kMuted, "any key: menu");
 }
 
 void drawHelp() {
@@ -316,8 +326,8 @@ void drawHelp() {
       "1-4   speed 1x 4x 10x 40x slower",
       "p pause   n one tick when paused",
       "a auto  m sound  t self-test  d digest",
-      "w lattice   g agent: the confirm key",
-      "any key to close",
+      "w lattice  g agent  ` or DEL: menu",
+      "any key: menu",
   };
   for (int i = 0; i < 9; i++) text(4, 4 + i * 14, i == 0 ? kText : kMuted, lines[i]);
 }
@@ -406,7 +416,7 @@ void drawLattice() {
   } else {
     text(4, 16, kMuted, "at rest; ENTER on the main page to drive it");
   }
-  text(4, 122, kMuted, "logic depth left to right; any key to go back");
+  text(4, 122, kMuted, "logic depth left to right; any key: menu");
 }
 
 void drawDigest() {
@@ -417,7 +427,7 @@ void drawDigest() {
   text(4, 34, kText, buf);
   if (!digestRows) {
     text(4, 52, kMuted, "computing on this device, a few seconds..");
-    text(4, 122, kMuted, "any key to go back");
+    text(4, 122, kMuted, "any key: menu");
     return;
   }
   snprintf(buf, sizeof buf, "%.32s", digestHex);
@@ -428,7 +438,7 @@ void drawDigest() {
   text(4, 80, kMuted, buf);
   text(4, 94, kMuted, "equal to Python, the browser and the EVM");
   text(4, 106, kMuted, "if it matches docs/CIRCUITS.md");
-  text(4, 122, kMuted, "any key to go back");
+  text(4, 122, kMuted, "any key: menu");
 }
 
 // ---- agent page: this device as the physical confirm key ---------------------------
@@ -454,8 +464,7 @@ int itemCount = 0, itemsInCount = 0;
 char summary[41] = "", chainState[10] = "", lastLine[100] = "";
 bool lastGranted = false;
 int nGranted = 0, nRefused = 0, selected = 0;
-uint32_t hostSeenMs = 0;
-bool hostEver = false;
+bool frameOpen = false;  // an S line started this frame
 char serialLine[200];
 int serialLen = 0;
 
@@ -486,6 +495,7 @@ void onHostLine(char *line) {
     nRefused = atoi(f[3]);
     copyField(chainState, sizeof chainState, f[4]);
     itemsInCount = 0;
+    frameOpen = true;
   } else if (f[0][0] == 'I' && n >= 8 && itemsInCount < kMaxItems) {
     AgentItem &it = itemsIn[itemsInCount++];
     copyField(it.agent, sizeof it.agent, f[2]);
@@ -498,6 +508,11 @@ void onHostLine(char *line) {
     lastGranted = f[1][0] == 'G';
     snprintf(lastLine, sizeof lastLine, "%s %s: %s", f[2], f[3], f[4]);
   } else if (f[0][0] == 'E') {
+    // A frame that lost a line on the way (the USB buffer can overflow while the arena
+    // animates) is dropped whole, never shown as "nothing waiting".
+    const bool whole = frameOpen && n >= 2 && atoi(f[1]) == itemsInCount;
+    frameOpen = false;
+    if (!whole) return;
     // Keep the selection on the same agent across frames.
     char keep[31] = "";
     if (selected < itemCount) copyField(keep, sizeof keep, items[selected].agent);
@@ -510,13 +525,12 @@ void onHostLine(char *line) {
       if (keep[0] && strcmp(items[i].agent, keep) == 0) selected = i;
       waitingNow += !items[i].armed;
     }
-    // The first frame from a host, or something new waiting for a person: show it.
-    if (!hostEver || waitingNow > waitingBefore) {
-      if (page == Page::Main || page == Page::Help) page = Page::Agent;
-      if (hostEver && sound) M5Cardputer.Speaker.tone(1900, 80);
-    }
+    // Something new waiting for a person: a tone and a count on screen, never a page
+    // switch — the device does not take the screen away from whoever is looking at it.
+    if (hostEver && waitingNow > waitingBefore && sound) M5Cardputer.Speaker.tone(1900, 80);
+    waitingCount = waitingNow;
     hostEver = true;
-    if (page == Page::Agent) dirty = true;
+    dirty = true;
   }
 }
 
@@ -544,7 +558,7 @@ void drawAgent() {
     text(4, 60, kText, "REFLEX_CARDPUTER=1 python console.py");
     text(4, 84, kMuted, "this key only writes confirm/blocked;");
     text(4, 96, kMuted, "no network, nothing stored");
-    text(4, 124, kMuted, "` back to the fly");
+    text(4, 124, kMuted, "` or DEL: menu");
     return;
   }
   text(4, 15, kMuted, summary);
@@ -579,7 +593,62 @@ void drawAgent() {
   canvas.drawFastHLine(0, 110, 240, kDim);
   snprintf(buf, sizeof buf, "%c %.37s", lastGranted ? '+' : 'x', lastLine);
   text(4, 113, lastGranted ? kOk : kBad, buf);
-  text(4, 125, kMuted, "ENT confirm  b block  u unblock  ` back");
+  text(4, 125, kMuted, "ENT confirm  b block  u unblock  ` menu");
+}
+
+// ---- menu -------------------------------------------------------------------------
+
+struct MenuEntry {
+  char key;
+  const char *label;
+  const char *note;
+  Page page;
+};
+const MenuEntry kMenu[] = {
+    {'1', "Fly escape reflex", "the circuit decides takeoff, live", Page::Main},
+    {'2', "Agent confirm key", "approve what the boundary held back", Page::Agent},
+    {'3', "Gate lattice", "173 NAND gates, each lit by its value", Page::Lattice},
+    {'4', "Whole-domain digest", "8,388,608 rows on this chip, ~10 s", Page::Digest},
+    {'5', "Self-test", "hashes and reference episodes", Page::SelfTest},
+    {'6', "Keys", "every key on every page", Page::Help},
+};
+const int kMenuCount = sizeof(kMenu) / sizeof(kMenu[0]);
+int menuIndex = 0;
+
+void drawMenu() {
+  char buf[48];
+  text(4, 3, kText, "C3S CIRCUIT AGENT");
+  text(206, 3, passed ? kOk : kBad, passed ? "PASS" : "FAIL");
+  for (int i = 0; i < kMenuCount; i++) {
+    const int y = 17 + i * 17;
+    if (i == menuIndex) {
+      canvas.fillRect(0, y - 2, 240, 16, kPanel);
+      canvas.fillRect(0, y - 2, 2, 16, kPar);
+    }
+    snprintf(buf, sizeof buf, "%c  %s", kMenu[i].key, kMenu[i].label);
+    text(6, y, i == menuIndex ? kText : kMuted, buf);
+    if (kMenu[i].page == Page::Agent) {
+      if (hostLive() && waitingCount) {
+        snprintf(buf, sizeof buf, "%d waiting", waitingCount);
+        text(172, y, kPar, buf);
+      } else {
+        text(172, y, hostLive() ? kOk : kDim, hostLive() ? "host ok" : "no host");
+      }
+    }
+  }
+  text(4, 120, kMuted, kMenu[menuIndex].note);
+  canvas.fillRect(0, 130, 240, 1, kDim);
+}
+
+void enterPage(Page p) {
+  page = p;
+  pageUntil = 0;
+  if (p == Page::Digest) {
+    digestRows = 0;
+    digestPending = true;
+  }
+  if (p == Page::Main) phaseMs = millis();
+  dirty = true;
 }
 
 void draw() {
@@ -594,6 +663,8 @@ void draw() {
     drawLattice();
   } else if (page == Page::Agent) {
     drawAgent();
+  } else if (page == Page::Menu) {
+    drawMenu();
   } else {
     drawTopBar();
     drawArena();
@@ -641,7 +712,23 @@ void readInput() {
         else if (c == '.' && selected + 1 < itemCount) selected++;
         else if (c == 'b') sendKey("block");
         else if (c == 'u') sendKey("unblock");
-        else if (c == '`' || c == 'h') page = Page::Main;
+        else if (c == '`' || c == 'h') page = Page::Menu;
+      }
+      if (keys.del) page = Page::Menu;
+      dirty = true;
+    }
+    return;
+  }
+  if (page == Page::Menu) {
+    if (go) enterPage(kMenu[menuIndex].page);
+    if (M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isPressed()) {
+      auto &keys = M5Cardputer.Keyboard.keysState();
+      if (keys.enter || keys.space) enterPage(kMenu[menuIndex].page);
+      for (char c : keys.word) {
+        if (c == ';' && menuIndex > 0) menuIndex--;
+        else if (c == '.' && menuIndex + 1 < kMenuCount) menuIndex++;
+        for (int i = 0; i < kMenuCount; i++)
+          if (c == kMenu[i].key) enterPage(kMenu[i].page);
       }
       dirty = true;
     }
@@ -649,8 +736,15 @@ void readInput() {
   }
   if (M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isPressed()) {
     auto &keys = M5Cardputer.Keyboard.keysState();
-    if (page != Page::Main) {
-      page = Page::Main;
+    if (page != Page::Main) {  // help, digest, lattice, self-test: any key returns to the menu
+      page = Page::Menu;
+      dirty = true;
+      return;
+    }
+    bool back = keys.del;
+    for (char c : keys.word) back = back || c == '`';
+    if (back) {
+      page = Page::Menu;
       dirty = true;
       return;
     }
@@ -659,7 +753,6 @@ void readInput() {
       if (c != ' ') onKey(c);
   }
   if (go) {
-    if (page != Page::Main) page = Page::Main;
     autoDemo = false;
     launch();
   }
@@ -668,6 +761,7 @@ void readInput() {
 }  // namespace
 
 void setup() {
+  Serial.setRxBufferSize(2048);  // a console frame must fit while the arena animates
   auto cfg = M5.config();
   cfg.serial_baudrate = 115200;
   M5Cardputer.begin(cfg, true);
@@ -723,13 +817,12 @@ void loop() {
   uint32_t now = millis();
   // The host status line has to notice silence even when no frame arrives.
   static bool wasLive = false;
-  const bool live = hostEver && now - hostSeenMs < 4000;
-  if (page == Page::Agent && live != wasLive) dirty = true;
+  const bool live = hostLive();
+  if (live != wasLive) dirty = true;
   wasLive = live;
 
   if (page == Page::SelfTest && pageUntil && now > pageUntil) {
-    page = Page::Main;
-    phaseMs = now;
+    page = Page::Menu;
     dirty = true;
   }
   if (phase == Phase::Looming && !paused) {
