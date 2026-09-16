@@ -129,15 +129,31 @@ each is a boundary rather than a cost. Measured alone, with `forbid_when_blocked
   verdict rather than an input — an agent that keeps asking for what it cannot have is
   stopped rather than left hammering the boundary — and it needs no new input at all: the
   refusal is `request` with no `grant`. A grant or a confirm clears the run; a tick with no
-  request is not a refusal and leaves the count alone. `grant` reaches only the next state,
+  request is not a refusal and leaves the count alone; and **a tick carrying the confirm is
+  not a refusal either**, so the reset it orders is not undone by the refusal it would
+  otherwise have been. The halted ticks grant nothing, and so does the tick whose confirm
+  lifts the halt — the same shape as the sticky block. `grant` reaches only the next state,
   never a condition of the same tick, so nothing here is circular. 51 NAND + 3 LATCH over
-  128 rows for `R=3`.
+  128 rows for `R=3`; 18 NAND + 1 LATCH over 32 rows for `R=1`.
 
   Its control needed care, and the care is the lesson: claiming a stricter `R` than the
   circuit enforces is only caught where the circuit would still *grant* — so the control
   runs with `forbid_when_blocked` on, where a tick when `blocked` drops is grantable. State
   a stricter claim against a policy that refuses for ever (a spent budget) and it passes
   vacuously, which is exactly the shape of a proof that proves nothing.
+
+  That lesson had a second half, and this rule was where it was learned twice. The first
+  version of the sentence above was missing the emphasised clause, and the circuit was a
+  one-way door: while the halt was open every request was a refusal, so the confirm tick
+  counted as one more refusal already at the threshold and re-tripped the latch it had come
+  to clear. Nothing caught it, because the monitor asserted only the safety half —
+  *nothing is granted while the halt is open* — which is trivially true of a halt that
+  never lifts. A breaker needs both halves proven: `properties` now also reports
+  `refusal_reset`, which asserts of every reachable configuration with the halt open that a
+  tick with `confirm` high leaves the latch clear **and** that the tick after it grants a
+  request no other rule refuses. Its control hides a rule from the claim — the circuit
+  keeps an 8-tick cooldown the claim does not mention — so the assertion is one that can
+  fail. A safety-only proof of a breaker proves nothing about the promise the breaker makes.
 
 The four inputs these read — `irreversible`, `failed`, `heartbeat`, `confirm_b` — are
 appended to the circuit only when the rule that reads them is on, in that order, so

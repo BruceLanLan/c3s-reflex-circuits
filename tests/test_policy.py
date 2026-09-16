@@ -20,7 +20,10 @@ POLICIES = [
     Policy(min_gap_ticks=8, max_grants=7, confirm_per_irreversible=True, two_key=True),
     Policy(min_gap_ticks=4, commit_ticks=4, confirm_per_irreversible=True, trip_after_failures=3),
     Policy(sticky_block=True, heartbeat_ticks=8, forbid_when_blocked=True),
-    # the rule that reads the circuit's own verdict
+    # the rule that reads the circuit's own verdict. R=1 trips on the first refusal, so
+    # it exercises the reset with no counter at all between the refusal and the latch.
+    Policy(trip_after_refusals=1),
+    Policy(trip_after_refusals=2),
     Policy(trip_after_refusals=3),
     Policy(min_gap_ticks=8, commit_ticks=4, trip_after_refusals=3, confirm_per_irreversible=True),
 ]
@@ -80,11 +83,18 @@ def test_every_rule_holds_from_reset(policy):
         # while a stricter claim says it should be halted is a tick where blocked drops. With a
         # rule that refuses for ever (a spent budget) the stricter claim is vacuously true.
         (Policy(trip_after_refusals=3), Policy(trip_after_refusals=2), "refusal_breaker"),
+        # The liveness half needs its own control, for the same reason. "A confirm lifts
+        # the halt, and the tick after it grants" is a claim the monitor can only make
+        # where no other rule explains the refusal, so the control hides one from it: the
+        # circuit enforces an 8-tick cooldown the claim does not mention, and the tick
+        # after the reset falls inside it. A liveness assertion that could not fail this
+        # way would be no better than the safety half that missed the one-way door.
+        (Policy(min_gap_ticks=8, trip_after_refusals=3), Policy(trip_after_refusals=3), "refusal_reset"),
     ],
     ids=[
         "stricter-rate-limit", "longer-commitment", "smaller-budget", "unenforced-block", "shorter-confirm-window",
         "sticky-claimed-on-stateless-block", "shorter-heartbeat", "one-shot-claimed-on-a-window", "breaker-two-vs-three",
-        "two-key-claimed-on-none", "fewer-refusals-before-halt",
+        "two-key-claimed-on-none", "fewer-refusals-before-halt", "reset-claimed-over-an-unmentioned-cooldown",
     ],
 )
 def test_claiming_more_than_the_circuit_enforces_is_caught(built, claimed, expected):
@@ -212,6 +222,35 @@ def test_a_success_between_failures_resets_the_count():
     policy = Policy(trip_after_failures=3, forbid_when_blocked=False)
     F = R | {"failed"}
     assert drive(policy, [F, F, R, F, F, R]) == [True] * 6
+
+
+def test_refusals_in_a_row_halt_and_a_confirm_lifts_it_on_the_next_tick():
+    """The half of this rule that nothing used to check. "Nothing is granted while the
+    halt is open" is true for ever in a circuit whose halt never opens again, which is
+    exactly what the first version was: while the halt is open every request is a
+    refusal, so the tick carrying the confirm counted as one more refusal at the
+    threshold and re-tripped the latch that same confirm had come to clear. The confirm
+    tick grants nothing, as with the sticky block; the tick after it does."""
+    policy = Policy(trip_after_refusals=2, forbid_when_blocked=True)
+    B = R | {"blocked"}
+    ticks = [B, B, R, R | {"confirm"}, R, R]
+    #        1  2  3  4 the reset       5  6
+    assert drive(policy, ticks) == [False, False, False, False, True, True]
+
+
+def test_a_confirm_alone_keeps_the_refusal_halt_from_ever_tripping():
+    """The same term seen from the other side: a confirm on the tick that would have
+    reached the threshold means there is no run of refusals to trip on."""
+    policy = Policy(trip_after_refusals=2, forbid_when_blocked=True)
+    B = R | {"blocked"}
+    assert drive(policy, [B, B | {"confirm"}, R]) == [False, False, True]
+
+
+def test_a_tick_with_no_request_neither_counts_nor_clears_the_refusal_run():
+    policy = Policy(trip_after_refusals=3, forbid_when_blocked=True)
+    B = R | {"blocked"}
+    # two refusals, an idle tick, then the third refusal still trips on schedule
+    assert drive(policy, [B, B, set(), B, R]) == [False, False, False, False, False]
 
 
 def test_two_keys_are_both_needed_and_both_spent():

@@ -63,6 +63,13 @@ OUTPUT_NAMES = ("grant",)
 # rule then fails the claim, which is what a negative control is for.
 _ABSENT_INPUT = {"irreversible": 1, "failed": 1, "heartbeat": 0, "confirm_b": 0}
 
+# The tick a liveness check asks about: a request with every other input at the value
+# that forbids nothing, and the person's confirm high. Every rule except the four that
+# read a counter (cooldown, commitment, budget, and an open halt or breaker) is satisfied
+# outright by this pattern, so if such a tick is refused, only those four can explain it.
+_PERMISSIVE_INPUT = {"request": 1, "intent": 1, "blocked": 0, "confirm": 1,
+                     "irreversible": 0, "failed": 0, "heartbeat": 1, "confirm_b": 1}
+
 
 def _width(limit: int) -> int:
     """Bits needed to count up to `limit` inclusive."""
@@ -99,7 +106,11 @@ class Policy:
                         circuit's own verdict rather than an input: an agent that keeps
                         asking for what it cannot have is stopped instead of left to
                         hammer the boundary. A grant or a confirm clears the count; a
-                        tick with no request is not a refusal and leaves it alone.
+                        tick with no request is not a refusal and leaves it alone; and a
+                        tick carrying the confirm is not a refusal either, so the reset
+                        it orders is not undone by the refusal it would otherwise be.
+                        The halted ticks grant nothing, and so does the tick whose
+                        confirm lifts the halt.
     two_key             every grant needs both `confirm` and `confirm_b` to have
                         arrived since the last grant (or to arrive now); a grant
                         spends both
@@ -313,7 +324,11 @@ class Policy:
         grant = int(allowed)
 
         R = self.trip_after_refusals
-        refusal_now = bool(R and request and not grant)
+        # A tick carrying the person's confirm is not a refusal that counts: it neither
+        # adds to the run nor trips the halt. Without `not confirm` the halt is a one-way
+        # door — while it is open `grant` is 0, so the confirm tick is itself a refusal at
+        # the threshold, which re-trips the latch the same confirm was meant to clear.
+        refusal_now = bool(R and request and not grant and not confirm)
         trip_refusals = bool(refusal_now and (R == 1 or st["refused"] >= R - 1))
 
         nxt = {
@@ -388,8 +403,11 @@ class Policy:
             allowed = b.and_(allowed, b.not_(refused_tripped))
         grant = allowed
         # Only now, once the verdict exists: a refusal of an actual request. `grant` reaches
-        # the next state and never a condition of this tick, so there is no loop.
-        refusal_now = b.and_(request, b.not_(grant)) if R else b.ZERO
+        # the next state and never a condition of this tick, so there is no loop. The same
+        # `clear` that zeroes the run also excuses the tick from being a refusal, so the
+        # confirm that resets the halt is not itself counted as one more refusal.
+        clear = b.or_(grant, confirm) if R else b.ZERO
+        refusal_now = b.and_(request, b.not_(clear)) if R else b.ZERO
         trip_refusals = (b.and_(refusal_now, cmp.ge_const(b, q["refused"], R - 1)) if R > 1 else refusal_now) if R else b.ZERO
 
         def drive(name: str, d: list[int]) -> None:
@@ -415,7 +433,6 @@ class Policy:
         if k:
             drive("tripped", [b.or_(break_now, b.and_(tripped, b.not_(confirm)))])
         if self.refused_bits:
-            clear = b.or_(grant, confirm)
             stay = cmp.mux_bits(b, refusal_now, list(q["refused"]), cmp.increment_saturating(b, q["refused"], b.ONE))
             drive("refused", cmp.mux_bits(b, clear, stay, cmp.const_bits(b, 0, self.refused_bits)))
         if R:
@@ -544,7 +561,7 @@ class Policy:
         violations = {
             name: 0
             for name in ("rate_limit", "commitment", "forbidden", "budget", "confirm_window", "halted", "one_shot",
-                         "breaker", "refusal_breaker", "two_key")
+                         "breaker", "refusal_breaker", "refusal_reset", "two_key")
         }
         H, k, R = claim.heartbeat_ticks, claim.trip_after_failures, claim.trip_after_refusals
         gap_cap = max(claim.min_gap_ticks, 1)
@@ -557,6 +574,8 @@ class Policy:
             for name in OPTIONAL_INPUTS:
                 inp.setdefault(name, _ABSENT_INPUT[name])
             patterns.append(inp)
+        probe = sum(_PERMISSIVE_INPUT[name] << i for i, name in enumerate(names))
+        resets_checked = 0
 
         # state, ticks since a grant (none yet), intent streak, grants, ticks since a
         # confirm (none yet), halt open, silent ticks, token held, consecutive failures,
@@ -616,11 +635,36 @@ class Policy:
                         int(bool(have_a and not grant)) if claim.two_key else 0,
                         int(bool(have_b and not grant)) if claim.two_key else 0,
                         # a refusal is a request that was not granted; a grant or a confirm
-                        # clears the run, a tick with no request neither adds nor clears
+                        # clears the run, a tick with no request neither adds nor clears,
+                        # and a tick carrying the confirm is not a refusal at all
                         (0 if (grant or confirm) else (min(refusals + 1, max(R - 1, 0)) if request else refusals)) if R else 0,
-                        int(bool((R and request and not grant and (R == 1 or refusals >= R - 1))
+                        int(bool((R and request and not grant and not confirm and (R == 1 or refusals >= R - 1))
                                  or (refusal_halt and not confirm))) if R else 0,
                     )
+                    # The liveness half of the refusal breaker. "Nothing is granted while
+                    # it is tripped" holds for ever in a circuit that never lifts the halt,
+                    # so safety alone says nothing about the promise the rule actually
+                    # makes: a confirm resets it. Two things are asserted about the tick
+                    # that carries the confirm — it leaves the latch clear, and the tick
+                    # after it grants a request that no other rule refuses. The second is
+                    # what makes this a claim about the circuit rather than about the
+                    # monitor's own model of it.
+                    if R and refusal_halt and confirm:
+                        # the monitor's own counters as they will read on the next tick
+                        since_n, streak_n, spent_n, halt_n, broken_n = t[1], t[2], t[3], t[5], t[9]
+                        still_tripped = bool(self.fields(nxt_state)["refused_tripped"])
+                        # the four rules that could refuse the probe tick for a reason of
+                        # their own; every other rule this pattern satisfies outright
+                        elsewhere = ((claim.min_gap_ticks and since_n < claim.min_gap_ticks)
+                                     or (claim.commit_ticks and streak_n < claim.commit_ticks)
+                                     or (claim.max_grants and spent_n >= claim.max_grants)
+                                     or halt_n or broken_n)
+                        if still_tripped:
+                            violations["refusal_reset"] += 1
+                        elif not elsewhere:
+                            resets_checked += 1
+                            if not int(outs[probe | (nxt_state << n_in)]):
+                                violations["refusal_reset"] += 1
                     if t not in seen:
                         seen.add(t)
                         new.append(t)
@@ -630,6 +674,7 @@ class Policy:
             "states_possible": 1 << self.state_bits,
             "configurations_visited": len(seen),
             "rows_checked": checked,
+            "refusal_resets_checked": resets_checked,
             "violations": violations,
             "holds": all(v == 0 for v in violations.values()),
             "rules": claim.describe(),
