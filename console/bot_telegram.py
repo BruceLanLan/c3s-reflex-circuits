@@ -22,6 +22,16 @@ A chat listed in TOOL_LAYER_CHATS is the person's. Only there:
     /stop                   block every agent          /resume   lift every block
 and those chats are told, once, whenever something new starts waiting for a person.
 
+Each waiting item is sent with buttons, so approving from a phone is one press rather than
+a typed line. A press carries exactly what a typed /confirm carries: the call it was shown
+against (`for_reason`) and that call's two digits (`code`). Telegram's callback_data is 64
+bytes, far too small for a `reason`, so the button carries a digest of (agent, reason, bit)
+and the press is resolved by recomputing that digest over what the console says is waiting
+*now*. A button therefore cannot approve "whatever is waiting" — if the call is gone, the
+code was reissued, or someone already approved it, the press is refused and writes nothing.
+Buttons are the person's, exactly as the typed commands are: a press from a chat outside
+TOOL_LAYER_CHATS is refused before anything is read.
+
 A chat the agent itself can type into must never be listed: a confirm that whoever is
 typing can give is a commitment cost dressed up as a boundary (docs/AGENT.md).
 
@@ -32,6 +42,7 @@ console can do nothing the compiled rules do not allow.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -66,7 +77,9 @@ HELP_PERSON = (
     "/pending — what waits for you\n"
     "/confirm [n|agent] · /confirm_b [n|agent] — for that call only\n"
     "/block <agent> · /unblock <agent>\n"
-    "/stop — block every agent · /resume"
+    "/stop — block every agent · /resume\n"
+    "Each waiting item also arrives with buttons; a press is bound to that one call and its "
+    "two digits, so it cannot be spent on a different call."
 )
 REFUSED_HERE = ("blocked, confirm and stop are written by a layer the agent cannot reach. This chat is "
                 "an agent's channel, so the bot will not send them from here; list the chat id in "
@@ -85,11 +98,39 @@ def call(path_or_url: str, payload: dict | None = None, timeout: int = 40) -> di
         return json.loads(resp.read())
 
 
-def say(chat_id, text: str) -> None:
+def say(chat_id, text: str, buttons: list[list[dict]] | None = None) -> None:
+    body = {"chat_id": chat_id, "text": text}
+    if buttons:
+        body["reply_markup"] = {"inline_keyboard": buttons}
     try:
-        call(f"{API}/sendMessage", {"chat_id": chat_id, "text": text})
+        call(f"{API}/sendMessage", body)
     except urllib.error.URLError as e:
         print(f"could not reply: {e}", flush=True)
+
+
+def answer(callback_id: str, text: str, alert: bool = False) -> None:
+    """Telegram requires every callback query to be answered, or the button spins forever.
+
+    The text is the whole reply on a phone when `alert` is false, so it says what happened
+    to the boundary — written, refused, or nothing at all — not merely "ok"."""
+    try:
+        call(f"{API}/answerCallbackQuery",
+             {"callback_query_id": callback_id, "text": text[:200], "show_alert": alert})
+    except urllib.error.URLError as e:
+        print(f"could not answer a press: {e}", flush=True)
+
+
+def strip_keyboard(chat_id, message_id) -> None:
+    """Take the buttons off an item that has been dealt with, so the next press cannot be a
+    second attempt at a call that is over. Best effort: the refusal on a stale press is what
+    actually protects the boundary, not the absence of the button."""
+    if message_id is None:
+        return
+    try:
+        call(f"{API}/editMessageReplyMarkup",
+             {"chat_id": chat_id, "message_id": message_id, "reply_markup": {"inline_keyboard": []}})
+    except (urllib.error.URLError, urllib.error.HTTPError) as e:
+        print(f"could not clear buttons: {e}", flush=True)
 
 
 def verdict_line(v: dict) -> str:
@@ -112,8 +153,147 @@ def verdict_line(v: dict) -> str:
 def pending_line(it: dict, n: int | None = None) -> str:
     head = f"{n}. " if n is not None else ""
     call_line = f"\n  call: {it['reason']}" if it.get("reason") else ""
-    return (f"{head}{it['agent']} · {it['class']} · tick {it['tick']}{call_line}\n  {it['why']}\n"
+    code_line = f"\n  code {it['code']} — the same two digits as on the console's page" if it.get("code") else ""
+    return (f"{head}{it['agent']} · {it['class']} · tick {it['tick']}{call_line}\n  {it['why']}{code_line}\n"
             f"  /{it['bit']} {n if n is not None else it['agent']}")
+
+
+CB = "c3s1"  # this bot's own callback_data, versioned so an old button from a restart is recognisably old
+
+
+def call_digest(agent: str, reason: str, bit: str) -> str:
+    """Twelve hex characters standing for one exact call.
+
+    Telegram allows 64 bytes of callback_data and a `reason` is routinely longer, so the
+    button carries this instead of the reason. It is not a secret and not an authorisation:
+    the press is resolved by recomputing it over the entries the console says are waiting
+    now, so a digest that matches nothing waiting approves nothing."""
+    return hashlib.sha256(f"{agent}\n{reason}\n{bit}".encode()).hexdigest()[:12]
+
+
+# What this bot last showed for a digest. Used only to name the agent when a *block* is
+# pressed on an item that has since gone: blocking only ever makes the boundary stricter.
+# A confirm is never resolved from here — only from what the console says is waiting.
+_SHOWN: dict[str, dict] = {}
+
+
+def remember(it: dict) -> str:
+    digest = call_digest(it["agent"], it.get("reason", ""), it["bit"])
+    _SHOWN[digest] = {"agent": it["agent"], "reason": it.get("reason", ""), "bit": it["bit"]}
+    for stale in list(_SHOWN)[:-200]:  # a bounded memory of what was on screen
+        _SHOWN.pop(stale, None)
+    return digest
+
+
+def keyboard(it: dict) -> list[list[dict]]:
+    """The four things a person does about one waiting call, as four buttons.
+
+    Every button names the call it was shown against; none of them means "whatever is
+    waiting now". The code rides along so the press can be refused if the console has
+    since reissued it."""
+    digest = remember(it)
+    code = it.get("code") or ""
+    bit = it["bit"]
+    grant = "approve this call" if bit == "confirm" else f"{bit} — the second key"
+    return [
+        [{"text": f"{grant} · code {code}", "callback_data": f"{CB}|{bit}|{code}|{digest}"}],
+        [{"text": f"block {it['agent']}", "callback_data": f"{CB}|block|{code}|{digest}"}],
+        [{"text": "stop everything", "callback_data": f"{CB}|stop|{code}|{digest}"},
+         {"text": "ignore", "callback_data": f"{CB}|ignore|{code}|{digest}"}],
+    ]
+
+
+def live_item(digest: str) -> dict | None:
+    """The entry the console is waiting on right now that this button was made for, if any.
+
+    Recomputed rather than remembered, which is what makes a press as narrow as a typed
+    /confirm: the item's reason and bit have to still hash to the same twelve characters."""
+    for it in pending_items(call("/api/state")):
+        if call_digest(it["agent"], it.get("reason", ""), it["bit"]) == digest:
+            return it
+    return None
+
+
+def handle_press(chat_id, data: str, callback_id: str, message_id=None) -> None:
+    # A press is written by whoever can type in this chat, so it is gated exactly as
+    # /confirm is. A chat an agent can reach must never be in TOOL_LAYER_CHATS.
+    if str(chat_id) not in TOOL_LAYER_CHATS:
+        answer(callback_id, "this chat is an agent's channel; a person's keys are not pressed from here", alert=True)
+        say(chat_id, REFUSED_HERE)
+        return
+    parts = data.split("|")
+    if len(parts) != 4 or parts[0] != CB:
+        answer(callback_id, "this button was not made by this bot", alert=True)
+        return
+    _, action, code, digest = parts
+
+    if action == "ignore":
+        answer(callback_id, "left waiting — nothing was written")
+        strip_keyboard(chat_id, message_id)
+        return
+
+    if action == "stop":
+        # The big red button. Deliberately not gated on reading the code: an emergency stop
+        # must never wait on two digits, and it only ever makes the boundary stricter
+        # (docs/API.md, why blocking needs no code). Lifting it is still /resume, typed.
+        d = call("/api/stop-all", {"source": "telegram"})
+        answer(callback_id, f"blocked {d.get('count', 0)} agent(s)")
+        say(chat_id, f"blocked {d.get('count', 0)} agent(s) from Telegram; /resume lifts it")
+        return
+
+    if action == "block":
+        name = (live_item(digest) or _SHOWN.get(digest) or {}).get("agent")
+        if not name:
+            answer(callback_id, "this button is older than this bot; use /block <agent>", alert=True)
+            say(chat_id, "that button predates a restart, so the bot no longer knows which agent it named. "
+                         "Nothing was written — /pending, or /block <agent>.")
+            return
+        call("/api/tool", {"agent": name, "blocked": 1})
+        answer(callback_id, f"{name} blocked")
+        say(chat_id, f"{name} blocked; /unblock {name} lifts it")
+        strip_keyboard(chat_id, message_id)
+        return
+
+    if action not in ("confirm", "confirm_b"):
+        answer(callback_id, f"this bot does not do {action!r}", alert=True)
+        return
+
+    # A confirm, and therefore the strict path: the call must still be waiting, under the
+    # same two digits, and not already approved. Anything else writes nothing.
+    item = live_item(digest)
+    if item is None:
+        answer(callback_id, "that call is no longer waiting — nothing was written", alert=True)
+        say(chat_id, "that call is not waiting for a person any more, so the press was refused and nothing "
+                     "was written. /pending shows what is.")
+        strip_keyboard(chat_id, message_id)
+        return
+    if item["bit"] != action:
+        answer(callback_id, f"that call now waits for {item['bit']}, not {action}", alert=True)
+        say(chat_id, f"that call now waits for {item['bit']}, not {action}; nothing was written. See /pending.")
+        return
+    if (item.get("code") or "") != code:
+        answer(callback_id, "the two digits beside that call have changed — read them again", alert=True)
+        say(chat_id, "the console has reissued the code beside that call, which means it is not the call this "
+                     "button was shown against. Nothing was written — /pending, and press the new button.")
+        strip_keyboard(chat_id, message_id)
+        return
+    if item.get("armed"):
+        answer(callback_id, "already approved — a second one was not written", alert=True)
+        say(chat_id, f"a {action} for that exact call is already waiting to be spent; nothing was written again.")
+        strip_keyboard(chat_id, message_id)
+        return
+    try:
+        call("/api/tool", {"agent": item["agent"], action: 1,
+                           "for_reason": item.get("reason", ""), "code": item["code"]})
+    except urllib.error.HTTPError as e:
+        why = json.loads(e.read()).get("error", str(e))
+        answer(callback_id, f"refused: {why}", alert=True)
+        say(chat_id, f"the console refused that press and wrote nothing: {why}")
+        return
+    answer(callback_id, f"{action} written for this call only")
+    say(chat_id, f"{action} written for {item['agent']}, for this call only: "
+                 f"{item.get('reason') or '(no reason given)'}")
+    strip_keyboard(chat_id, message_id)
 
 
 def split_class(rest: list[str]) -> tuple[str, str]:
@@ -168,7 +348,13 @@ def handle(chat_id, text: str) -> None:
         agents = [a["agent"] for a in s["agents"]]
         waiting = pending_items(s)
         if command == "/pending":
-            say(chat_id, "\n\n".join(pending_line(it, i + 1) for i, it in enumerate(waiting)) or "nothing is waiting for a person")
+            if not waiting:
+                say(chat_id, "nothing is waiting for a person")
+                return
+            # One message per item, each with its own buttons, so /pending also rebuilds
+            # the buttons after a restart instead of leaving only typed commands.
+            for i, it in enumerate(waiting):
+                say(chat_id, pending_line(it, i + 1), keyboard(it))
         elif command in ("/confirm", "/confirm_b"):
             # A confirm is for one call: the item by its /pending number, or an agent's
             # newest waiting item; the console holds it for that exact call.
@@ -184,7 +370,18 @@ def handle(chat_id, text: str) -> None:
             if item is None:
                 say(chat_id, f"nothing waiting for {bit}" + (f" matches {rest[0]}" if rest else "") + "; see /pending")
                 return
-            call("/api/tool", {"agent": item["agent"], bit: 1, "for_reason": item.get("reason", "")})
+            # A chat channel sends the code as well (docs/API.md, I-2): the console only
+            # checks a code it is given, so it is this bot's job to always give one, and a
+            # typed confirm is then bound as tightly as a press.
+            body = {"agent": item["agent"], bit: 1, "for_reason": item.get("reason", "")}
+            if item.get("code"):
+                body["code"] = item["code"]
+            try:
+                call("/api/tool", body)
+            except urllib.error.HTTPError as e:
+                say(chat_id, "the console refused that confirm and wrote nothing: "
+                             + json.loads(e.read()).get("error", str(e)))
+                return
             say(chat_id, f"{bit} written for {item['agent']}, for this call only: {item.get('reason') or '(no reason given)'}")
         elif command in ("/block", "/unblock"):
             if not rest or rest[0] not in agents:
@@ -223,7 +420,7 @@ def announce_forever(interval: float = 3.0) -> None:
             if not first:  # what was already waiting at start-up is in /pending, not a ping
                 for it in fresh:
                     for chat in TOOL_LAYER_CHATS:
-                        say(chat, "waiting for a person\n" + pending_line(it))
+                        say(chat, "waiting for a person\n" + pending_line(it), keyboard(it))
             first = False
         except Exception as e:
             print(f"announce: {e}", flush=True)
@@ -247,6 +444,16 @@ def main() -> None:
             continue
         for u in updates:
             offset = u["update_id"] + 1
+            press = u.get("callback_query")
+            if press:
+                where = press.get("message") or {}
+                try:
+                    handle_press(where.get("chat", {}).get("id"), press.get("data") or "",
+                                 press["id"], where.get("message_id"))
+                except Exception as e:
+                    print(f"handling a press failed: {e}", flush=True)
+                    answer(press["id"], "that press could not be carried out; nothing was written", alert=True)
+                continue
             message = u.get("message") or u.get("channel_post") or {}
             text = message.get("text")
             if text:
