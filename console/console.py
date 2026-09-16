@@ -158,8 +158,12 @@ def operator_token() -> str:
 # so today's adapters do not break, and `/api/state` marks it `token_bound: false`. The
 # cost of that default is exactly stated: **an unbound name is a name anything local can
 # speak for**, which is the adversarial review's first finding. A deployment that wants the
-# door shut sets REFLEX_REQUIRE_AGENT_TOKEN=1, and then every request must carry a token —
-# a name with no token is refused instead of trusted. `docs/ISOLATION.md` turns it on.
+# door shut sets REFLEX_REQUIRE_AGENT_TOKEN=1: there the console binds nothing over HTTP at
+# all, and a request whose name a person has not bound with `c3s token bind` is refused
+# rather than trusted. (Requiring merely *a* token was not enough — the adversarial review
+# sent an arbitrary header value, bound the victim's name on the way through and spent its
+# confirm. Authenticating a name and creating one are different powers.)
+# `docs/ISOLATION.md` turns it on.
 REQUIRE_AGENT_TOKEN = os.environ.get("REFLEX_REQUIRE_AGENT_TOKEN", "") not in ("", "0", "no")
 
 AGENTS_LOCK = threading.Lock()
@@ -167,6 +171,42 @@ AGENTS_LOCK = threading.Lock()
 
 class BindingsUnreadable(RuntimeError):
     """`agents.json` is there and cannot be read. Not the same as "nobody is bound"."""
+
+
+def _store_lock():
+    """Read-modify-write on the store, held against the other processes too.
+
+    A thread lock is not enough and this was not theoretical: the console and a test
+    process were both binding names in the same second, and whichever read first wrote
+    last — one of them silently put back a binding the other had just rotated away, and
+    another time the reverse. A lost *binding* is the dangerous direction: the name quietly
+    becomes unbound again, which is the one state anything local may speak for. `c3s token
+    bind` and `c3s token rotate` run in their own processes, so the lock has to be one the
+    filesystem keeps. The lock file is separate from the store because the store is
+    replaced (a new inode) on every write."""
+    import contextlib
+    import fcntl
+
+    @contextlib.contextmanager
+    def held():
+        with AGENTS_LOCK:  # same order everywhere: threads first, then the file
+            fd = None
+            try:
+                AGENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+                fd = os.open(str(AGENTS_FILE) + ".lock", os.O_CREAT | os.O_RDWR, 0o600)
+                fcntl.flock(fd, fcntl.LOCK_EX)
+            except OSError:
+                fd = None  # no lock to be had (a read-only home?); a thread-safe write is still better than none
+            try:
+                yield
+            finally:
+                if fd is not None:
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_UN)
+                    finally:
+                        os.close(fd)
+
+    return held()
 
 
 def _token_sha256(token: str) -> str:
@@ -184,17 +224,22 @@ def agent_bindings() -> dict:
     there and does not parse raises instead: reading it as "nothing is bound" would turn
     one bad write into "every agent's token is gone" and keep serving, which is the same
     mistake `Boundary._load` refuses to make for the rules (it exits rather than start with
-    none). A boundary must not reset open, and that includes this one."""
+    none). A boundary must not reset open, and that includes this one.
+
+    One unreadable *record* is not one unreadable file: it is kept as a binding whose token
+    nothing can match, so that name refuses everything and every other name is unaffected.
+    (The first cut of this raised for the whole store, which turned one odd record into an
+    outage for every agent — the adversarial review's 2.2.)"""
     if not AGENTS_FILE.exists():
         return {}
     try:
         data = json.loads(AGENTS_FILE.read_text())
     except (OSError, ValueError) as e:
         raise BindingsUnreadable(f"{AGENTS_FILE} exists and cannot be read ({e})") from e
-    if not isinstance(data, dict) or not all(
-            isinstance(v, dict) and isinstance(v.get("token_sha256"), str) for v in data.values()):
+    if not isinstance(data, dict):
         raise BindingsUnreadable(f"{AGENTS_FILE} is not a map of agent name to binding")
-    return data
+    return {k: (v if isinstance(v, dict) and isinstance(v.get("token_sha256"), str)
+                else {"token_sha256": None, "unreadable": True}) for k, v in data.items()}
 
 
 def _write_bindings(data: dict) -> None:
@@ -215,14 +260,18 @@ def _write_bindings(data: dict) -> None:
     os.replace(tmp, AGENTS_FILE)
 
 
-def check_agent_token(name: str, given: str) -> str:
+def check_agent_token(name: str, given: str, may_bind: bool = True) -> str:
     """One of:
 
     `unbound`  no token offered, none on file — allowed, and shown as unbound.
     `bound`    a token offered for a name nobody had bound — bound to it now.
     `ok`       the token matches the one on file.
-    `spoof`    the name is bound and this is not its token (a wrong one, or none), or
-               nothing is bound and this console requires a token from everyone.
+    `spoof`    the name is bound and this is not its token (a wrong one, or none).
+    `required` nothing is bound and this caller may not be the one to bind it.
+
+    `may_bind=False` refuses to make a binding at all: trust on first use is trust in
+    whoever got there first, which is fine for a program on this machine and not fine for
+    whoever is on the Wi-Fi. Callers that are not local pass False, and nothing is written.
 
     Raises `BindingsUnreadable` if the store is there and unreadable; the caller refuses
     the request rather than treating every agent as unbound.
@@ -230,21 +279,62 @@ def check_agent_token(name: str, given: str) -> str:
     import hmac
 
     given = (given or "").strip()
-    with AGENTS_LOCK:
+    with _store_lock():
         data = agent_bindings()
         record = data.get(name)
         if record is None:
+            if not may_bind:
+                return "required"
             if not given:
-                # The default trusts an unbound name (I-3's compatibility clause, and the
-                # state of the world before I-3 existed). REFLEX_REQUIRE_AGENT_TOKEN=1
-                # does not: an agent that cannot say which program it is does not speak.
-                return "required" if REQUIRE_AGENT_TOKEN else "unbound"
+                # The default trusts an unbound name: I-3's compatibility clause, and the
+                # state of the world before I-3 existed.
+                return "unbound"
             data[name] = {"token_sha256": _token_sha256(given), "bound_at": time.time()}
             _write_bindings(data)
             return "bound"
-        if not given:
-            return "spoof"
+        if not given or not isinstance(record.get("token_sha256"), str):
+            return "spoof"  # a record nothing can match is a name that refuses everything
         return "ok" if hmac.compare_digest(_token_sha256(given), record["token_sha256"]) else "spoof"
+
+
+def bound_token_owner(given: str) -> str | None:
+    """Which agent a token belongs to, or None. Used where there is no name to check it
+    against — a `GET` from the LAN, which is either the operator's or an agent's or
+    nobody's. Constant-time per record, and it never says *which* token was close."""
+    import hmac
+
+    given = (given or "").strip()
+    if not given:
+        return None
+    digest = _token_sha256(given)
+    with _store_lock():
+        for name, record in agent_bindings().items():
+            if isinstance(record.get("token_sha256"), str) and hmac.compare_digest(digest, record["token_sha256"]):
+                return name
+    return None
+
+
+def token_bind(agent: str, token: str) -> dict:
+    """`c3s token bind --agent <name>`: bind a name to a token from a person's hand, before
+    any agent runs.
+
+    This is what makes `REFLEX_REQUIRE_AGENT_TOKEN=1` usable. In that mode the console
+    binds nothing over HTTP — trust on first use is trust in whoever asks first, and the
+    adversarial review's second pass showed what that is worth: with the switch on but
+    binding still allowed, an attacker sent *any* header value and bound the victim's name
+    on the way to spending its confirm. So the two powers are separated: HTTP may
+    authenticate a name, and only the person's own command may create one."""
+    token = (token or "").strip()
+    if not token:
+        raise ValueError("no token: pass the agent's REFLEX_AGENT_TOKEN, the same one that agent will send")
+    with _store_lock():
+        data = agent_bindings()
+        already = data.get(agent)
+        data[agent] = {"token_sha256": _token_sha256(token), "bound_at": time.time()}
+        _write_bindings(data)
+    return {"agent": agent, "bound": True, "replaced": already is not None,
+            "next": f"start that agent with REFLEX_AGENT_TOKEN set to this token; any other program using the name "
+                    f"{agent!r} is now refused"}
 
 
 def token_rotate(agent: str) -> dict:
@@ -252,10 +342,21 @@ def token_rotate(agent: str) -> dict:
 
     Deliberately the whole of rotation. There is no "new token" to hand out, because the
     console never had the token — only its hash — and the new one is whatever the agent's
-    own environment says next. Depends on nothing but AGENTS_FILE, so a CLI can call it
-    without a console running."""
-    with AGENTS_LOCK:
-        data = agent_bindings()
+    own environment says next (or whatever `token_bind` is given). Depends on nothing but
+    AGENTS_FILE, so a CLI can call it without a console running.
+
+    A store that cannot be read is the one case where this cannot be surgical: the old
+    contents are unknown, so rotation is a reset, and it says so rather than raising at the
+    person who came here to fix exactly that (the adversarial review's 2.3)."""
+    with _store_lock():
+        try:
+            data = agent_bindings()
+        except BindingsUnreadable as e:
+            _write_bindings({})
+            return {"agent": agent, "rotated": True, "reset": True, "why": str(e),
+                    "next": "the store could not be read, so it was reset: every binding is gone and every agent "
+                            "rebinds (or is bound again with `c3s token bind`). Nothing else recovers a file "
+                            "whose contents are unknown."}
         record = data.pop(agent, None)
         if record is None:
             return {"agent": agent, "rotated": False, "why": "that name was not bound; the next request with a token binds it"}
@@ -778,8 +879,10 @@ class Boundary:
                         "armed_blocked": a["armed"]["blocked"],
                         "armed_confirm": a["armed"]["confirm"],
                         # I-3: has this name got a token of its own, or is anything on this
-                        # machine free to speak as it?
-                        "token_bound": name in bindings,
+                        # machine free to speak as it? `null` when the store could not be
+                        # read: "unknown" must not render as "unbound" in a consumer that
+                        # has not learned about `agent_tokens.store_error` yet.
+                        "token_bound": (name in bindings) if bindings_error is None else None,
                         "token_bound_at": bindings.get(name, {}).get("bound_at"),
                     }
                 )
@@ -1475,7 +1578,15 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "reflex-console"
 
     def log_message(self, fmt, *args):
-        print(f"{self.address_string()} {fmt % args}", flush=True)
+        # The request line goes to the console's log, and a log is not a secret store: a
+        # pairing link with `?token=…` in it would sit there in plaintext for anything that
+        # can read the file (on this machine, /tmp/console.log is world-readable). So the
+        # query string never reaches the log. The pairing link puts the token in the URL
+        # *fragment* for the same reason — a fragment is never sent to a server at all.
+        import re
+
+        line = re.sub(r"\?[^\s\"]*", "?<redacted>", fmt % args)
+        print(f"{self.address_string()} {line}", flush=True)
 
     def _send(self, code: int, body: bytes, kind: str) -> None:
         self.send_response(code)
@@ -1528,20 +1639,61 @@ class Handler(BaseHTTPRequestHandler):
         given = self.headers.get("X-Reflex-Token") or str(payload.get("token", ""))
         return hmac.compare_digest(given, TOKEN)
 
+    # -- who is at the other end of the socket -------------------------------------------
+    #
+    # Everything above asks *what* is being requested. These two ask where from, because a
+    # console bound to 0.0.0.0 for the pairing QR is reachable by everyone on the Wi-Fi,
+    # and the endpoints that need no token — GET /api/state, GET /api/manifest, POST
+    # /api/request — would then let a stranger tick your circuits and read what your agent
+    # is doing. The rule is per connection, not per bind address: on loopback nothing
+    # changes, whatever the console is bound to.
+
+    def _from_loopback(self) -> bool:
+        import ipaddress
+
+        raw = ((self.client_address[0] if self.client_address else "") or "").split("%")[0]
+        try:
+            ip = ipaddress.ip_address(raw)
+        except ValueError:
+            return False  # cannot tell who this is; treat it as far away
+        return bool((getattr(ip, "ipv4_mapped", None) or ip).is_loopback)
+
+    def _agent_token(self) -> str:
+        return (self.headers.get("X-Reflex-Agent-Token") or "").strip()
+
+    def _reader_may_look(self, path: str) -> bool:
+        """`GET /api/state` and `/api/manifest` are open on this machine and closed from
+        the network: over the LAN they need the operator's token (the phone that scanned
+        the QR has it) or an agent token that is actually bound (its own adapter)."""
+        if path != "/api/state" and not path.startswith("/api/manifest"):
+            return True
+        if self._from_loopback() or self._has_token({}) or bound_token_owner(self._agent_token()):
+            return True
+        self._json(403, {"error": "reading the console over the network needs a token: the operator token "
+                                  "(X-Reflex-Token — the pairing link carries it) or a bound agent's own "
+                                  "token. On this machine it needs none."})
+        return False
+
     def do_GET(self) -> None:
         if not self._local_only():
             return
-        if self.path.split("?")[0] == "/api/classes":  # W2: the tool→class map (see the W2 block above)
+        # One place where the query string comes off. Routes match on the path alone, so
+        # `/?token=…` and `/api/state?t=1` reach what they name; /api/manifest still reads
+        # its own `?class=` out of self.path.
+        path = self.path.split("?", 1)[0]
+        if not self._reader_may_look(path):
+            return
+        if path == "/api/classes":  # W2: the tool→class map (see the W2 block above)
             return api_classes_get(self)
-        if self.path.startswith("/api/device/"):  # W11
+        if path.startswith("/api/device/"):  # W11
             device_get(self, BOUNDARY)
-        elif self.path in ("/", "/index.html"):
+        elif path in ("/", "/index.html"):
             self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
-        elif self.path == "/api/state":
+        elif path == "/api/state":
             self._json(200, BOUNDARY.status())
-        elif self.path.startswith("/api/manifest"):
+        elif path.startswith("/api/manifest"):
             self._manifest()
-        elif self.path == "/favicon.ico":
+        elif path == "/favicon.ico":
             self._send(204, b"", "image/x-icon")
         else:
             self._json(404, {"error": "no such path"})
@@ -1676,9 +1828,17 @@ class Handler(BaseHTTPRequestHandler):
             # Before anything ticks: a request under a bound name with the wrong token must
             # not spend that agent's confirm, move its cooldown, or count towards its
             # breaker. It is not that agent's request at all.
-            given = (self.headers.get("X-Reflex-Agent-Token") or "").strip()
+            given = self._agent_token()
+            # Who may *create* a binding, as opposed to use one. Not a request from the
+            # network — that is trust in whoever got there first, and over the Wi-Fi that
+            # is a stranger squatting the name your agent has not used yet. And not anyone
+            # at all when this console requires tokens: there, names are bound by a
+            # person's own command (`c3s token bind`), because an attacker who can bind is
+            # an attacker who can be the victim (the review's second pass). Nothing is
+            # written for a request that may not bind.
+            loopback = self._from_loopback()
             try:
-                state = check_agent_token(name, given)
+                state = check_agent_token(name, given, may_bind=loopback and not REQUIRE_AGENT_TOKEN)
             except BindingsUnreadable as e:
                 # Fail closed and say so. Serving on as if nothing were bound would turn
                 # one bad write into "every agent's token is gone", quietly.
@@ -1687,11 +1847,24 @@ class Handler(BaseHTTPRequestHandler):
                                           "treat every agent as unbound: fix the file, or remove it to start "
                                           "from nothing bound."})
                 return
+            # From the network, a name speaks only if it is already bound *and* sends its
+            # token: I-3's "an unbound name keeps working" is a compatibility promise to
+            # the programs on this machine, not an invitation to the Wi-Fi. Binding is
+            # loopback-only too — first use over the LAN would let a stranger claim a name
+            # before the real agent ever ran.
+            if not loopback and state != "ok":
+                state, lan_why = "spoof", (
+                    f"{name!r} came from {self.client_address[0] if self.client_address else 'elsewhere'}, not this "
+                    "machine: over the network only an agent name that is already bound, sending its own token, "
+                    "may make a request")
+            else:
+                lan_why = None
             if state in ("spoof", "required"):
                 asked = payload.get("class")
-                why = (f"{name!r} is not bound to any token and this console requires one "
-                       "(REFLEX_REQUIRE_AGENT_TOKEN)") if state == "required" else \
-                      f"{name!r} is bound to its own agent token and this is not it"
+                why = lan_why or ((f"{name!r} is not a bound agent name, and this console only answers to names a "
+                                   "person has bound (REFLEX_REQUIRE_AGENT_TOKEN): `c3s token bind --agent "
+                                   f"{name}`") if state == "required" else
+                                  f"{name!r} is bound to its own agent token and this is not it")
                 TRANSCRIPTS.appendleft({
                     "at": time.time(),
                     "kind": "spoof",

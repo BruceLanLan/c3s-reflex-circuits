@@ -125,10 +125,14 @@ def test_a_corrupt_store_refuses_rather_than_reading_as_nothing_bound(store):
             console.check_agent_token("a", given)
     with pytest.raises(console.BindingsUnreadable):
         console.agent_bindings()
-    # A store whose shape is wrong is corruption too, not an empty store.
+    # A store that is not a map at all is corruption too, not an empty store.
+    for shape in ("[]", '"nope"', "null", "17"):
+        store.write_text(shape)
+        with pytest.raises(console.BindingsUnreadable):
+            console.check_agent_token("a", "s3cret")
+    # One bad *record* is narrower: that name refuses everything (see the test below).
     store.write_text(json.dumps({"a": "not-a-record"}))
-    with pytest.raises(console.BindingsUnreadable):
-        console.check_agent_token("a", "s3cret")
+    assert console.check_agent_token("a", "s3cret") == "spoof"
     # No file at all is the honest starting state: nobody is bound.
     store.unlink()
     assert console.agent_bindings() == {}
@@ -136,19 +140,94 @@ def test_a_corrupt_store_refuses_rather_than_reading_as_nothing_bound(store):
 
 
 @needs_console
-def test_requiring_a_token_refuses_an_unbound_name_instead_of_trusting_it(store, monkeypatch):
-    """The adversarial review's first finding: by default an unbound name is a name
-    anything local can speak for, which inside the isolation container means the agent can
-    act as any name nobody has bound. REFLEX_REQUIRE_AGENT_TOKEN shuts that door."""
-    monkeypatch.setattr(console, "REQUIRE_AGENT_TOKEN", True)
-    assert console.check_agent_token("a", "") == "required"
-    assert console.check_agent_token("a", "   ") == "required"
-    assert console.check_agent_token("a", "s3cret") == "bound"  # first use still binds
-    assert console.check_agent_token("a", "s3cret") == "ok"
-    assert console.check_agent_token("a", "other") == "spoof"
-    # And the default is unchanged: compatibility is what I-3 promises in docs/API.md.
-    monkeypatch.setattr(console, "REQUIRE_AGENT_TOKEN", False)
-    assert console.check_agent_token("b", "") == "unbound"
+def test_a_console_that_requires_tokens_binds_nothing_over_http(store):
+    """The adversarial review's first finding, twice over. By default an unbound name is a
+    name anything local can speak for. Requiring *a* token was not enough: the review sent
+    an arbitrary header value, which bound the victim's name on the way to spending its
+    confirm. So in that mode nothing binds over HTTP at all — `c3s token bind` does, and
+    `may_bind=False` is what the request path passes."""
+    # What the attacker sent in the review's T2/T3: a name nobody bound, any token.
+    assert console.check_agent_token("victim", "literally-anything", may_bind=False) == "required"
+    assert not store.exists(), "an arbitrary token bound a name it had no business binding"
+    # A person binds it out of band, and then only that token speaks for it.
+    assert console.token_bind("victim", "the-real-token")["bound"] is True
+    assert console.check_agent_token("victim", "literally-anything", may_bind=False) == "spoof"
+    assert console.check_agent_token("victim", "the-real-token", may_bind=False) == "ok"
+    # Binding again replaces it (rotation and rebinding in one step), and refuses nothing.
+    assert console.token_bind("victim", "a-new-token")["replaced"] is True
+    assert console.check_agent_token("victim", "the-real-token", may_bind=False) == "spoof"
+    assert console.check_agent_token("victim", "a-new-token", may_bind=False) == "ok"
+    with pytest.raises(ValueError):
+        console.token_bind("victim", "   ")
+
+
+@needs_console
+def test_one_bad_record_does_not_take_every_other_name_down(store):
+    """The review's 2.2: failing closed for the whole store turned one odd record into an
+    outage for every agent. Per record now — that name refuses everything, the rest work."""
+    console.check_agent_token("good", "good-token")
+    data = json.loads(store.read_text())
+    data["odd"] = "not a record at all"
+    store.write_text(json.dumps(data))
+    assert console.check_agent_token("good", "good-token") == "ok"
+    assert console.check_agent_token("odd", "anything") == "spoof"
+    assert console.check_agent_token("odd", "") == "spoof"
+    assert console.bound_token_owner("good-token") == "good"
+
+
+@needs_console
+def test_two_processes_binding_at_once_do_not_lose_each_others_bindings(store):
+    """Found by accident while testing: the console and a second process were both writing
+    the store, and whichever read first wrote last — one silently put back a binding the
+    other had just rotated away, and once the reverse. A lost binding is the dangerous
+    direction, because the name quietly becomes unbound again."""
+    code = ("import sys; sys.path.insert(0, %r);\n"
+            "import console; console.AGENTS_FILE = console.Path(%r);\n"
+            "console.token_bind('agent-' + sys.argv[1], 'token-' + sys.argv[1])\n") % (str(ROOT), str(store))
+    procs = [subprocess.Popen([sys.executable, "-c", code, str(i)]) for i in range(8)]
+    assert [p.wait(timeout=60) for p in procs] == [0] * 8
+    bound = json.loads(store.read_text())
+    assert sorted(bound) == [f"agent-{i}" for i in range(8)], "a concurrent bind was lost"
+    for i in range(8):
+        assert console.check_agent_token(f"agent-{i}", f"token-{i}") == "ok"
+
+
+@needs_console
+def test_rotation_can_recover_a_store_it_cannot_read(store):
+    """The review's 2.3: the advertised recovery raised on exactly the store it was meant
+    to recover. Rotation on an unreadable store resets it, and says that is what it did."""
+    console.check_agent_token("a", "old")
+    store.write_text("{ truncated")
+    out = console.token_rotate("a")
+    assert out["rotated"] is True and out["reset"] is True and "could not be read" in out["next"]
+    assert console.agent_bindings() == {}
+    assert console.check_agent_token("a", "") == "unbound"
+
+
+@needs_console
+def test_a_caller_that_may_not_bind_never_writes_a_binding(store):
+    """The rule for a request that did not come from this machine (the coordinator's LAN
+    policy): it may use a binding, never make one. First use over the Wi-Fi is trust in
+    whoever got there first, and over the Wi-Fi that is a stranger."""
+    assert console.check_agent_token("a", "stranger-chose-this", may_bind=False) == "required"
+    assert not store.exists(), "a caller that may not bind wrote a binding anyway"
+    assert console.check_agent_token("a", "", may_bind=False) == "required"
+    # A name that IS bound still works for whoever has its token, and still refuses others.
+    console.check_agent_token("a", "mine")
+    assert console.check_agent_token("a", "mine", may_bind=False) == "ok"
+    assert console.check_agent_token("a", "not-mine", may_bind=False) == "spoof"
+
+
+@needs_console
+def test_a_token_can_be_recognised_without_a_name(store):
+    """What a GET from the network has: a token and no agent field."""
+    assert console.bound_token_owner("nothing-is-bound") is None
+    console.check_agent_token("one", "token-one")
+    console.check_agent_token("two", "token-two")
+    assert console.bound_token_owner("token-one") == "one"
+    assert console.bound_token_owner("token-two") == "two"
+    assert console.bound_token_owner("token-three") is None
+    assert console.bound_token_owner("") is None and console.bound_token_owner(None) is None
 
 
 # ---- the live console -----------------------------------------------------------------
@@ -196,6 +275,24 @@ def live():
     yield made.append
     for agent in made:
         console.token_rotate(agent)
+
+
+def test_live_a_get_with_a_query_string_still_reaches_its_route(live):
+    """The pairing link arrives as `/?token=…` (and the page polls `/api/state?…`): a
+    route that matches the whole request line 404s on the one request that matters most."""
+    c = http.client.HTTPConnection(HOST, PORT, timeout=10)
+    try:
+        c.request("GET", "/api/state?anything=1")
+        r = c.getresponse()
+        assert r.status == 200 and json.loads(r.read())["agents"] is not None
+    finally:
+        c.close()
+    c = http.client.HTTPConnection(HOST, PORT, timeout=10)
+    try:
+        c.request("GET", "/?token=whatever#approvals")
+        assert c.getresponse().status == 200
+    finally:
+        c.close()
 
 
 @needs_console
