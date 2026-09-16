@@ -27,6 +27,41 @@ circuit itself commands a takeoff.
   with the caller's latch state kept per address. It evaluates through the same
   `NandMachine` and the same netlist bytes, and the constructor checks their SHA-256.
 
+## Rules you write, compiled and proven
+
+The three properties above are not only facts about a fly. They are the shapes of the
+boundaries someone actually wants around an agent — a rate limit, a commitment cost, a
+forbidding condition — which is why `c3s/policy.py` makes them writable:
+
+```python
+from c3s.policy import Policy
+
+policy = Policy(min_gap_ticks=8, commit_ticks=4, forbid_when_blocked=True, max_grants=3)
+circuit = policy.build()        # 108 NAND + 8 LATCH, 3 inputs, 1 output
+policy.verify(circuit)          # all 2,048 rows equal the Python reference
+policy.properties(circuit)      # every rule, in every state reachable from reset
+```
+
+A `Policy` compiles to a NAND/LATCH circuit with no hidden state. Two things are then
+checked, and they are different things:
+
+* **Equality**: the circuit and a plain-Python statement of the same rules agree on
+  every row of the domain — 2,048 rows for the policy above, 262,144 for one with a
+  60-tick cooldown, a 16-tick commitment and a 15-grant budget (205 NAND + 15 LATCH).
+  The domain stays small on purpose: exhaustive checking needs
+  `2^(inputs + state)` rows, and past about 24 bits it stops being cheap.
+* **The rules themselves**: a search from reset visits every state the circuit can
+  reach under every input, with monitors that count independently of the circuit's own
+  latches, and no rule is ever broken. Claiming a rule the circuit does not enforce —
+  a stricter gap, a longer commitment, a smaller budget — is reported as violations, so
+  the check cannot pass by being vacuous; `tests/test_policy.py` includes those four
+  controls.
+
+Compiled rules inherit the same limits as everything else here. They bound **what the
+circuit grants**: how often, in what order, under which flag. They say nothing about
+what an agent does with a grant, and they measure time in ticks that advance only when
+something drives them.
+
 ## What the proofs give it
 
 For **any** proposals whatsoever, because the properties hold on every reachable
