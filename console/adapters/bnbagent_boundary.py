@@ -57,7 +57,8 @@ a transfer authorization — it arms the tool-layer bit `irreversible`, so a
 `confirm_per_irreversible` rule refuses it unless a person has left a confirm. A refusal
 raises `BoundaryRefused` (a `PermissionError`) with the rule's words and the inner
 wallet is never touched. If the console cannot be reached it raises, unless `fail_open`
-or `REFLEX_FAIL_OPEN=1` says to sign unchecked. It never writes `confirm`, `confirm_b`
+or `REFLEX_FAIL_OPEN=1` says to sign unchecked; if the console arms the bit and then
+rejects the request itself (HTTP 4xx), the bit stays armed for the agent's next tick. It never writes `confirm`, `confirm_b`
 or `blocked`: those belong to a person or to the layer above the agent. A self-
 broadcasting inner wallet (one that overrides `make_executor` or `make_x402_payer`,
 like twak) is refused at those two calls rather than handed its ungated executor.
