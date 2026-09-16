@@ -332,6 +332,9 @@
       <div class="note" style="color:var(--text)" data-i18n="cn.noone"></div>
       <div class="note" data-i18n="cn.trust"></div>
       <div class="actions"><button class="pre" type="button" data-copy="cn-forge" data-i18n="cn.copy"></button><span class="note" id="cn-forge-note"></span></div>
+      <div class="step"><span class="n">4</span><span data-i18n="cn.s4"></span></div>
+      <div class="actions"><button class="pre" type="button" id="cn-manifest-go" data-i18n="cn.manifest.go"></button><button class="pre" type="button" data-copy="cn-manifest" data-i18n="cn.copy"></button><span class="note" id="cn-manifest-note"></span></div>
+      <pre id="cn-manifest" hidden></pre>
     </div>
   </div>
   <div class="card"><div class="h2"><span data-i18n="cn.curl"></span></div><pre id="cn-curl"></pre></div>
@@ -443,6 +446,9 @@ const T = {
     "cn.tg.sub": "从聊天里问、看、确认", "cn.tg.note": "agent 自己能打字的聊天窗口不能给它写 confirm——那就不是边界了。只有 TOOL_LAYER_CHATS 里的聊天能发 /confirm 与 /block。",
     "cn.daily": "日常工具（经代理）", "cn.daily.sub": "读免费，发/删要过电路", "cn.daily.note": "类别→电路的映射在一个 agent 改不到的配置文件里。没接进代理的工具，电路看不见。",
     "cn.chain": "链上（用户自部署）",
+    "cn.s4": "把这张电路发成 ERC-8004 边界清单：别人可以重新编译、逐行核对、在 BSC 上复算，然后给你的 agent 打分。",
+    "cn.manifest.go": "生成清单", "cn.manifest.busy": "正在编译、逐行核对、遍历证明…",
+    "cn.manifest.done": "{cls} 清单 · keccak256 {hash} · 下面就是要托管的字节，复制后不要重新排版，别人用 validate_boundary.py 复核",
     "cn.s1": "<b>编译电路</b> —— 在 Boundaries 里装好这一类的规则；这里拿到网表字节与 sha256。",
     "cn.s2": "<b>部署</b> —— 下面的命令在你自己的机器上、用你自己的钥匙跑：",
     "cn.s3": "<b>Safe</b> —— owner 发一笔 <code>enableModule(module)</code>。agent 不是 owner，只能调 <code>act(to, value, data)</code>；电路不放，Safe 不动。",
@@ -535,6 +541,9 @@ const T = {
     "cn.tg.sub": "ask, look, confirm from a chat", "cn.tg.note": "A chat the agent itself can type into must not write confirm — that would not be a boundary. Only chats in TOOL_LAYER_CHATS may send /confirm and /block.",
     "cn.daily": "Everyday tools (through the proxy)", "cn.daily.sub": "reading is free; sending and deleting pass the circuit", "cn.daily.note": "The class → circuit map lives in a config file the agent cannot edit. A tool not routed through the proxy is invisible to the circuit.",
     "cn.chain": "On chain (you deploy it)",
+    "cn.s4": "Publish this circuit as an ERC-8004 boundary manifest: anyone can recompile it, check every row, replay it on BSC, and score your agent.",
+    "cn.manifest.go": "Build manifest", "cn.manifest.busy": "compiling, checking every row, proving…",
+    "cn.manifest.done": "{cls} manifest · keccak256 {hash} · below are the exact bytes to host — copy without reformatting; others re-check them with validate_boundary.py",
     "cn.s1": "<b>Compile</b> — install this class's rules under Boundaries; the netlist bytes and sha256 land here.",
     "cn.s2": "<b>Deploy</b> — run the commands below on your own machine with your own keys:",
     "cn.s3": "<b>Safe</b> — the owner sends one <code>enableModule(module)</code>. The agent is not an owner; it can only call <code>act(to, value, data)</code>; when the circuit refuses, the Safe does not move.",
@@ -1071,6 +1080,18 @@ forge create src/ReflexModule.sol:ReflexModule --rpc-url $RPC --private-key $PK 
   --constructor-args $NAND_MACHINE $NETLIST $NETLIST_SHA256 $N_IN $OPTIONAL_INPUTS $N_STATE $SAFE $SUPERVISOR 0x0000000000000000000000000000000000000000
 cast call $MODULE "netlistSha256()(bytes32)" --rpc-url $RPC    <span class="c"># must equal NETLIST_SHA256</span>`;
 }
+$("cn-manifest-go").addEventListener("click", async () => {
+  const note = $("cn-manifest-note"), pre = $("cn-manifest"), cls = CN_CLS;
+  note.textContent = t("cn.manifest.busy");
+  try {
+    const r = await fetch(`/api/manifest?class=${encodeURIComponent(cls)}`, { cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) { note.textContent = d.error || String(r.status); pre.hidden = true; return; }
+    pre.textContent = d.manifest_canonical;  // byte for byte what the hash covers; do not reformat
+    pre.hidden = false;
+    note.textContent = t("cn.manifest.done", { cls, hash: d.keccak256 || `(${d.hash_error})` });
+  } catch (e) { note.textContent = String(e); }
+});
 document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
   const text = $(b.dataset.copy).textContent;
   try { await navigator.clipboard.writeText(text); const old = b.textContent; b.textContent = t("cn.copied"); setTimeout(() => { b.textContent = old; }, 1200); } catch (e) { /* clipboard unavailable */ }

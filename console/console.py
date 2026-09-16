@@ -515,10 +515,50 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         elif self.path == "/api/state":
             self._json(200, BOUNDARY.status())
+        elif self.path.startswith("/api/manifest"):
+            self._manifest()
         elif self.path == "/favicon.ico":
             self._send(204, b"", "image/x-icon")
         else:
             self._json(404, {"error": "no such path"})
+
+    def _manifest(self) -> None:
+        """GET /api/manifest?class=spend — the installed circuit of one class as an
+        ERC-8004 boundary manifest (c3s/erc8004.py), with its keccak256 and the
+        registration file that would advertise it. Built here, signed and sent nowhere."""
+        from urllib.parse import parse_qs, urlsplit
+
+        from c3s import erc8004
+
+        cls = (parse_qs(urlsplit(self.path).query).get("class") or [DEFAULT_CLASS])[0]
+        if cls not in CLASSES:
+            self._json(400, {"error": f"no such class: {cls!r}"})
+            return
+        with BOUNDARY.lock:
+            compiled = BOUNDARY.policies[cls]
+        if compiled is None or compiled.deny_all or compiled.policy is None:
+            why = "denied outright: there is no circuit to publish" if compiled is not None else "no circuit installed"
+            self._json(400, {"error": f"{cls}: {why}"})
+            return
+        manifest = erc8004.build_manifest(compiled.policy)
+        try:
+            digest, hash_error = erc8004.manifest_hash(manifest), None
+        except Exception as e:  # keccak256 needs Foundry's cast
+            digest, hash_error = None, str(e)
+        uri = "https://<where-you-host>/manifest.json"
+        self._json(200, {
+            "class": cls,
+            "manifest": manifest,
+            # The bytes that are hashed and must be hosted as they are: a pretty-printed
+            # copy is a different file with a different hash.
+            "manifest_canonical": erc8004.canonical_bytes(manifest).decode("utf-8"),
+            "keccak256": digest,
+            "hash_error": hash_error,
+            "registration_file": erc8004.registration_file(
+                f"my-agent-{cls}", "An agent whose actions pass through this compiled boundary.", uri, digest or "0x", None),
+            "next": "host manifest.json byte for byte, then run scripts/boundary_manifest.py in c3s-reflex for the "
+                    "cast send templates; anyone can re-check it with scripts/validate_boundary.py",
+        })
 
     def do_POST(self) -> None:
         try:
