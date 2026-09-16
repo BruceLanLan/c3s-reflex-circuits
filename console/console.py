@@ -1369,6 +1369,14 @@ def class_map(handler: "Handler | None" = None, agent: str = "claude-code:mine")
 def api_classes_get(h: "Handler") -> None:
     from urllib.parse import parse_qs, urlsplit
 
+    # Open on this machine, and closed from the network — the same line `/api/state` draws,
+    # because this answer names absolute paths on the console's machine (where the adapters
+    # are, where the user's settings.json is). The phone that scanned the pairing QR has
+    # the operator token and still gets it.
+    if h.client_address and h.client_address[0] not in ("127.0.0.1", "::1") and not h._has_token({}):
+        h._json(403, {"error": "reading the tool map over the network needs the operator token "
+                               "(X-Reflex-Token — the pairing link carries it); on this machine it needs none"})
+        return
     agent = (parse_qs(urlsplit(h.path).query).get("agent") or ["claude-code:mine"])[0][:40] or "claude-code:mine"
     h._json(200, class_map(h, agent))
 
