@@ -56,6 +56,11 @@ write its own `confirm` has a commitment cost dressed up as a boundary.
 
 ## What it does not do
 
+* It cannot keep a same-machine agent from reaching the console by a route its checks do
+  not name. The hook and the proxy refuse the direct attempts — writing to `/api/tool` or
+  `/api/policy`, editing the rules file or the hook configuration, killing the console —
+  but the structural answer is to run the agent where it cannot reach the console's port
+  or these files at all: another OS user, a container, a sandbox without localhost.
 * It holds **no wallet and no private key**, signs nothing and broadcasts nothing. The
   optional chain check is a read-only `eth_call` with nothing deployed.
 * It never *performs* an action. A grant here is a verdict; what an allowed action

@@ -153,11 +153,17 @@ class Proxy:
         if not isinstance(params, dict):
             params = {}
         name = str(params.get("name", ""))
-        if not any(fnmatch.fnmatchcase(name, g) for g in self.gates):
-            return True
         arguments = params.get("arguments")
         if not isinstance(arguments, dict):
             arguments = {}
+        # Gated or not: a tool call aimed at the console's own tool-layer or rules endpoint
+        # (a fetch tool, an http tool) is the agent writing its own confirm. Refused outright.
+        tamper = self.reaches_the_guard(arguments)
+        if tamper:
+            return self.refuse(msg, name, f"refused before any circuit was asked: {tamper}. The boundary's tool "
+                                          "layer belongs to a person; an agent may not write its own confirm or change its rules.")
+        if not any(fnmatch.fnmatchcase(name, g) for g in self.gates):
+            return True
         cls = self.fixed_class or classify(name, self.class_rules)
         irreversible = is_irreversible_tool(name, self.irreversible_tools)
         reason = f"[{cls}] {name}{' [irreversible]' if irreversible else ''}: {describe(arguments)}"[:160]
@@ -165,6 +171,21 @@ class Proxy:
         refusal = self.ask(reason, cls, irreversible)
         if refusal is None:
             return True
+        return self.refuse(msg, name, refusal)
+
+    def reaches_the_guard(self, arguments: dict) -> Optional[str]:
+        from urllib.parse import urlsplit
+
+        u = urlsplit(self.console)
+        port = u.port or (443 if u.scheme == "https" else 80)
+        text = json.dumps(arguments, ensure_ascii=False).lower()
+        hosts = {u.hostname or "127.0.0.1", "127.0.0.1", "localhost", "0.0.0.0", "[::1]"}
+        if any(f"{h}:{port}" in text for h in hosts) and ("/api/tool" in text or "/api/policy" in text):
+            return "it would write to the boundary console's tool-layer or rules endpoint"
+        return None
+
+    def refuse(self, msg: dict, name: str, refusal: str) -> bool:
+        """Answer the client with a tool error in place of the server; False = not forwarded."""
         if "id" not in msg:
             # A tools/call without an id is a notification; nothing can answer it.
             # Refusing means not forwarding, and saying so where a person can see it.
