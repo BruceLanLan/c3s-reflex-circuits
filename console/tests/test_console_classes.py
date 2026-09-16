@@ -120,11 +120,21 @@ def test_max_grants_zero_means_unlimited_so_never_is_deny_all():
 
 
 def test_uninstalled_class_is_not_gated():
+    """Removes the class itself rather than assuming nobody installed one: `c3s demo`
+    installs all four, so the assumption held only on a console nobody had used."""
+    before = (api("/api/state").get("policies") or {}).get("message")
     api("/api/policy", {"class": "message", "remove": True})
-    a = agent_name()
-    r = request(a, "message")
-    assert r["granted"] and r["class_installed"] is False and r["why"] == []
-    assert api("/api/state")["policies"]["message"] is None
+    try:
+        a = agent_name()
+        r = request(a, "message")
+        assert r["granted"] and r["class_installed"] is False and r["why"] == []
+        assert api("/api/state")["policies"]["message"] is None
+    finally:
+        if before is not None:
+            if before.get("deny_all"):
+                api("/api/policy", {"class": "message", "deny_all": True})
+            else:
+                api("/api/policy", dict(before["settings"], **{"class": "message"}))
 
 
 def test_shared_halt_blocks_every_class_until_a_confirm():

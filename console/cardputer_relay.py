@@ -273,7 +273,7 @@ class Relay(threading.Thread):
                                 self.heard_at = time.time()
                             elif text.startswith("K|"):
                                 self._key(text)
-                            elif text.startswith(("brain view", "c3s escape core", "digest ")):
+                            elif text.startswith(("c3s escape core", "reflex arc", "digest ")):
                                 self.log(f"cardputer says: {text}")
             except Exception as e:  # unplugged, reset, port busy (e.g. while flashing)
                 if self.connected:

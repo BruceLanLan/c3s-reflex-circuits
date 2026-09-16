@@ -39,7 +39,13 @@ DEFAULT_RULES: tuple[tuple[str, str], ...] = (
     ("send_*", "message"), ("reply*", "message"), ("post_*", "message"),
     ("create_message*", "message"), ("publish*", "message"), ("*send_email*", "message"),
     ("*send_message*", "message"),
+    # A calendar write is a message: creating, moving or cancelling an event mails
+    # everyone invited. W4's recorded run found these landing in `exec` and ungated,
+    # which is the wrong class for a call other people receive.
+    ("create_event*", "message"), ("update_event*", "message"), ("cancel_event*", "message"),
+    ("invite*", "message"), ("respond_to_event*", "message"),
     ("write_*", "files"), ("move_*", "files"), ("delete_*", "files"), ("trash_*", "files"),
+    ("overwrite*", "files"), ("truncate*", "files"), ("rename*", "files"),
     ("create_file*", "files"), ("edit_file*", "files"), ("create_directory*", "files"),
     ("Write", "files"), ("Edit", "files"), ("MultiEdit", "files"), ("NotebookEdit", "files"),
 )
@@ -55,6 +61,13 @@ DEFAULT_IRREVERSIBLE_TOOLS: tuple[str, ...] = (
     "send_*", "reply*", "post_*", "publish*", "create_message*", "*send_email*", "*send_message*",
     "forward*", "*_send", "delete_*", "trash_*", "move_*", "remove_*", "*transfer*", "*withdraw*",
     "*swap*", "*pay*", "*send_transaction*", "*sign_transaction*", "approve*",
+    # Overwriting is not undoable, and the old contents are not anywhere afterwards.
+    # `write_file*` and not `write_*`, so Claude Code's own `Write` keeps the hook's
+    # path-aware judgement (inside the workspace: reversible; outside it: not).
+    "write_file*", "overwrite*", "truncate*", "rename*",
+    # A calendar invitation that went out cannot be recalled, and moving a meeting has
+    # already told everyone. Same finding as the class rules above.
+    "create_event*", "update_event*", "cancel_event*", "invite*", "respond_to_event*",
 )
 
 
