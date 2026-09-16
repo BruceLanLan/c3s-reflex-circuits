@@ -1,6 +1,6 @@
 """Boundary console: rules compiled to circuits, and every decision made by them.
 
-    C3S_REPO=~/work/c3s-reflex python console.py        # http://127.0.0.1:8765
+    python console.py        # http://127.0.0.1:8765  (the circuits are ../c3s)
 
 You write rules. They compile to a NAND/LATCH circuit, which is checked against a
 plain-Python statement of the same rules on every row of its domain, and each rule is
@@ -50,7 +50,19 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-REPO = Path(os.environ.get("C3S_REPO", Path.home() / "work" / "c3s-reflex")).expanduser()
+# The circuits are in this repository, one level up from console/. `C3S_REPO` still wins,
+# and the older layout (a separate ~/work/c3s-reflex checkout) still resolves.
+def _circuits_root() -> Path:
+    named = os.environ.get("C3S_REPO")
+    if named:
+        return Path(named).expanduser()
+    here = Path(__file__).resolve().parent.parent
+    if (here / "c3s" / "policy.py").is_file():
+        return here
+    return Path.home() / "work" / "c3s-reflex"
+
+
+REPO = _circuits_root()
 HOST = os.environ.get("CONSOLE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("CONSOLE_PORT", "8765"))
 VERIFY_ON_CHAIN = os.environ.get("VERIFY_ON_CHAIN", "1") not in ("0", "", "no")

@@ -14,18 +14,17 @@
 需要：macOS 或 Linux、`python3` 是 Python 3.10 以上、一个终端。不需要钱包、不需要账号；只在拉
 Python 包时上一次网。
 
-两个仓库。电路仓是编译器和它的证明，后台在它上面跑：
+一个克隆。电路（编译器和它的证明）和后台在同一个仓库里：前者在仓库根目录，后者在 `console/`。
 
 ```sh
-git clone https://github.com/BruceLanLan/c3s-reflex-circuits ~/work/c3s-reflex
-git clone <后台仓库> reflex-console && cd reflex-console    # 尚未公开发布；从交给你的地方克隆
-sh install.sh
+git clone https://github.com/BruceLanLan/c3s-reflex-circuits
+cd c3s-reflex-circuits/console && sh install.sh
 ```
 
 `install.sh` 把 `c3s` 命令装进一个隔离环境（优先 `uv`，其次 `pipx`，都没有就在
 `~/.c3s-circuit-agent/venv` 建一个普通 venv），记住这个 checkout，然后起后台、开页面。**不碰系统
-Python，不用 sudo。** 电路仓不在 `~/work/c3s-reflex` 就先 `export C3S_REPO=<路径>`；装完提示找不到
-`c3s`，是 `~/.local/bin` 不在 `PATH` 里。
+Python，不用 sudo。** 电路就在上一层，什么都不用设；如果你把电路单独放在别处，`export
+C3S_REPO=<路径>` 仍然优先。装完提示找不到 `c3s`，是 `~/.local/bin` 不在 `PATH` 里。
 
 装完你会看到一串**操作者令牌**。它是"人"这个角色的钥匙——后面所有要人点头的动作都要它。它同时
 存在 `~/.c3s-circuit-agent/operator-token`，权限 600。
@@ -264,7 +263,7 @@ confirm` 是要人点头；`blocked is high` 是有东西把它拦了（红键�
   `min_gap_ticks=8, commit_ticks=4, forbid_when_blocked`）。
 * 规则不是解释执行的：它们**编译成 netlist**，逐行核对，在可达状态上证明，然后才被安装。
   磁盘上保存的是规则的设置，不是电路；启动时**重新编译、重新证明**，不信任盘上的东西。
-* 电路仓（`C3S_REPO`，默认 `~/work/c3s-reflex`）提供 `c3s.policy`、`c3s.exhaust`、`c3s.netlist`。
+* 电路在同一个仓库的上一层（`C3S_REPO` 可以改），提供 `c3s.policy`、`c3s.exhaust`、`c3s.netlist`。
   后台自己不实现逻辑语义。
 
 ## 10. 两条通道（整个项目的支点）
