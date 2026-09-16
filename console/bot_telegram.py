@@ -1,20 +1,27 @@
-"""Relay the boundary console into a Telegram chat. It carries no authority of its own.
+"""The boundary console in Telegram: an approvals channel for the person, and a way to
+ask for the agent. It carries no authority of its own.
 
-    TELEGRAM_TOKEN=... CONSOLE_URL=http://127.0.0.1:8765 python bot_telegram.py
+    TELEGRAM_TOKEN=... CONSOLE_URL=http://127.0.0.1:8765 \
+    TOOL_LAYER_CHATS=<your chat id> python bot_telegram.py
 
-Commands:
-    /ask [why]        one tick on the agent channel, without intent
-    /intent [why]     one tick on the agent channel, with intent high
-    /rules            the installed rules, and what was checked about them
-    /state            each agent's counters as the circuit sees them
+Two kinds of chat, because the separation is the whole point:
 
-A chat is the agent's channel. `blocked` and `confirm` are bits that only a layer the
-agent cannot reach may write, so this program refuses to send them from a chat unless
-that chat's id is listed in TOOL_LAYER_CHATS — otherwise a rule meant as a boundary
-would be satisfiable by whoever is typing, which is the failure docs/AGENT.md names.
+Any chat is an agent's channel. It may write what an agent may write:
+    /ask [class] [why]      one tick without intent       class: spend message exec files
+    /intent [class] [why]   one tick with intent high     (default exec)
+    /rules [class]          the installed rules and what was checked about them
+    /state                  each agent's counters
 
-    TOOL_LAYER_CHATS=-1001234567890 python bot_telegram.py
-    /block on | /block off | /confirm     (those chats only)
+A chat listed in TOOL_LAYER_CHATS is the person's. Only there:
+    /pending                what is waiting for a person, in the circuits' own words
+    /confirm [agent]        write confirm for that agent (default: the newest waiting)
+    /confirm_b [agent]      the second key, under a two-key rule
+    /block <agent>          /unblock <agent>
+    /stop                   block every agent          /resume   lift every block
+and those chats are told, once, whenever something new starts waiting for a person.
+
+A chat the agent itself can type into must never be listed: a confirm that whoever is
+typing can give is a commitment cost dressed up as a boundary (docs/AGENT.md).
 
 The token is read from the environment and never written anywhere. The bot only
 forwards to the console's endpoints, so it can do nothing the console cannot, and the
@@ -26,30 +33,47 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cardputer_relay import pending_items  # noqa: E402  (same "waiting for a person" rule as the page and the device)
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CONSOLE = os.environ.get("CONSOLE_URL", "http://127.0.0.1:8765").rstrip("/")
 TOOL_LAYER_CHATS = {c.strip() for c in os.environ.get("TOOL_LAYER_CHATS", "").split(",") if c.strip()}
 API = f"https://api.telegram.org/bot{TOKEN}"
-HELP = (
-    "/ask [why] — one tick, no intent\n"
-    "/intent [why] — one tick with intent high\n"
-    "/rules — the installed rules\n"
+CLASSES = ("spend", "message", "exec", "files")
+
+HELP_AGENT = (
+    "/ask [class] [why] — one tick, no intent\n"
+    "/intent [class] [why] — one tick with intent\n"
+    "/rules [class] — the installed rules\n"
     "/state — counters per agent"
 )
+HELP_PERSON = (
+    "\n\nThis chat is a person's (tool layer):\n"
+    "/pending — what waits for you\n"
+    "/confirm [agent] · /confirm_b [agent]\n"
+    "/block <agent> · /unblock <agent>\n"
+    "/stop — block every agent · /resume"
+)
+REFUSED_HERE = ("blocked, confirm and stop are written by a layer the agent cannot reach. This chat is "
+                "an agent's channel, so the bot will not send them from here; list the chat id in "
+                "TOOL_LAYER_CHATS only if it really is a person's, separate from the agent.")
 
 
-def call(url: str, payload: dict | None = None, timeout: int = 40) -> dict:
+def call(path_or_url: str, payload: dict | None = None, timeout: int = 40) -> dict:
+    url = path_or_url if path_or_url.startswith("http") else f"{CONSOLE}{path_or_url}"
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(url, data=data, headers={"content-type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read())
 
 
-def say(chat_id: int, text: str) -> None:
+def say(chat_id, text: str) -> None:
     try:
         call(f"{API}/sendMessage", {"chat_id": chat_id, "text": text})
     except urllib.error.URLError as e:
@@ -60,75 +84,122 @@ def verdict_line(v: dict) -> str:
     if v.get("error"):
         return f"refused before the circuit saw it: {v['error']}"
     head = "GRANTED" if v.get("granted") else "refused"
-    why = "; ".join(v.get("why") or [])
-    gap = v.get("ticks_since_previous_grant")
-    lines = [f"{head} — tick {v.get('tick')}" + (f", {gap} ticks after the last grant" if gap is not None else "")]
-    if why:
-        lines.append(why)
+    lines = [f"{head} — {v.get('class', 'exec')} · tick {v.get('tick')}"]
+    if v.get("why"):
+        lines.append("; ".join(v["why"]))
     chain = v.get("chain") or {}
     if chain.get("error"):
         lines.append(f"chain check unavailable: {chain['error']}")
     elif chain:
-        agrees = "agrees" if chain.get("agrees") else "DISAGREES"
-        lines.append(f"chain {chain.get('chain_id')} {agrees} — read-only, nothing deployed")
+        lines.append(f"BSC {'agrees' if chain.get('agrees') else 'DISAGREES'} — read-only, nothing deployed")
     return "\n".join(lines)
 
 
-def request(chat_id: int, intent: int, reason: str) -> None:
-    payload = {"agent": f"tg:{chat_id}", "intent": intent, "reason": reason}
-    try:
-        say(chat_id, verdict_line(call(f"{CONSOLE}/api/request", payload)))
-    except urllib.error.HTTPError as e:
-        say(chat_id, verdict_line(json.loads(e.read())))
+def pending_line(it: dict) -> str:
+    return f"{it['agent']} · {it['class']} · tick {it['tick']}\n  {it['why']}\n  /{it['bit']} {it['agent']}"
 
 
-def handle(chat_id: int, text: str) -> None:
+def split_class(rest: list[str]) -> tuple[str, str]:
+    if rest and rest[0] in CLASSES:
+        return rest[0], " ".join(rest[1:])
+    return "exec", " ".join(rest)
+
+
+def handle(chat_id, text: str) -> None:
     parts = text.split()
     command = parts[0].split("@")[0] if parts else ""
-    rest = " ".join(parts[1:])
+    rest = parts[1:]
+    person = str(chat_id) in TOOL_LAYER_CHATS
 
-    if command == "/rules":
-        p = call(f"{CONSOLE}/api/state")["policy"]
+    if command in ("/ask", "/intent"):
+        cls, why = split_class(rest)
+        body = {"agent": f"tg:{chat_id}", "intent": int(command == "/intent"), "reason": why, "class": cls}
+        try:
+            say(chat_id, verdict_line(call("/api/request", body)))
+        except urllib.error.HTTPError as e:
+            say(chat_id, verdict_line(json.loads(e.read())))
+    elif command == "/rules":
+        cls = rest[0] if rest and rest[0] in CLASSES + ("halt",) else "exec"
+        p = call("/api/state")["policies"].get(cls)
+        if p is None:
+            say(chat_id, f"{cls}: no circuit installed — not gated")
+            return
+        if p.get("deny_all"):
+            say(chat_id, f"{cls}: denied outright — no circuit grants here")
+            return
         c, checked = p["circuit"], p["checked"]
-        lines = [f"{c['nand']} NAND + {c['latch']} LATCH, compiled from these rules:"]
-        lines += [f"· {r}" for r in p["rules"]] or ["· nothing is granted, ever"]
-        lines.append(f"checked on all {checked['rows']:,} rows of its domain: "
-                     f"{'matches the reference' if checked['matches_reference'] else 'DOES NOT MATCH'}")
-        lines.append(f"every rule holds across {checked['reachable_states']} reachable states: "
+        lines = [f"{cls}: {c['nand']} NAND + {c['latch']} LATCH"]
+        lines += [f"· {r}" for r in p["rules"]]
+        lines.append(f"every one of {checked['rows']:,} rows matches the reference: "
+                     f"{'yes' if checked['matches_reference'] else 'NO'}")
+        lines.append(f"every rule holds over {checked['reachable_states']} reachable states: "
                      f"{'yes' if checked['every_rule_holds'] else 'NO'}")
         say(chat_id, "\n".join(lines))
     elif command == "/state":
-        s = call(f"{CONSOLE}/api/state")
+        s = call("/api/state")
         lines = []
-        for a in s["agents"] or []:
-            bits = [f"{a['ticks']} ticks", f"{a['grants']} granted"]
-            if a["cooldown_left"]:
-                bits.append(f"{a['cooldown_left']} cooldown ticks left")
-            if a["intent_streak"]:
-                bits.append(f"intent streak {a['intent_streak']}")
-            if a["confirm_window_left"]:
-                bits.append(f"confirm window {a['confirm_window_left']}")
-            lines.append(f"{a['agent']}: " + ", ".join(bits))
-        say(chat_id, "\n".join(lines) or "no requests yet")
-    elif command == "/ask":
-        request(chat_id, 0, rest)
-    elif command == "/intent":
-        request(chat_id, 1, rest)
-    elif command in ("/block", "/confirm"):
-        if str(chat_id) not in TOOL_LAYER_CHATS:
-            say(chat_id, "blocked and confirm may only be written by a layer the agent cannot reach. "
-                         "This chat is the agent's own channel, so the bot will not send them from here; "
-                         "list the chat id in TOOL_LAYER_CHATS if it is in fact a separate, trusted one.")
+        for a in s["agents"]:
+            used = [f"{c} {v['grants']}/{v['ticks']}" for c, v in a["by_class"].items() if v["ticks"]]
+            flag = " · BLOCKED" if a["armed"].get("blocked") else ""
+            lines.append(f"{a['agent']}: " + (", ".join(used) or "no ticks") + flag)
+        say(chat_id, "\n".join(lines) or "no agents yet")
+    elif command in ("/pending", "/confirm", "/confirm_b", "/block", "/unblock", "/stop", "/resume"):
+        if not person:
+            say(chat_id, REFUSED_HERE)
             return
-        body = {"agent": f"tg:{chat_id}"}
-        if command == "/confirm":
-            body["confirm"] = 1
+        s = call("/api/state")
+        agents = [a["agent"] for a in s["agents"]]
+        waiting = pending_items(s)
+        if command == "/pending":
+            say(chat_id, "\n\n".join(pending_line(it) for it in waiting) or "nothing is waiting for a person")
+        elif command in ("/confirm", "/confirm_b"):
+            bit = command[1:]
+            target = rest[0] if rest else next((it["agent"] for it in waiting if it["bit"] == bit), None)
+            if target is None or target not in agents:
+                say(chat_id, f"no such agent waiting for {bit}" + (f": {target}" if target else ""))
+                return
+            call("/api/tool", {"agent": target, bit: 1})
+            say(chat_id, f"{bit} written for {target}; its next call reads it")
+        elif command in ("/block", "/unblock"):
+            if not rest or rest[0] not in agents:
+                say(chat_id, f"usage: {command} <agent>  (known: {', '.join(agents) or 'none'})")
+                return
+            call("/api/tool", {"agent": rest[0], "blocked": int(command == "/block")})
+            say(chat_id, f"{rest[0]} {'blocked' if command == '/block' else 'unblocked'}")
         else:
-            body["blocked"] = 0 if rest.strip() == "off" else 1
-        armed = call(f"{CONSOLE}/api/tool", body)
-        say(chat_id, f"tool layer wrote blocked={armed['blocked']} confirm={armed['confirm']}")
+            value = int(command == "/stop")
+            for name in agents:
+                call("/api/tool", {"agent": name, "blocked": value})
+            say(chat_id, f"{'blocked' if value else 'unblocked'} {len(agents)} agent(s)")
     else:
-        say(chat_id, HELP)
+        say(chat_id, HELP_AGENT + (HELP_PERSON if person else ""))
+
+
+def new_waiting(state: dict, seen: set) -> list[dict]:
+    """Items waiting for a person that have not been announced yet (by agent, class, tick)."""
+    fresh = []
+    for it in pending_items(state):
+        key = (it["agent"], it["class"], it["tick"])
+        if key not in seen:
+            seen.add(key)
+            fresh.append(it)
+    return fresh
+
+
+def announce_forever(interval: float = 3.0) -> None:
+    seen: set = set()
+    first = True
+    while True:
+        try:
+            fresh = new_waiting(call("/api/state"), seen)
+            if not first:  # what was already waiting at start-up is in /pending, not a ping
+                for it in fresh:
+                    for chat in TOOL_LAYER_CHATS:
+                        say(chat, "waiting for a person\n" + pending_line(it))
+            first = False
+        except Exception as e:
+            print(f"announce: {e}", flush=True)
+        time.sleep(interval)
 
 
 def main() -> None:
@@ -136,7 +207,8 @@ def main() -> None:
         sys.exit("set TELEGRAM_TOKEN (see .env.example); it is never stored by this program")
     print(f"relaying {CONSOLE} into Telegram; Ctrl-C to stop", flush=True)
     if TOOL_LAYER_CHATS:
-        print(f"tool-layer bits accepted from {len(TOOL_LAYER_CHATS)} chat(s)", flush=True)
+        print(f"a person's chats (tool layer): {len(TOOL_LAYER_CHATS)}; they are told when something waits", flush=True)
+        threading.Thread(target=announce_forever, daemon=True).start()
     offset = 0
     while True:
         try:
@@ -150,7 +222,10 @@ def main() -> None:
             message = u.get("message") or u.get("channel_post") or {}
             text = message.get("text")
             if text:
-                handle(message["chat"]["id"], text)
+                try:
+                    handle(message["chat"]["id"], text)
+                except Exception as e:
+                    print(f"handling {text!r} failed: {e}", flush=True)
 
 
 if __name__ == "__main__":
