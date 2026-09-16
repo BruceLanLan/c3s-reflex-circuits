@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "c3s-circuit-agent"
+version = "1.0.0.dev0"
+description = "The boundary console for an agent: rules compiled to NAND/LATCH circuits, and every decision made by them"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "BruceBlue" }]
+keywords = ["agent", "boundary", "circuit", "approval", "mcp"]
+
+# numpy is not ours: `console.py` compiles its rules with the circuits repository
+# (c3s/policy.py), and that imports numpy. Everything else the console and this command
+# line need is in the standard library — the HTTP server, the QR encoder, launchd through
+# launchctl. pyserial is only for the Cardputer, rumps only for the menu bar, so both are
+# extras: an install that needs neither downloads neither.
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+cardputer = ["pyserial>=3.5"]
+menubar = ["rumps>=0.4.0"]
+# The Telegram bot and the adapters use urllib, so they need nothing here.
+
+[project.scripts]
+c3s = "c3s_cli.cli:main"
+
+[project.urls]
+Author = "https://github.com/BruceLanLan"
+
+# The console itself (console.py, static/index.html, the adapters, the examples) is *not*
+# packaged: `c3s` starts it from the checkout it finds through REFLEX_CONSOLE_DIR, the path
+# it remembers in ~/.c3s-circuit-agent/console-dir, the current directory or ~/work/
+# reflex-console. That way the page you approve on is the page in the repository, and an
+# upgrade is a `git pull` rather than a reinstall. docs/INSTALL.md says so plainly.
+[tool.setuptools]
+packages = ["c3s_cli", "menubar"]
