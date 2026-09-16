@@ -103,7 +103,7 @@ itself. An agent that can read that file can; run the agent where it cannot
 ```sh
 c3s demo           # a pretend mailbox, calendar and folder, one chore, every call decided — nothing leaves the machine
 c3s status         # is it running, what is waiting for a person
-c3s stop-all       # block every agent the console knows, now; --resume lifts it
+c3s stop-all       # refuse everything, now, including agents it has never met; --resume lifts it
 c3s up --lan       # also reachable from a phone on the same Wi-Fi — read "Who holds the keys" first
 c3s pair           # the QR code for the phone
 c3s down
@@ -147,7 +147,7 @@ them; the last row says why.
 | `min_gap_ticks` | at least *n* ticks between grants | nothing the agent can change |
 | `max_grants` | at most *n* grants, ever | nothing the agent can change |
 | `commit_ticks` | *n* consecutive intent ticks before a grant | **the agent — a cost, not a boundary** |
-| `trip_after_refusals` | *n* refusals in a row halt the agent instead of letting it hammer the boundary | the circuit's own verdict — **compiled and proven in the library, not yet installable from this console** |
+| `trip_after_refusals` | *n* refusals in a row halt the agent instead of letting it hammer the boundary | the circuit's own verdict — **compiled in the library, deliberately not installable here**: its safety half is proven, its reset is broken, and no confirm lifts it (found 2026-09-17) |
 
 "Never" is not a big number: `max_grants=0` means *unlimited*. A class set to **deny all**
 compiles to no circuit at all — there is no path to a grant — and the console says so in
@@ -157,15 +157,17 @@ those words.
 
 * **The page** — seven views (Overview, Boundaries, Approvals, Tasks, Activity, Agents,
   Connect), in Chinese and English, on your machine only by default. `c3s up --lan` is
-  opt-in and is what creates the exposure below. The pairing QR carries the operator token
-  in the URL fragment, which never reaches the server, and the page clears it from the
-  address bar — that part is clean. But the page then sends the token in a header on
-  **every two-second poll, in cleartext**, because over the LAN nothing answers without it.
-  While `--lan` is on, treat the operator token as readable by anyone on that network.
-  `c3s pair --no-token` keeps it out of the QR and changes nothing about the polling; only
-  not using `--lan`, or trusting the network, does. `c3s token rotate` after a phone
-  session is the remedy today. A separate read-only token for the phone is being built and
-  is not there yet (`docs/REDTEAM-2026-09-17.md`, F1).
+  opt-in. `c3s pair` mints the phone **its own viewer token** and puts that in the QR, in
+  the URL fragment, which never reaches a server; the page keeps it and clears the address
+  bar. **The operator token never leaves this machine**, which is the point: a viewer
+  token reads the state and approves a waiting call whose code matches, and that is all —
+  it cannot install rules, unblock, stop, resume, or write a heartbeat, and the page
+  disables those controls and says why. A phone's read is not a heartbeat either. This is
+  new tonight and it replaces a real hole: the page used to send the operator token on
+  every two-second poll, in cleartext, for as long as it was open. `c3s pair --forget <id>`
+  revokes a phone; a phone paired before tonight gets a 403 and has to be paired again.
+  There is still no TLS, so a viewer token is readable on that network — it just is not
+  the key to everything.
 * **A Cardputer on your desk** — the approvals list on a physical screen, and the physical
   Enter key writes the approval. Over USB the relay runs inside the console and its
   presence is the heartbeat. Over Wi-Fi the device is paired by four digits it shows and
@@ -212,10 +214,12 @@ those words.
   presser holds the token file; the Cardputer proves someone is beside that device; a
   chat proves the message came from an allowlisted conversation. Each is a boundary
   exactly as long as the agent has no path into that layer.
-* **The stop button covers the names it knows.** An agent first seen after the button was
-  pressed is not blocked by it, and an agent that renames itself walks out from under it.
-  The page counts *n of m*; pressing again catches up. `REFLEX_REQUIRE_AGENT_TOKEN=1`
-  closes the rename, and today has no command-line path to bind names (see the guide).
+* **The stop button stops everything, including what it has not met.** It is a latch the
+  console checks before it consults any circuit, so a brand-new agent name and a class
+  with no circuit installed are both refused while it is down — measured, because it used
+  to be a list of names an agent walked out of by renaming itself. The cost is the other
+  side of the same coin: a session that starts while the stop is down is dead until a
+  person resumes, and resuming is deliberately a second act.
 * **"Irreversible" is decided from tool names and arguments.** That is the tool layer's
   promise, not the circuit's proof. A tool named `helper` that sends mail is this layer's
   miss.
