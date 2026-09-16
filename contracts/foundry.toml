@@ -8,6 +8,10 @@ optimizer = true
 optimizer_runs = 10000
 via_ir = true
 evm_version = "cancun"
+# Without this, solc embeds a metadata hash that changes when the compilation unit
+# changes (adding script/ shifted it), so the runtime bytecode would not be
+# reproducible from the same sources.
+bytecode_hash = "none"
 gas_limit = "18446744073709551615"
 fs_permissions = [{ access = "read", path = "./test/fixtures" }]
 memory_limit = 1073741824

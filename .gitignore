@@ -9,3 +9,4 @@ contracts/cache/
 contracts/lib/
 firmware/cardputer/.pio/
 .DS_Store
+contracts/broadcast/

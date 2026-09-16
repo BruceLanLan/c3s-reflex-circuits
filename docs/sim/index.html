@@ -50,14 +50,22 @@
   /* ---------- bench ---------- */
   .bench {
     display: grid;
-    place-items: center;
+    /* An explicit minmax(0, 1fr) column: without it the serial log's long lines size
+       the implicit column by content and the page scrolls sideways on a phone. */
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    justify-items: center;
+    /* Grid items default to min-width: auto, so the screen canvas's intrinsic width
+       would widen the whole column and push the page sideways on a phone. */
     padding-block: 32px;
     padding-inline: 24px;
     background: linear-gradient(180deg, #EEF2F4 0%, var(--screen) 55%, var(--screen-deep) 100%);
     min-width: 0;
   }
+  .bench > * { min-width: 0; max-width: 100%; }
   .device {
     width: min(100%, 780px);
+    min-width: 0;
     background: linear-gradient(180deg, #2E333A 0%, #202428 100%);
     border-radius: 22px;
     padding: 20px 20px 18px;
@@ -76,7 +84,7 @@
   }
   .device-top b { color: var(--dim); font-weight: 400; }
   .bezel { background: #07080A; border-radius: 10px; padding: clamp(8px, 2vw, 16px); }
-  #screen { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #0C0E12; }
+  #screen { display: block; width: 100%; max-width: 100%; min-width: 0; height: auto; aspect-ratio: 16 / 9; background: #0C0E12; }
   .keys {
     margin-top: 18px;
     display: grid;
@@ -106,6 +114,15 @@
   .key[aria-pressed="true"] { border-color: var(--amber); }
   .key[aria-pressed="true"] span { color: var(--amber); }
   .bench-note { margin: 14px 4px 0; color: #5B6068; font-size: 12.5px; max-width: 70ch; }
+  /* Fills the space beside the device with what the page is actually evidence of. */
+  .bench-facts { margin: 18px 4px 0; width: min(100%, 78ch); display: grid; gap: 7px; color: #5B6068; font-size: 12.5px; }
+  .bench-facts b { color: #33383E; font-weight: 600; }
+  .bench h2 { color: #6A7078; }  /* the rail's heading colour is tuned for its dark background */
+  .bench-log { width: 100%; max-width: 780px; min-width: 0; margin-top: 20px; }
+  .bench-facts code { font-family: var(--mono); font-size: 11.5px; }
+  .chain-fields { display: grid; gap: 6px; margin: 0; }
+  .chain-field { width: 100%; background: none; border: 1px solid var(--line); color: inherit; padding: 4px 6px; font: inherit; font-size: 12.5px; }
+  .chain-fields .modes { justify-self: start; }
 
   /* ---------- rail ---------- */
   .rail {
@@ -187,6 +204,18 @@
         <div class="keys" id="keys"></div>
       </div>
       <p class="bench-note" data-i18n="benchNote">Click the keys, or type them: Enter launches a loom; the arrow keys or ; . , / change l/v and azimuth.</p>
+
+      <div class="bench-facts">
+        <span><b data-i18n="bfDomainH">Verified on every row.</b> <span data-i18n="bfDomain">The core's step relation was checked on all 8,388,608 (input, state) combinations, not sampled.</span></span>
+        <span><b data-i18n="bfAgreeH">Five evaluators agree.</b> <span data-i18n="bfAgree">Python, this WebAssembly build, the Cardputer ADV firmware's C, a Solidity evaluator and a BNB Smart Chain node produce the same SHA-256 chain over that whole domain.</span></span>
+        <span><b data-i18n="bfDeviceH">Measured, not claimed.</b> <span data-i18n="bfDevice">The device digests all 8,388,608 rows in 10,218 ms; this page's boot self-test takes about 50 ms.</span></span>
+        <span><b data-i18n="bfProofsH">Five temporal properties proven.</b> <span data-i18n="bfProofs">No takeoff for seven ticks after one, four consecutive raising ticks before a long-mode takeoff, and three more, each proven twice by two independent engines.</span></span>
+      </div>
+
+      <section class="bench-log">
+        <h2 data-i18n="logTitle">Serial log</h2>
+        <pre id="log" aria-live="off"></pre>
+      </section>
     </div>
   </section>
 
@@ -221,17 +250,14 @@
       <ul class="notes">
         <li data-i18n="chainNote">Nothing is deployed, and no wallet, key or gas is involved: one read-only eth_call, whose state override installs the compiled evaluator at a throwaway address, makes a public node run the same netlist. Choosing this sends the netlist bytes, which are already public, and your IP address to the endpoint below.</li>
       </ul>
-      <p>
-        <input id="chain-rpc" type="text" spellcheck="false" aria-label="RPC endpoint" placeholder="https://bsc-rpc.publicnode.com"
-               style="width: 15em; max-width: 100%; background: none; border: 1px solid var(--line); color: inherit; padding: 3px 6px; font: inherit">
+      <p class="chain-fields">
+        <input id="chain-rpc" class="chain-field" type="text" spellcheck="false" aria-label="RPC endpoint"
+               placeholder="https://bsc-rpc.publicnode.com">
+        <input id="chain-addr" class="chain-field" type="text" spellcheck="false"
+               aria-label="Your own NandMachine address (optional)" placeholder="0x… your own NandMachine (optional)">
         <span class="modes"><button type="button" id="chain-run" data-i18n="chainRun">Check four ticks on chain</button></span>
       </p>
       <ul class="checks" id="chain-checks"></ul>
-    </section>
-
-    <section>
-      <h2 data-i18n="logTitle">Serial log</h2>
-      <pre id="log" aria-live="off"></pre>
     </section>
 
     <section>
@@ -297,6 +323,17 @@ const I18N = {
     chainAgrees: (x, s, m, n) => `输入 0x${x.toString(16)} 状态 ${s} → 运动 ${m} 状态 ${n}：节点与本浏览器一致`,
     chainDiffers: (x, s, m, n) => `输入 0x${x.toString(16)} 状态 ${s} → 运动 ${m} 状态 ${n}：与本浏览器不一致`,
     chainError: (msg) => `没能连上节点：${msg}`,
+    chainAddrNote: "默认不部署任何东西。如果你自己部署了一份 NandMachine（见 docs/CIRCUITS.md 的自部署步骤），把地址填在第二个框里，就会直接调用你那份合约，不再用 state override。",
+    chainDeployed: (id, name, addr) => `链 ${id}（${name}），调用你自己部署的 ${addr.slice(0, 10)}…`,
+    chainBadAddr: (addr) => `这不像一个合约地址：${addr}`,
+    bfDomainH: "每一行都验证过。",
+    bfDomain: "核心的单拍转移关系在全部 8,388,608 个（输入, 状态）组合上逐行核对过，不是抽样。",
+    bfAgreeH: "五个求值器互相印证。",
+    bfAgree: "Python、这个 WebAssembly 版本、Cardputer ADV 固件里的 C、Solidity 求值器，以及一个 BNB 智能链节点，在整个定义域上算出同一条 SHA-256 链。",
+    bfDeviceH: "是实测，不是声称。",
+    bfDevice: "真机把全部 8,388,608 行算成摘要用了 10,218 ms；本页的开机自检约 50 ms。",
+    bfProofsH: "五条时序性质已证明。",
+    bfProofs: "起飞后七拍内不会再起飞、长模式起飞前必有连续四拍抬翅，另外还有三条——每条都用两套独立引擎各证一次。",
   },
 };
 Object.assign(I18N.en, {
@@ -320,6 +357,8 @@ Object.assign(I18N.en, {
   chainAgrees: (x, s, m, n) => `inputs 0x${x.toString(16)} state ${s} → motor ${m} state ${n}: the node agrees with this browser`,
   chainDiffers: (x, s, m, n) => `inputs 0x${x.toString(16)} state ${s} → motor ${m} state ${n}: DIFFERS from this browser`,
   chainError: (msg) => `could not reach the node: ${msg}`,
+  chainDeployed: (id, name, addr) => `chain ${id} (${name}), calling your own deployment at ${addr.slice(0, 10)}…`,
+  chainBadAddr: (addr) => `that does not look like a contract address: ${addr}`,
 });
 for (const el of document.querySelectorAll("[data-i18n]")) I18N.en[el.dataset.i18n] ??= el.textContent;
 
@@ -841,13 +880,25 @@ async function runChainCheck() {
   try {
     onchain ??= await (await fetch("onchain.json")).json();
     const rpc = document.getElementById("chain-rpc").value.trim() || onchain.rpc[0];
+    const addr = document.getElementById("chain-addr").value.trim();
+    const deployed = /^0x[0-9a-fA-F]{40}$/.test(addr);
+    if (addr && !deployed) {
+      chainItems = [["bad", "chainBadAddr", [addr]]];
+      chainBusy = false;
+      renderChain();
+      return;
+    }
     const id = Number(await rpcCall(rpc, "eth_chainId", []));
-    chainItems = [["info", "chainChain", [id, onchain.chains[String(id)] ?? "?"]]];
+    const name = onchain.chains[String(id)] ?? "?";
+    chainItems = [deployed ? ["info", "chainDeployed", [id, name, addr]] : ["info", "chainChain", [id, name]]];
     renderChain();
-    const override = { [CHAIN_ADDRESS]: { code: onchain.evaluator.runtime_bytecode } };
+    // Nothing is deployed unless the visitor points at their own contract.
+    const target = deployed ? addr : CHAIN_ADDRESS;
+    const override = deployed ? null : { [CHAIN_ADDRESS]: { code: onchain.evaluator.runtime_bytecode } };
     for (const [inputs, state] of CHAIN_ROWS) {
       const data = "0x" + encodeEvaluate(onchain, inputs, state);
-      const raw = (await rpcCall(rpc, "eth_call", [{ to: CHAIN_ADDRESS, data }, "latest", override])).replace(/^0x/, "");
+      const params = override ? [{ to: target, data }, "latest", override] : [{ to: target, data }, "latest"];
+      const raw = (await rpcCall(rpc, "eth_call", params)).replace(/^0x/, "");
       const motor = Number("0x" + raw.slice(0, 64)), next = Number("0x" + raw.slice(64, 128));
       const local = w.sim_step(0, inputs, state);
       const ok = motor === (local & 255) && next === ((local >> 8) & 255);

@@ -217,7 +217,7 @@ storage would remove most of the read cost; that optimisation is not implemented
 
 `scripts/verify_onchain.py` makes a real BNB Smart Chain node execute the core and
 compares every answer with this repository's evaluator. Nothing is deployed: an
-`eth_call` state override installs the 2,519-byte compiled `NandMachine` runtime at a
+`eth_call` state override installs the 2,478-byte compiled `NandMachine` runtime at a
 throwaway address for the duration of one read-only call, and `evaluate` (selector
 `0x6b758dac`) is a `pure` function, so no storage, transaction, wallet, private key
 or gas is involved, and nothing is left on chain.
@@ -237,6 +237,31 @@ beside Python, the firmware's C and the browser's WebAssembly.
 What leaves the machine that runs it: the netlist bytes and input values, both
 already public here, plus the caller's IP address, to whichever RPC provider is
 chosen.
+
+### If you would rather deploy it yourself
+
+Nothing here is deployed anywhere, and this repository holds no key. To put the
+circuit on chain under your own address,
+`contracts/script/DeployReflexCore.s.sol` deploys the evaluator and one core, taking
+the netlist from the committed fixtures, so what lands on chain is the circuit this
+repository verifies — the constructor recomputes its SHA-256 and the script aborts if
+it does not equal the manifest's.
+
+```sh
+cd contracts
+forge script script/DeployReflexCore.s.sol --rpc-url <endpoint>              # simulate only
+forge script script/DeployReflexCore.s.sol --rpc-url <endpoint> --broadcast  # and send it
+```
+
+The transaction is signed on your machine by whatever signer you pass (`--ledger`, a
+keystore, `--private-key`); nothing in this repository ever sees it. Simulated against
+BSC mainnet on 2026-09-16, the two deployments together cost **2,869,152 gas**, about
+**0.000143 BNB** at the 0.05 gwei that node estimated. `contracts/foundry.toml` sets
+`bytecode_hash = "none"`, because solc otherwise embeds a metadata hash that shifts
+whenever the compilation unit changes; without that setting the same sources would not
+produce the same runtime bytes. The simulator page's "On BNB
+Smart Chain" mode then accepts your `NandMachine` address and calls your deployment
+instead of installing the bytecode through a state override.
 
 ## Reproducing
 
