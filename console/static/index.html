@@ -708,7 +708,7 @@ const R = { gap: $("r-gap"), commit: $("r-commit"), blocked: $("r-blocked"), max
 const TEMPLATES = [
   ["tp.nomoney", "spend", null],
   ["tp.nodelete", "files", { confirm_per_irreversible: true, forbid_when_blocked: true }],
-  ["tp.msgconfirm", "message", { confirm_window_ticks: 1, forbid_when_blocked: true }],
+  ["tp.msgconfirm", "message", { confirm_per_irreversible: true, forbid_when_blocked: true }],
   ["tp.breaker", "exec", { trip_after_failures: 3, forbid_when_blocked: true }],
   ["tp.fly", "exec", { min_gap_ticks: 8, commit_ticks: 4, forbid_when_blocked: true }],
   ["tp.spend", "spend", { min_gap_ticks: 8, max_grants: 7, confirm_per_irreversible: true, two_key: true, forbid_when_blocked: true }],

@@ -48,7 +48,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from reflex_classes import classify, load_rules  # noqa: E402  (sibling file: which circuit answers)
+from reflex_classes import classify, is_irreversible_tool, load_irreversible_tools, load_rules  # noqa: E402  (sibling file)
 
 CONSOLE = os.environ.get("REFLEX_CONSOLE", "http://127.0.0.1:8765").rstrip("/")
 
@@ -96,6 +96,8 @@ def is_irreversible(tool: str, args: dict, cwd: str) -> bool:
         texts = [str(args.get("command", "")).lower(), describe(tool, args).lower()]
         pats = irreversible_patterns()
         return any(fnmatch.fnmatchcase(t, p.lower()) for t in texts for p in pats)
+    if tool.startswith("mcp__"):
+        return is_irreversible_tool(tool, load_irreversible_tools(os.environ.get("REFLEX_IRREVERSIBLE_TOOLS_FILE")))
     return False
 
 

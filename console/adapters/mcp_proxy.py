@@ -52,7 +52,7 @@ import urllib.request
 from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from reflex_classes import CLASSES, classify, load_rules  # noqa: E402  (sibling file: which circuit answers)
+from reflex_classes import CLASSES, classify, is_irreversible_tool, load_irreversible_tools, load_rules  # noqa: E402  (sibling file)
 
 LAUNCHERS =("python", "python3", "node", "npx", "uvx", "uv", "bun", "bunx", "deno", "npm", "pnpm", "yarn")
 
@@ -99,6 +99,7 @@ class Proxy:
         # the server published, never from the model.
         self.fixed_class = fixed_class
         self.class_rules = load_rules(class_file)
+        self.irreversible_tools = load_irreversible_tools(os.environ.get("REFLEX_IRREVERSIBLE_TOOLS_FILE"))
         self.out_lock = threading.Lock()  # relayed lines and refusals share one stdout
 
     # -- the two directions ---------------------------------------------------------
@@ -158,9 +159,10 @@ class Proxy:
         if not isinstance(arguments, dict):
             arguments = {}
         cls = self.fixed_class or classify(name, self.class_rules)
-        reason = f"[{cls}] {name}: {describe(arguments)}"[:160]
+        irreversible = is_irreversible_tool(name, self.irreversible_tools)
+        reason = f"[{cls}] {name}{' [irreversible]' if irreversible else ''}: {describe(arguments)}"[:160]
 
-        refusal = self.ask(reason, cls)
+        refusal = self.ask(reason, cls, irreversible)
         if refusal is None:
             return True
         if "id" not in msg:
@@ -176,12 +178,20 @@ class Proxy:
         }, ensure_ascii=False).encode("utf-8") + b"\n")
         return False
 
-    def ask(self, reason: str, cls: str) -> Optional[str]:
-        """One tick of the class's circuit. None if granted, else the refusal text."""
+    def ask(self, reason: str, cls: str, irreversible: bool = False) -> Optional[str]:
+        """One tick of the class's circuit. None if granted, else the refusal text. For a
+        tool whose name says its effect cannot be taken back, the tool-layer bit
+        `irreversible` is armed first; the tick consumes it."""
         body = json.dumps({"agent": self.agent, "intent": 1, "reason": reason, "class": cls}).encode()
         req = urllib.request.Request(f"{self.console}/api/request", data=body,
                                      headers={"content-type": "application/json"})
         try:
+            if irreversible:
+                arm = urllib.request.Request(f"{self.console}/api/tool",
+                                             data=json.dumps({"agent": self.agent, "irreversible": 1}).encode(),
+                                             headers={"content-type": "application/json"})
+                with urllib.request.urlopen(arm, timeout=15) as resp:
+                    resp.read()
             with urllib.request.urlopen(req, timeout=15) as resp:
                 verdict = json.loads(resp.read())
         except (urllib.error.URLError, OSError, ValueError) as e:
@@ -196,7 +206,10 @@ class Proxy:
         hint = ""
         if any(w.startswith("no confirmation") for w in why_list):
             hint = " A person can arm a confirmation from the console page; the model cannot."
-        if any(w.startswith("blocked") for w in why_list):
+        if any(w.startswith("irreversible") for w in why_list):
+            hint = (" This call cannot be taken back and needs a fresh confirm from a person; the"
+                    " model cannot supply one. Do not retry until it has been given.")
+        if any(w.startswith("blocked") or w.startswith("halted") for w in why_list):
             hint = " The tool layer has blocked this agent; only it can lift that."
         return f"refused by the boundary at tick {verdict.get('tick')}: {why}.{hint}"
 

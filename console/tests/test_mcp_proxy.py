@@ -259,3 +259,24 @@ def test_exit_code_is_forwarded_and_stdout_stays_clean(client):
     assert rc == 0
     assert c.lines.empty()  # nothing but answered requests ever reached stdout
     assert "Traceback" not in err
+
+
+def test_an_irreversible_tool_needs_a_persons_confirm(client):
+    """`delete_everything` is irreversible by name, so the proxy arms the tool-layer bit
+    before asking; under confirm_per_irreversible only a confirm the test writes as the
+    person lets exactly one call through."""
+    console("/api/policy", {"class": "message", "confirm_per_irreversible": True, "forbid_when_blocked": True})
+    try:
+        agent = fresh_agent()
+        c = client("--agent", agent, "--class", "message")
+        first = text_of(c.tool("delete_everything"))
+        assert "irreversible, and no unspent confirm" in first and "person" in first, first
+        assert text_of(c.tool("echo", text="reversible")) == "reversible"  # not irreversible by name
+        console("/api/tool", {"agent": agent, "confirm": 1})
+        assert text_of(c.tool("delete_everything")) == "deleted"
+        assert "irreversible" in text_of(c.tool("delete_everything"))  # the confirm was spent
+        c.close()
+        rows = [e for e in console("/api/state")["transcript"] if e.get("agent") == agent and e["kind"] == "request"]
+        assert sum(1 for e in rows if "[irreversible]" in e["reason"]) == 3
+    finally:
+        console("/api/policy", {"class": "message", "remove": True})
