@@ -121,3 +121,18 @@
 | `ap.stop.hint` | 按住半秒才会停下，防止误触。 | Hold for half a second; a tap alone does nothing. | 停下按钮下方一行小字（F4） |
 | `ac.more` | 同一个 agent 连续 {n} 条同样的拒绝 · 展开 | {n} identical refusals from the same agent in a row · expand | 流水折叠行（F5） |
 | `ap.halt.stale` | 停机已经解除；这条会在它下一次请求时从这里消失。 | The halt has been lifted; this card goes when the agent next sends. | 停机已复位但卡片仍在时（F6，需后台配合） |
+
+## 落地记录（2026-09-17 · 与上表不一致处以页面为准）
+
+上表写于操作者全停闩（operator-stop latch）之前。落地时按当时的页面事实调整了这些键，
+记录在此，免得读者拿上表去对页面：
+
+- `ap.stop.sub` / `ap.stop.done` / `ap.stopped.banner` / `ov.none` / `ov.halt.off`：F11 说「全部停下拦不住没规则的类」，
+  这在闩落地后已不成立——闩在任何电路之前拒绝每一类、每个 agent（含未出现的）。落地文案说的是闩真正做的事；
+  `ap.stop.sub` 合入了「按住半秒」；`ap.stopped.banner` 沿用页面现有的 `{n}` 占位（`renderStop` 传的是 `{n, since}`，不是 `{m}/{n}`）。
+  `ap.stop.gap` 因此没有加。
+- `ap.code.hint` 删除（卡片内不再重复），由新键 `ap.hint.once` 在列表顶部说一次。
+- `nav.tasks` 中文改为「任务」：手机标签截断的理由与其余导航键相同。
+- `tok.prompt` 合并：采用上表的人称写法，保留页面里更准确的一句「只随它所守的写操作发出，读取从不带它」。
+- 新增 `ev.proof.no`（证明行不通过时的一句）、`ac.more.ok`（连续同样的放行也折叠）、`ac.less`（收起）。
+- 未加：`first.done`（页面用 CSS 勾选，无消费者）、`ap.halt.stale`（后台已给共享停机条目 `bit`/`code`，卡片不再是死路，此键无处可用）。

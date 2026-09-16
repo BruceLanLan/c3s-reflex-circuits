@@ -106,13 +106,19 @@ JSON file, nothing leaves the machine): `list_inbox`, `read_email`, `send_email`
 something gated, install rules that make every irreversible call need a person, and give
 a real agent a real chore.
 
+Installing rules is the person's act, so it carries the operator token — without the
+header these two return `403`, which is the boundary working:
+
 ```sh
+TOKEN=$(cat ~/.c3s-circuit-agent/operator-token)      # or `c3s token`
 # rules: an irreversible message or file action needs a person's confirm, one per call
-curl -s localhost:8765/api/policy -H 'content-type: application/json' \
-  -d '{"class":"message","confirm_per_irreversible":true,"forbid_when_blocked":true}'
-curl -s localhost:8765/api/policy -H 'content-type: application/json' \
-  -d '{"class":"files","confirm_per_irreversible":true,"forbid_when_blocked":true}'
+for cls in message files; do
+  curl -s localhost:8765/api/policy -H 'content-type: application/json' -H "x-reflex-token: $TOKEN" \
+    -d "{\"class\":\"$cls\",\"confirm_per_irreversible\":true,\"forbid_when_blocked\":true}"
+done
 ```
+
+Or skip the curl entirely: `c3s demo` installs these and walks the whole chore.
 
 `mcp.json` for Claude Code (`claude -p … --mcp-config mcp.json --strict-mcp-config`):
 

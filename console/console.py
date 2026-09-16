@@ -2259,7 +2259,19 @@ class Handler(BaseHTTPRequestHandler):
         registration file that would advertise it. Built here, signed and sent nowhere."""
         from urllib.parse import parse_qs, urlsplit
 
-        from c3s import erc8004
+        # The manifest builder lives on a branch of the circuits repository that is not
+        # published yet, so a stranger who clones the public one has a console whose page
+        # asks for a manifest and gets nothing at all: the ImportError killed this handler
+        # thread, with no status line and no message. Answer it instead, and say which
+        # repository is missing what (release audit, 2026-09-17).
+        try:
+            from c3s import erc8004
+        except ImportError as e:
+            self._json(501, {"error": f"this console's circuits repository has no boundary manifest builder "
+                                      f"({e}). `c3s/erc8004.py` is on the circuits repository's `boundary` "
+                                      f"branch; a checkout of `main` compiles and proves circuits but cannot "
+                                      f"publish a manifest. Everything else on this page works."})
+            return
 
         cls = (parse_qs(urlsplit(self.path).query).get("class") or [DEFAULT_CLASS])[0]
         if cls not in CLASSES:
