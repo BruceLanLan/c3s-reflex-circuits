@@ -295,10 +295,31 @@
   }
   .notes { margin: 0; padding-left: 18px; color: var(--dim); display: grid; gap: 4px; font-size: 13px; }
 
+  /* "One fingerprint, many hosts": three hosts' digests of the same whole domain. */
+  .fp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 20px; }
+  .fp-host {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--line);
+    background: var(--rail-raised);
+    display: grid;
+    gap: 8px;
+    align-content: start;
+  }
+  .fp-host h3 { margin: 0; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--paper); }
+  .fp-host p { margin: 0; }
+  .fp-sub { color: var(--dim); font-size: 12.5px; text-wrap: pretty; }
+  .fp-hex { font-family: var(--mono); font-size: 12px; line-height: 1.5; display: grid; overflow-wrap: anywhere; }
+  .fp-hex .fp-empty { color: var(--faint); font-family: var(--ui); font-size: 12.5px; }
+  .fp-note { color: var(--faint); font-size: 12px; font-family: var(--mono); overflow-wrap: anywhere; }
+  .fp-name { margin: 16px 0 14px; max-width: 78ch; color: #CFCAC0; text-wrap: pretty; }
+  .fp-host .modes { justify-self: start; }
+
   @media (max-width: 960px) {
     .app { grid-template-columns: minmax(0, 1fr); }
     .rail { border-left: 0; border-top: 1px solid var(--line); }
     .chain-grid { grid-template-columns: minmax(0, 1fr); }
+    .fp-grid { grid-template-columns: minmax(0, 1fr); }
   }
   @media (max-width: 640px) {
     .topnav a { display: none; }
@@ -404,6 +425,7 @@
         <button type="button" role="tab" id="tab-fly" data-tab="fly" aria-controls="panel-3d" aria-selected="false" tabindex="-1" data-i18n="tabFly">Fly brain</button>
         <button type="button" role="tab" id="tab-wiring" data-tab="wiring" aria-controls="panel-3d" aria-selected="false" tabindex="-1" data-i18n="tabWiring">Wiring</button>
         <button type="button" role="tab" id="tab-chain" data-tab="chain" aria-controls="panel-chain" aria-selected="false" tabindex="-1" data-i18n="tabChain">On chain</button>
+        <button type="button" role="tab" id="tab-fingerprint" data-tab="fingerprint" aria-controls="panel-fingerprint" aria-selected="false" tabindex="-1" data-i18n="tabFingerprint">Fingerprint</button>
       </div>
     </div>
 
@@ -504,6 +526,45 @@
           <p data-i18n="deploy2">You deploy that module yourself, to your own Safe. The maintainers deploy nothing, hold no wallet and no key, and issue no token.</p>
         </aside>
       </div>
+    </div>
+
+    <div id="panel-fingerprint" class="panel-fp wrap" role="tabpanel" aria-labelledby="tab-fingerprint" hidden>
+      <div class="panel-head"><h2 data-i18n="fpTitle">One fingerprint, many hosts</h2></div>
+      <p class="panel-lede" data-i18n="fpLede">Every host that runs the escape reflex arc can be asked the same question: walk all 8,388,608 (input, state) rows of the step relation in order, hash each answer into a chain, and report the 32 bytes that come out. Three hosts answer it here.</p>
+
+      <div class="fp-grid">
+        <section class="fp-host">
+          <h3 data-i18n="fpBrowserH">This browser</h3>
+          <p class="fp-sub" data-i18n="fpBrowserSub">The firmware's own C, compiled to WebAssembly, digesting all 8,388,608 rows here and now. It blocks for a moment while it runs, as it does on the device.</p>
+          <p class="fp-hex" id="fp-browser"></p>
+          <p class="fp-note" id="fp-browser-note"></p>
+          <span class="modes"><button type="button" id="fp-run" data-i18n="fpRun">Compute it here</button></span>
+        </section>
+
+        <section class="fp-host">
+          <h3 data-i18n="fpEvmH">The committed fixture</h3>
+          <p class="fp-sub" data-i18n="fpEvmSub">The value the Solidity evaluator is checked against in contracts/test/fixtures/circuits.json. It is a committed number, not a call made just now: the On chain tab is where a public node evaluates rows live.</p>
+          <p class="fp-hex" id="fp-evm"></p>
+          <p class="fp-note">contracts/test/fixtures/circuits.json</p>
+        </section>
+
+        <section class="fp-host">
+          <h3 data-i18n="fpDeviceH">A Cardputer</h3>
+          <p class="fp-sub" data-i18n="fpDeviceSub">On the device, menu 5 digests the same rows on its own chip and prints one line over USB serial. Paste that line here.</p>
+          <p class="fp-hex" id="fp-device"></p>
+          <input id="fp-paste" class="chain-field" type="text" spellcheck="false" autocomplete="off"
+                 aria-label="Paste the Cardputer's serial line" placeholder="digest 477aee… over 8388608 rows in 10218 ms">
+          <p class="fp-note" id="fp-device-note"></p>
+        </section>
+      </div>
+
+      <ul class="checks" id="fp-verdict"></ul>
+      <p class="fp-name" data-i18n="fpName">The fingerprint is this reflex arc's name. A copy whose fingerprint differs is honestly not this one — not a damaged version of it, a different circuit. That is the only death it can have, and it is why nothing here is stored on a server: the name travels with the bytes.</p>
+      <ul class="notes">
+        <li data-i18n="fpNote1">The digest covers the whole domain, not a sample: every input and state combination, in order, including the ones no stimulus ever reaches.</li>
+        <li data-i18n="fpNote2">Agreement means the hosts compute the same function. It says nothing about which of them you should trust with an action — see “What it guarantees, and what it does not” above.</li>
+        <li data-i18n="fpNote3">Pasting a device line proves nothing about your device to anyone but you. It is a check you run, not a claim you publish; patterns/README.md says how a finding is published.</li>
+      </ul>
     </div>
   </section>
 </main>
@@ -628,6 +689,38 @@ const I18N = {
     deploy2: "这个模块由你自己部署到你自己的 Safe。维护者什么都不部署，不持有钱包和私钥，也不发代币。",
     agentLink: "规则即电路（AGENT.md）",
     footProduct: "C3S Circuit Agent。第一颗电路以研究名 LoomEscape 发布。",
+    tabFingerprint: "指纹",
+    fpTitle: "一个指纹，处处同一只",
+    fpLede: "每个跑这条逃逸反射弧的宿主都可以被问同一个问题：按顺序走遍单拍转移关系的全部 8,388,608 个（输入, 状态）行，把每一行的答案哈希进一条链，报出最后的 32 字节。这里有三个宿主来回答。",
+    fpBrowserH: "本浏览器",
+    fpBrowserSub: "固件自己的 C 编译成的 WebAssembly，就在此刻把全部 8,388,608 行算成摘要。算的时候页面会卡住一下，真机也是这样。",
+    fpRun: "在这里算一遍",
+    fpAgain: "再算一遍",
+    fpBusy: "正在计算…",
+    fpNotYet: "还没算",
+    fpEvmH: "仓库里的定值",
+    fpEvmSub: "contracts/test/fixtures/circuits.json 里用来核对 Solidity 求值器的那个值。它是仓库里写定的数，不是刚刚发起的调用——让公共节点当场算，在“上链”那一页。",
+    fpDeviceH: "一台 Cardputer",
+    fpDeviceSub: "真机上菜单 5 会在它自己的芯片上算同样这些行，并通过 USB 串口打印一行。把那一行粘到这里。",
+    fpPasteHere: "还没粘贴",
+    fpNoHex: "粘贴的内容里没有 64 位十六进制",
+    fpHexOnly: "已读到摘要；这一行还带着它的行数与毫秒数",
+    fpRows: (rows, ms) => `${rows.toLocaleString("en")} 行，用时 ${ms} ms`,
+    fpHostBrowser: "本浏览器",
+    fpHostEvm: "仓库里的定值",
+    fpHostDevice: "粘贴的设备",
+    fpAnd: "、",
+    fpAgree: (n, names) => `${n} 个宿主给出同一组 32 字节：${names}`,
+    fpAlone: (n, names) => `目前这里只有一个指纹：${names}`,
+    fpMatches: (name, head) => `${name}：${head}… 与仓库里的定值一致`,
+    fpReference: (name, head) => `${name}：${head}… 就是“同一只”必须算出的那个指纹`,
+    fpDiffers: (name, head) => `${name}：${head}… 不一致——那不是这一只`,
+    fpTryBrowser: "点“在这里算一遍”，看本浏览器是否给出同一个指纹。",
+    fpTryDevice: "粘一台 Cardputer 打印的那一行，就有第三个宿主。",
+    fpName: "指纹就是这条反射弧的名字。指纹不同的副本，诚实地说就不是这一只——不是它坏了的版本，而是另一颗电路。这是它唯一的死法，也是这里什么都不存在服务器上的原因：名字跟着字节走。",
+    fpNote1: "摘要覆盖的是整个定义域，不是抽样：每一个输入与状态的组合都按顺序算进去，包括任何刺激都到不了的那些。",
+    fpNote2: "一致只说明这些宿主算的是同一个函数，不说明你该把动作交给其中哪一个——见上面“它保证什么，不保证什么”。",
+    fpNote3: "粘一行设备输出，只对你自己证明了你的设备，对别人什么都没证明。这是你自己跑的核对，不是你发表的声明；怎么发表一条发现，见 patterns/README.md。",
   },
 };
 Object.assign(I18N.en, {
@@ -655,6 +748,24 @@ Object.assign(I18N.en, {
   chainError: (msg) => `could not reach the node: ${msg}`,
   chainDeployed: (id, name, addr) => `chain ${id} (${name}), calling your own deployment at ${addr.slice(0, 10)}…`,
   chainBadAddr: (addr) => `that does not look like a contract address: ${addr}`,
+  fpAgain: "Compute it again",
+  fpBusy: "computing…",
+  fpNotYet: "not computed yet",
+  fpPasteHere: "nothing pasted yet",
+  fpNoHex: "no 64-digit hex value in what was pasted",
+  fpHexOnly: "digest read; the device's line also carries its rows and milliseconds",
+  fpRows: (rows, ms) => `${rows.toLocaleString("en")} rows in ${ms} ms`,
+  fpHostBrowser: "this browser",
+  fpHostEvm: "the committed fixture",
+  fpHostDevice: "the pasted device",
+  fpAnd: ", ",
+  fpAgree: (n, names) => `${n} hosts, one fingerprint: ${names}`,
+  fpAlone: (n, names) => `${names} is the only fingerprint here so far`,
+  fpMatches: (name, head) => `${name}: ${head}… matches the committed fixture`,
+  fpReference: (name, head) => `${name}: ${head}… is the fingerprint a copy of this one has to produce`,
+  fpDiffers: (name, head) => `${name}: ${head}… DIFFERS — that is not this one`,
+  fpTryBrowser: "Compute it here to see whether this browser agrees.",
+  fpTryDevice: "Paste a Cardputer's line to add a third host.",
 });
 for (const el of document.querySelectorAll("[data-i18n]")) I18N.en[el.dataset.i18n] ??= el.textContent;
 
@@ -671,6 +782,7 @@ function applyLang() {
   renderFacts();
   renderChecks();
   renderChain();
+  renderFingerprints();
 }
 for (const b of document.querySelectorAll(".lang button")) {
   b.addEventListener("click", () => {
@@ -1529,6 +1641,7 @@ function frame() {
     digestPending = false;
     dirty = true;
     log(`digest ${digestHex} over ${digestRows} rows in ${digestMs} ms`);
+    renderFingerprints();  // the device's own digest page feeds the fingerprint panel
   }
   if (page === "selftest" && pageUntil && now > pageUntil) { page = "menu"; dirty = true; }
   if (phase === "looming" && !paused) {
@@ -1657,6 +1770,105 @@ for (const b of document.querySelectorAll("#chain-mode button")) {
   });
 }
 document.getElementById("chain-run").addEventListener("click", runChainCheck);
+
+// ---------------------------------------------------------------- one fingerprint, many hosts
+
+// The whole-domain digest of core-hand-abc: the SHA-256 chain over all 2**23 rows of its
+// step relation, as contracts/test/fixtures/circuits.json pins it. The Solidity evaluator
+// is tested against that file, tests/test_firmware.py checks both C builds against it,
+// and tests/test_firmware.py also checks that this constant is still the fixture's value.
+const FIXTURE_DIGEST = "0x477aee38d33c82b3c223961f040a99b186ebb49edcb36cd7f17f3548fba1e1ea";
+const DOMAIN_ROWS = 8388608;
+
+let fpBusy = false, fpDevice = null, fpDeviceNote = "", fpPasted = "";
+
+// Any 64 hex digits in the text, lower-cased: the device prints
+// `digest <hex> over <rows> rows in <ms> ms`, and a person may paste any part of it.
+function fpHex(text) {
+  const m = /[0-9a-fA-F]{64}/.exec(text || "");
+  return m ? m[0].toLowerCase() : null;
+}
+
+function fpShow(id, digest, empty) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = "";
+  if (!digest) {
+    const span = document.createElement("span");
+    span.className = "fp-empty";
+    span.textContent = empty;
+    el.append(span);
+    return;
+  }
+  const bare = digest.replace(/^0x/, "");
+  for (const half of [bare.slice(0, 32), bare.slice(32)]) {
+    const line = document.createElement("span");
+    line.textContent = half;
+    el.append(line);
+  }
+}
+
+function renderFingerprints() {
+  const browser = digestRows ? digestHex : null;
+  fpShow("fp-evm", FIXTURE_DIGEST, "");
+  fpShow("fp-browser", browser, fpBusy ? t("fpBusy") : t("fpNotYet"));
+  fpShow("fp-device", fpDevice, t("fpPasteHere"));
+  const bnote = document.getElementById("fp-browser-note");
+  bnote.textContent = browser ? t("fpRows")(digestRows, digestMs) : "";
+  const dnote = document.getElementById("fp-device-note");
+  dnote.textContent = fpDevice ? fpDeviceNote : fpPasted ? t("fpNoHex") : "";
+  const run = document.getElementById("fp-run");
+  run.disabled = fpBusy || !w;
+  run.textContent = fpBusy ? t("fpBusy") : browser ? t("fpAgain") : t("fpRun");
+
+  const hosts = [["fpHostBrowser", browser], ["fpHostEvm", FIXTURE_DIGEST], ["fpHostDevice", fpDevice]]
+    .filter(([, d]) => d)
+    .map(([key, d]) => [key, d.replace(/^0x/, "")]);
+  const items = [];
+  const same = hosts.filter(([, d]) => d === hosts[0][1]);
+  if (same.length === hosts.length) {
+    const names = hosts.map(([key]) => t(key)).join(t("fpAnd"));
+    items.push([hosts.length > 1 ? "ok" : "info", hosts.length > 1 ? "fpAgree" : "fpAlone", [hosts.length, names]]);
+  } else {
+    for (const [key, d] of hosts) {
+      const ok = d === FIXTURE_DIGEST.replace(/^0x/, "");
+      const which = key === "fpHostEvm" ? "fpReference" : ok ? "fpMatches" : "fpDiffers";
+      items.push([key === "fpHostEvm" ? "info" : ok ? "ok" : "bad", which, [t(key), d.slice(0, 16)]]);
+    }
+  }
+  if (!browser) items.push(["info", "fpTryBrowser", []]);
+  if (!fpDevice) items.push(["info", "fpTryDevice", []]);
+  document.getElementById("fp-verdict").innerHTML = items
+    .map(([cls, key, args]) => `<li class="${cls}"><i></i><span>${chainText(key, args)}</span></li>`)
+    .join("");
+}
+
+// sim_digest blocks while it walks the domain, so the "computing" state is painted
+// first: two frames guarantee the browser has shown it before the loop stalls.
+function runFingerprint() {
+  if (fpBusy || !w) return;
+  fpBusy = true;
+  renderFingerprints();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const t0 = millis();
+    digestHex = cstr(w.sim_digest(0));
+    digestMs = millis() - t0;
+    digestRows = 2 ** (w.sim_prog(0, 0) + w.sim_prog(0, 1));
+    fpBusy = false;
+    dirty = true;
+    log(`digest ${digestHex} over ${digestRows} rows in ${digestMs} ms`);
+    renderFingerprints();
+  }));
+}
+
+document.getElementById("fp-run").addEventListener("click", runFingerprint);
+document.getElementById("fp-paste").addEventListener("input", (e) => {
+  fpPasted = e.target.value.trim();
+  fpDevice = fpHex(fpPasted);
+  const m = /over\s+([0-9]+)\s+rows\s+in\s+([0-9]+)\s*ms/.exec(fpPasted);
+  fpDeviceNote = m ? t("fpRows")(Number(m[1]), Number(m[2])) : t("fpHexOnly");
+  renderFingerprints();
+});
 
 // ---------------------------------------------------------------- measured wiring
 
@@ -1853,7 +2065,7 @@ function splash(lines, color) {
 
 // ---------------------------------------------------------------- tabs
 
-const TABS = ["handheld", "fly", "wiring", "chain"];
+const TABS = ["handheld", "fly", "wiring", "chain", "fingerprint"];
 const tabButtons = [...document.querySelectorAll("[role=tab]")];
 function showTab(name, focus) {
   if (!TABS.includes(name)) name = "handheld";
@@ -1866,6 +2078,7 @@ function showTab(name, focus) {
   document.getElementById("panel-handheld").hidden = name !== "handheld";
   document.getElementById("panel-3d").hidden = name !== "fly" && name !== "wiring";
   document.getElementById("panel-chain").hidden = name !== "chain";
+  document.getElementById("panel-fingerprint").hidden = name !== "fingerprint";
   if (name === "fly") setWiringView("cells");
   if (name === "wiring") setWiringView("graph");
 }
