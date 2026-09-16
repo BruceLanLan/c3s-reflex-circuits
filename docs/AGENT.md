@@ -36,20 +36,38 @@ forbidding condition — which is why `c3s/policy.py` makes them writable:
 ```python
 from c3s.policy import Policy
 
-policy = Policy(min_gap_ticks=8, commit_ticks=4, forbid_when_blocked=True, max_grants=3)
-circuit = policy.build()        # 108 NAND + 8 LATCH, 3 inputs, 1 output
-policy.verify(circuit)          # all 2,048 rows equal the Python reference
+policy = Policy(min_gap_ticks=8, commit_ticks=4, forbid_when_blocked=True,
+                max_grants=3, confirm_window_ticks=8)
+circuit = policy.build()        # 4 inputs, 1 output; this one is 241 NAND + 18 LATCH
+policy.verify(circuit)          # every row of its domain equals the Python reference
 policy.properties(circuit)      # every rule, in every state reachable from reset
 ```
+
+### Which input a rule rests on decides what it is worth
+
+This matters more than the gate count, and it is the thing most easily got wrong.
+`request` and `intent` are written by the agent. A rule that rests on them alone —
+`commit_ticks` — is a **cost the agent can always choose to pay**: four ticks of
+"intent" is four ticks it simply spends. `blocked` and `confirm` must come from a
+layer the agent cannot write (the tool runner, a human, a signed feed); rules resting
+on those are **boundaries**. `min_gap_ticks` and `max_grants` bind whatever the agent
+does, because they count grants rather than inputs.
+
+Nothing in the module can enforce that separation — it is a property of how the thing
+is wired up. So it is named in the code (`AGENT_WRITABLE`,
+`MUST_COME_FROM_THE_TOOL_LAYER`), asserted in the tests, and written here: a
+deployment that lets the model produce its own `confirm` has a commitment cost
+dressed up as a boundary.
 
 A `Policy` compiles to a NAND/LATCH circuit with no hidden state. Two things are then
 checked, and they are different things:
 
 * **Equality**: the circuit and a plain-Python statement of the same rules agree on
-  every row of the domain — 2,048 rows for the policy above, 262,144 for one with a
-  60-tick cooldown, a 16-tick commitment and a 15-grant budget (205 NAND + 15 LATCH).
-  The domain stays small on purpose: exhaustive checking needs
-  `2^(inputs + state)` rows, and past about 24 bits it stops being cheap.
+  every row of the domain — 128 rows for a confirmation window alone (36 NAND +
+  3 LATCH), 4,194,304 for the five-rule policy above with a 60-tick cooldown and a
+  15-grant budget (241 NAND + 18 LATCH). The domain stays small on purpose: exhaustive
+  checking needs `2^(inputs + state)` rows, and measured here a 200-gate circuit at 24
+  bits costs about a second and a gigabyte, four times that at 26.
 * **The rules themselves**: a search from reset visits every state the circuit can
   reach under every input, with monitors that count independently of the circuit's own
   latches, and no rule is ever broken. Claiming a rule the circuit does not enforce —
