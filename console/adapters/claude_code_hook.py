@@ -61,7 +61,7 @@ DEFAULT_IRREVERSIBLE = (
     "curl *| *sh*", "wget *| *sh*",
     "chmod -R *", "chown -R *",
     "*drop table*", "*drop database*", "*truncate *", "*delete from *",
-    "mkfs*", "dd if=*", "*> /dev/*",
+    "mkfs*", "dd if=*", "*> /dev/sd*", "*> /dev/disk*", "*> /dev/nvme*",
 )
 
 
