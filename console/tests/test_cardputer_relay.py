@@ -145,3 +145,47 @@ def test_a_refused_call_says_which_version_a_person_approved(boundary):
     boundary.arm("mail", {"irreversible": 1})
     exact = boundary.request("mail", 1, approved, "message")
     assert exact["granted"] and exact["confirm_waiting_for"] == []
+
+
+def test_the_item_line_carries_the_effect_summary_as_a_ninth_field(boundary):
+    """I-1 on 240x135: the device leads with what the call would do, not with the tool name.
+    The summary is appended, so firmware that reads the first eight fields is unaffected."""
+    boundary.install("files", Policy(confirm_per_irreversible=True, forbid_when_blocked=True))
+    boundary.arm("mail", {"irreversible": 1})
+    boundary.request("mail", 1, "[files] trash_email [irreversible]: id=m3", "files",
+                     {"kind": "delete", "target": "inbox/m3", "summary": "Trash the seed-phrase mail",
+                      "amount": None, "asset": None, "path": None, "reversible": False})
+    item = next(line for line in frame(boundary.status())[0] if line.startswith("I|"))
+    fields = item.split("|")
+    assert len(fields) == 9 and fields[-1] == "Trash the seed-phrase mail"
+    assert fields[6] == "confirm" and fields[7] == "0"
+
+
+def test_an_item_without_an_effect_still_ends_with_an_empty_field(boundary):
+    boundary.install("files", Policy(confirm_per_irreversible=True, forbid_when_blocked=True))
+    boundary.arm("mail", {"irreversible": 1})
+    boundary.request("mail", 1, "rm -rf", "files")
+    item = next(line for line in frame(boundary.status())[0] if line.startswith("I|"))
+    assert item.split("|")[-1] == "" and len(item.split("|")) == 9
+
+
+def test_the_relay_shows_what_the_console_computed_and_derives_nothing_itself(boundary):
+    """One derivation (I-2): the relay filters and flattens the console's `pending`, and
+    a cooldown — which no key on the device can lift — never reaches the screen."""
+    from cardputer_relay import pending_items
+
+    boundary.install("files", Policy(confirm_per_irreversible=True, forbid_when_blocked=True))
+    boundary.install("exec", Policy(min_gap_ticks=8, forbid_when_blocked=True))
+    boundary.arm("mail", {"irreversible": 1})
+    boundary.request("mail", 1, "[files] trash_email [irreversible]: id=m3", "files")
+    boundary.request("slow", 1, "again")
+    boundary.request("slow", 1, "again")  # refused by a cooldown: waiting on time, no code
+    state = boundary.status()
+    assert {(p["agent"], p["waiting_on_time"]) for p in state["pending"]} == {("mail", False), ("slow", True)}
+    items = pending_items(state)
+    assert [it["agent"] for it in items] == ["mail"]
+    mine = next(p for p in state["pending"] if p["agent"] == "mail")
+    assert items[0]["code"] == mine["code"]                  # the console's code, not a new one
+    assert items[0]["why"] == "; ".join(mine["why"])         # flattened for one line of screen
+    state["pending"] = []  # nothing computed upstream: nothing shown, whatever the transcript says
+    assert pending_items(state) == [] and frame(state)[1] == []
