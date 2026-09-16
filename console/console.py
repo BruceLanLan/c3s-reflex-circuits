@@ -77,6 +77,9 @@ DEFAULT_CLASS = "exec"
 
 # The rules the escape circuit itself was proven to obey; the starting point, not a law.
 FLY_DEFAULT = Policy(min_gap_ticks=8, commit_ticks=4, forbid_when_blocked=True)
+# Installed rules survive a restart. Without this, restarting the console would quietly
+# turn "no transfers" back into "spend has no circuit" — a boundary that resets open.
+STATE_FILE = Path(os.environ.get("REFLEX_STATE_FILE", Path.home() / ".c3s-circuit-agent" / "policies.json")).expanduser()
 TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
 CHAIN = None  # set in __main__ when the chain second opinion is on
 STARTED_AT = time.time()
@@ -179,11 +182,48 @@ class Boundary:
 
     heartbeat_source = None  # callable -> bool, set by a tool-layer device (cardputer_relay)
 
-    def __init__(self, default_exec: Policy) -> None:
+    def __init__(self, default_exec: Policy, state_file: Path | None = None) -> None:
         self.lock = threading.Lock()
         self.policies: dict[str, Compiled | None] = {c: None for c in CLASSES}
         self.agents: dict[str, dict] = {}
-        self.install(DEFAULT_CLASS, default_exec)
+        self.state_file = state_file
+        saved = self._load()
+        if saved is None:
+            self.install(DEFAULT_CLASS, default_exec)
+            return
+        for cls, entry in saved.items():  # recompiled and re-proven, not trusted from disk
+            if entry.get("deny_all"):
+                self._switch(cls, Compiled.denied(), save=False)
+            else:
+                self._switch(cls, Compiled.build(policy_from(entry["settings"])), save=False)
+        if self.policies[DEFAULT_CLASS] is None:
+            self._switch(DEFAULT_CLASS, Compiled.build(default_exec), save=False)
+
+    def _load(self) -> dict | None:
+        """The saved rules, or None when there is no file yet. A file that exists but cannot
+        be read or parsed stops the console: starting with no rules would start open."""
+        if self.state_file is None or not self.state_file.exists():
+            return None
+        try:
+            data = json.loads(self.state_file.read_text())
+            classes = data["classes"]
+            if not isinstance(classes, dict) or any(c not in CLASSES for c in classes):
+                raise ValueError(f"unknown class in {sorted(classes)}")
+            return classes
+        except Exception as e:
+            raise SystemExit(f"cannot read the saved rules in {self.state_file} ({e}); refusing to start "
+                             f"without them. Fix or move the file to start from the defaults.")
+
+    def _save(self) -> None:
+        if self.state_file is None:
+            return
+        with self.lock:
+            classes = {c: ({"deny_all": True} if p.deny_all else {"settings": p.summary["settings"]})
+                       for c, p in self.policies.items() if p is not None}
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.state_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"format": "c3s.console.policies/1", "saved_at": time.time(), "classes": classes}, indent=2))
+        tmp.replace(self.state_file)  # atomic: a crash mid-write never leaves half a file
 
     # -- what is installed ---------------------------------------------------
 
@@ -200,13 +240,15 @@ class Boundary:
         self._switch(cls, None)
         return {"class": cls, "installed": False}
 
-    def _switch(self, cls: str, compiled: Compiled | None) -> dict:
+    def _switch(self, cls: str, compiled: Compiled | None, save: bool = True) -> dict:
         if cls not in CLASSES:
             raise ValueError(f"no such class: {cls!r}; one of {', '.join(CLASSES)}")
         with self.lock:
             self.policies[cls] = compiled
             for a in self.agents.values():  # a new circuit starts every agent from reset
                 a["classes"][cls] = _fresh_class_state()
+        if save:
+            self._save()
         summary = dict(compiled.summary) if compiled else {"installed": False}
         summary["class"] = cls
         return summary
@@ -665,7 +707,11 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     print(f"compiling the default rules (the ones the fly circuit obeys) from {REPO} …", flush=True)
-    BOUNDARY = Boundary(FLY_DEFAULT)
+    BOUNDARY = Boundary(FLY_DEFAULT, STATE_FILE)
+    print(f"rules are kept in {STATE_FILE}", flush=True)
+    for cls, compiled in BOUNDARY.policies.items():
+        if compiled is not None and cls != DEFAULT_CLASS:
+            print(f"  {cls}: {'denied outright' if compiled.deny_all else '; '.join(compiled.summary['rules'])}", flush=True)
     s = BOUNDARY.policies[DEFAULT_CLASS].summary
     print(f"  {DEFAULT_CLASS}: {'; '.join(s['rules'])}")
     print(f"  {s['circuit']['nand']} NAND + {s['circuit']['latch']} LATCH · {s['checked']['rows']} rows checked · "
