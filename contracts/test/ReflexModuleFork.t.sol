@@ -94,6 +94,8 @@ contract ReflexModuleForkTest is Test {
 
         machine = new NandMachine();
         module = new ReflexModule(machine, NETLIST, SHA, N_IN, OPTIONAL, N_STATE, ISafe(address(safe)), supervisor, address(0));
+        vm.prank(supervisor);
+        module.setAgent(agent, true);
         _asOwner(address(safe), abi.encodeCall(ISafeFull.enableModule, (address(module))));
     }
 
@@ -340,31 +342,52 @@ contract ReflexModuleForkTest is Test {
         assertEq(recipient.balance, 0);
     }
 
-    /// The route around it that this fork run found, and did not close. `act` keys
-    /// everything by `msg.sender` and asks nobody who the agent is, so an address that
-    /// appears nowhere in the deployment arrives with empty latches: `request` and `intent`
-    /// high, `blocked` low, `irreversible` low for a zero-value call whose selector is not
-    /// on the list, no prior grant to cool down from — granted, on its first tick. Every
-    /// tick-counting rule is per address, so a second address is a second budget.
+    /// The route this fork run found, and the fix for it. `act` keys everything by
+    /// `msg.sender`, so before the module knew who its agents were, an address that appeared
+    /// nowhere in the deployment arrived with empty latches — `request` and `intent` high,
+    /// `blocked` low, `irreversible` low for a zero-value call whose selector is not on the
+    /// list, no prior grant to cool down from — and was granted on its first tick. Every
+    /// tick-counting rule was therefore per address, and addresses are free, which made
+    /// `min_gap_ticks` a cost rather than the boundary AGENT.md calls it.
+    ///
+    /// Now `act` asks. An unnamed caller gets `NotAgent` and spends nothing, while the agent
+    /// the supervisor named is unaffected — and a stranger still cannot spend a confirmation
+    /// left for that agent, because the confirmation key names the agent.
     /// docs/ONCHAIN-LOCAL-FORK.md, "The route around it".
-    function test_fork_anyAddressIsAFreshAgentWithEmptyLatches() public {
+    function test_fork_anUnnamedCallerIsNotAnAgent() public {
         SlotWriter writer = new SlotWriter();
         bytes memory write = abi.encodeCall(SlotWriter.write, (stranger));
 
         assertTrue(_act(agent, address(writer), 0, write), "the named agent's first tick");
         assertFalse(_act(agent, address(writer), 0, write), "the named agent is now cooling down");
 
-        // A different address, never registered, never funded by us, in the same block.
-        assertTrue(_act(stranger, address(writer), 0, write), "a stranger's first tick was refused");
-        assertFalse(module.lastFailed(stranger), "the stranger's call did not reach the Safe");
-        assertEq(module.recordOf(stranger).ticks, 1, "the stranger's own tick counter");
-        assertEq(module.recordOf(agent).ticks, 2, "the agent's, untouched by the stranger");
+        vm.expectRevert(abi.encodeWithSelector(ReflexModule.NotAgent.selector, stranger));
+        this.strangerActs(address(writer), write);
+        assertEq(module.recordOf(stranger).ticks, 0, "an unnamed caller spent a tick");
+        assertEq(module.recordOf(agent).ticks, 2, "the agent's counter, untouched");
 
-        // What the arrangement does stop, even so: value and listed selectors still need a
-        // confirmation, and a confirmation names the agent, so it cannot be spent by another.
+        // Named, the same address is an agent with its own empty latches — which is the
+        // point of naming rather than of a second contract.
+        vm.prank(supervisor);
+        module.setAgent(stranger, true);
+        assertTrue(_act(stranger, address(writer), 0, write), "a named second agent was refused");
+
+        // Even so, a confirmation belongs to one agent: the key includes it.
         _confirm(recipient, MOVED, "");
-        assertFalse(_act(stranger, recipient, MOVED, ""), "a stranger spent the agent's confirmation");
-        assertEq(address(safe).balance, FUNDING, "value left the Safe on a stranger's tick");
+        assertFalse(_act(stranger, recipient, MOVED, ""), "a second agent spent the first one's confirmation");
+        assertEq(address(safe).balance, FUNDING, "value left the Safe on the wrong agent's tick");
+
+        // And taking the name away is a kill switch for that agent alone.
+        vm.prank(supervisor);
+        module.setAgent(stranger, false);
+        vm.expectRevert(abi.encodeWithSelector(ReflexModule.NotAgent.selector, stranger));
+        this.strangerActs(address(writer), write);
+        assertTrue(safe.isModuleEnabled(address(module)), "the module is still enabled for the others");
+    }
+
+    function strangerActs(address to, bytes memory data) external {
+        vm.prank(stranger);
+        module.act(to, 0, data);
     }
 }
 

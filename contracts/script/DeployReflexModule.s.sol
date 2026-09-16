@@ -20,6 +20,10 @@ import {ReflexModule} from "../src/ReflexModule.sol";
 ///     SAFE             the Safe the module will be enabled on
 ///     SUPERVISOR       the key that writes blocked / confirm / heartbeat / the selector list
 ///     SUPERVISOR_B     the second key, only for two_key policies (optional, default 0)
+///     AGENT            the address allowed to call `act` (optional; name it later with
+///                      `setAgent` as the supervisor, but name it before the owners enable
+///                      the module: an unnamed module grants nothing, a named one grants
+///                      only that address, and neither state is one to leave to chance)
 ///     NAND_MACHINE     an already deployed evaluator to reuse (optional; deploys one otherwise)
 ///
 ///     cd contracts
@@ -40,6 +44,7 @@ contract DeployReflexModule is Script {
         address safe = vm.envAddress("SAFE");
         address supervisor = vm.envAddress("SUPERVISOR");
         address supervisorB = vm.envOr("SUPERVISOR_B", address(0));
+        address agent = vm.envOr("AGENT", address(0));
         address existingMachine = vm.envOr("NAND_MACHINE", address(0));
 
         require(sha256(netlist) == want, "NETLIST does not hash to NETLIST_SHA256");
@@ -48,6 +53,9 @@ contract DeployReflexModule is Script {
         vm.startBroadcast();
         machine = existingMachine == address(0) ? new NandMachine() : NandMachine(existingMachine);
         module = new ReflexModule(machine, netlist, want, nIn, uint8(optional), nState, ISafe(safe), supervisor, supervisorB);
+        // Only possible here if the broadcasting key *is* the supervisor; otherwise the
+        // supervisor sends `setAgent` itself, before the module is enabled.
+        if (agent != address(0) && supervisor == msg.sender) module.setAgent(agent, true);
         vm.stopBroadcast();
 
         require(module.netlistSha256() == want, "deployed netlist is not the one exported");
@@ -56,6 +64,8 @@ contract DeployReflexModule is Script {
         console2.log("ReflexModule ", address(module));
         console2.log("Safe         ", safe);
         console2.log("Supervisor   ", supervisor);
-        console2.log("Next: the Safe's owners enable the module (enableModule), then the agent calls act.");
+        console2.log("Agent named  ", agent != address(0) && module.agents(agent));
+        console2.log("Next: the supervisor names the agent (setAgent) and lists the irreversible selectors,");
+        console2.log("then the Safe's owners enable the module (enableModule), and then the agent calls act.");
     }
 }

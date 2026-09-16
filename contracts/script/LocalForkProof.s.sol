@@ -84,7 +84,10 @@ contract LocalForkProof is Script {
         ReflexModule module = new ReflexModule(machine, netlist, sha, nIn, optional, nState, ISafe(safeAddr), A0, address(0));
         module.setIrreversible(bytes4(keccak256("transfer(address,uint256)")), true);
         module.setIrreversible(bytes4(keccak256("approve(address,uint256)")), true);
+        module.setAgent(A1, true);
         vm.stopBroadcast();
+        require(module.agents(A1), "the agent was not named");
+        require(!module.agents(A9), "a stranger was named");
         require(module.netlistSha256() == sha, "the deployed netlist is not the exported one");
         require(keccak256(module.netlist()) == keccak256(netlist), "the netlist does not read back from code");
 
@@ -183,16 +186,20 @@ contract LocalForkProof is Script {
         require(module.lastFailed(A1), "(d) the forwarded call should be recorded as failed");
         console2.log("(d) no second path: a granted tick through MultiSendCallOnly cannot add an owner");
 
-        // (e) a stranger. `act` records state per `msg.sender` and has no idea who the agent
-        //     is, so an address that appears nowhere in the deployment is a fresh agent with
-        //     empty latches — see docs/ONCHAIN-LOCAL-FORK.md, "the route around it".
-        vm.startBroadcast(A9);
-        (bool strangerGranted,) = module.act(ELSEWHERE, 0, "");
-        vm.stopBroadcast();
-        console2.log(
-            string.concat("(e) stranger tick 1 granted=", strangerGranted ? "true" : "false", " (see the doc)")
-        );
-        require(module.recordOf(A9).ticks == 1, "(e) the stranger spent no tick");
+        // (e) a stranger. `act` records state per `msg.sender`, so before it asked who the
+        //     agent was, an address that appears nowhere in the deployment was a fresh agent
+        //     with empty latches and was granted on its first tick — see
+        //     docs/ONCHAIN-LOCAL-FORK.md, "The route around it". Now it is refused at the
+        //     door, with the module's own reason, and spends nothing.
+        //     This one is checked in simulation, not broadcast: a reverting transaction
+        //     aborts a broadcast run. `scripts/onchain_local_fork.sh` re-checks it against
+        //     the chain with `cast call`, and the fork tests assert the typed error.
+        vm.prank(A9);
+        (bool reached, bytes memory err) = address(module).call(abi.encodeCall(ReflexModule.act, (ELSEWHERE, 0, "")));
+        require(!reached, "(e) an address nobody named was allowed to act");
+        require(bytes4(err) == ReflexModule.NotAgent.selector, "(e) refused for some other reason");
+        require(module.recordOf(A9).ticks == 0, "(e) the stranger spent a tick");
+        console2.log("(e) an address nobody named is refused with NotAgent and spends nothing");
 
         console2.log("all assertions held, on a local fork, nothing broadcast");
     }

@@ -63,8 +63,9 @@ transaction, with `NandMachine` and one `ReflexModule` deployed over the compile
 Policy(min_gap_ticks=4, confirm_per_irreversible=True, forbid_when_blocked=True)
 ```
 
-and the module enabled by an owner-sent `execTransaction`. The agent is anvil account 1: not
-an owner, never an owner, holding nothing but the ability to call `act`.
+and the module enabled by an owner-sent `execTransaction`. The agent is anvil account 1,
+named by the supervisor: not an owner, never an owner, holding nothing but the ability to
+call `act`.
 
 ## What is proven
 
@@ -186,48 +187,50 @@ a `false` should read the return value, or `peek` first — which is free and ch
 
 ## The route around it
 
-Two things were found while looking for the way around this, and only one of them is closed.
+Two things were found while looking for the way around this. Both are closed now; the
+first was wide open when this fork run began, and closing it is a separate commit.
 
-### Any address is a fresh agent — open
+### Any address was a fresh agent — found here, then closed
 
-`act` records everything under `msg.sender` and never asks who the agent is. There is no
-allowlist. So on a module that has just been enabled, an address that appears nowhere in the
-deployment — never registered, never funded, never mentioned — arrives with empty latches:
-`request` and `intent` high because it called, `blocked` low, `irreversible` low for a
-zero-value call whose selector is not on the supervisor's list, and no earlier grant to cool
-down from. It is **granted on its first tick**, and the Safe performs the call.
+As the module stood when this fork run began, `act` recorded everything under `msg.sender`
+and never asked who the agent was. There was no allowlist. So on a module that had just been
+enabled, an address that appeared nowhere in the deployment — never registered, never
+funded, never mentioned — arrived with empty latches: `request` and `intent` high because it
+called, `blocked` low, `irreversible` low for a zero-value call whose selector is not on the
+supervisor's list, and no earlier grant to cool down from. It was **granted on its first
+tick**, and the Safe performed the call. Anvil account 9, in a real transaction, did exactly
+that.
 
-`test_fork_anyAddressIsAFreshAgentWithEmptyLatches` asserts this, and the script's case (e)
-does it with a real transaction from anvil account 9. The consequence is not only that a
-stranger gets one call; it is that *every tick-counting rule is per address*. "At most one
-grant in any four ticks" bounds one address. Ten addresses are ten budgets, and they cost an
-attacker nothing to create.
+The consequence was not that a stranger got one call. It was that *every tick-counting rule
+was per address*: "at most one grant in any four ticks" bounded one address, ten addresses
+were ten budgets, and addresses are free. [AGENT.md](AGENT.md) calls `min_gap_ticks` and
+`max_grants` **boundaries**, "because they count grants rather than inputs" — with no list
+of agents that claim was false on chain, and they were costs.
 
-What still holds under this, and is asserted: value and listed selectors need a
-confirmation, and a confirmation is keyed to the agent, so a stranger cannot spend the one
-left for the real agent. The hole is the reversible, unlisted calls — which, given a
-fail-open selector list, is most calls.
-
-The smallest honest fix is an allowlist the supervisor writes, so that a module with no
-registered agent is inert rather than open:
+So the module now asks. The supervisor names agents; an unnamed caller gets the module's own
+`NotAgent(address)` and spends no tick; a module nobody has been named on grants nothing to
+anybody, which is the safe direction to fail in. `setAgent(x, false)` is a kill switch for
+one agent, finer than the owners' `disableModule`.
 
 ```solidity
-mapping(address => bool) public agents;
+mapping(address => bool) public agents;          // written by the supervisor
 error NotAgent(address who);
 
-function setAgent(address agent, bool on) external onlySupervisor {
-    agents[agent] = on;
-    emit AgentSet(agent, on);
-}
-
-// in act(), after the re-entry check so that a re-entrant call still reads Reentrant:
+// in act(), after the re-entry check, so a re-entrant call still reads Reentrant:
 if (!agents[msg.sender]) revert NotAgent(msg.sender);
 ```
 
-with a matching step in `ONCHAIN-SELF-DEPLOY.md`: register the agent and list the
-irreversible selectors *before* the owners enable the module. Until that lands, the reader's
-own mitigation is to treat `enableModule` as the moment the module goes live for everybody,
-and to list as irreversible every selector they would mind a stranger calling.
+`test_fork_anUnnamedCallerIsNotAnAgent` asserts the refusal, that no tick is spent, that
+naming the same address makes it an agent with its own latches, and that un-naming it stops
+that agent alone. `ONCHAIN-SELF-DEPLOY.md` gained the step, before `enableModule` rather
+than after it, and `DeployReflexModule.s.sol` an optional `AGENT`. The cost is one cold
+`SLOAD` per tick: a refused tick went from ~121k to ~123k gas, a granted one from ~209k to
+~211k.
+
+What held even without the list, and is still asserted: value and listed selectors need a
+confirmation, and the confirmation key names the agent, so one agent cannot spend
+another's. The exposure was the reversible, unlisted calls — which, given a fail-open
+selector list, is most calls.
 
 ### Delegatecall around the module — closed
 

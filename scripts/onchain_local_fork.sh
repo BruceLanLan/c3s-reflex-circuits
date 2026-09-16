@@ -174,6 +174,19 @@ case "$FORBIDDEN" in
   *) die "act() on the Safe itself did not revert with ForbiddenTarget: $FORBIDDEN" ;;
 esac
 
+check "the agent is named" true "$(cast call "$FORK_MODULE" "agents(address)(bool)" "$FORK_AGENT" --rpc-url "$RPC")"
+check "the stranger is not named" false "$(cast call "$FORK_MODULE" "agents(address)(bool)" "$FORK_STRANGER" --rpc-url "$RPC")"
+
+# The other refusal that is a revert with the module's own reason: an address nobody named.
+set +e
+UNNAMED=$(cast call "$FORK_MODULE" "act(address,uint256,bytes)(bool,bytes)" "$FORK_RECIPIENT" 0 0x \
+  --from "$FORK_STRANGER" --rpc-url "$RPC" 2>&1)
+set -e
+case "$UNNAMED" in
+  *"NotAgent(${FORK_STRANGER}"*) printf '   ok   %-44s %s\n' "act() from an unnamed address reverts" "NotAgent($FORK_STRANGER)" ;;
+  *) die "an unnamed caller was not refused with NotAgent: $UNNAMED" ;;
+esac
+
 say "5. the fork tests: the ways around it"
 ( cd "$ROOT/contracts" && FORK_URL="$RPC" forge test --match-path 'test/ReflexModuleFork.t.sol' -vv \
     | grep -E '^(\[PASS|\[FAIL|Suite result|Ran )' )
