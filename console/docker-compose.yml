@@ -21,6 +21,12 @@
 #   docker compose up -d
 #   docker compose exec agent bash  # run Claude Code / your MCP client in here
 #
+# Start the console on the host with REFLEX_REQUIRE_AGENT_TOKEN=1 when you use this. The
+# one call this container may make names the agent it is for, in its body, and an unbound
+# name is one anything may speak for (I-3's compatibility clause) — so without that
+# setting the container can still act as, and spend the confirm of, any agent nobody has
+# bound yet. docs/ISOLATION.md, "what the container can still do", with the proof.
+#
 # Proofs, and how to re-run them: docs/ISOLATION.md. What this does and does not stop:
 # SECURITY.md.
 

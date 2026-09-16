@@ -51,6 +51,19 @@ docker compose up -d
 docker compose exec agent bash           # run Claude Code or your MCP client in here
 ```
 
+**Start the console with `REFLEX_REQUIRE_AGENT_TOKEN=1`** when you run this recipe:
+
+```sh
+REFLEX_REQUIRE_AGENT_TOKEN=1 python console.py
+```
+
+Without it, the one call the container is allowed to make is a blank cheque on every
+agent name *nobody has bound yet* — see "what the container can still do" below. With it,
+a request whose name has no token is refused instead of trusted, so the container can only
+ever speak as itself. It is off by default because I-3 promises in `docs/API.md` that an
+unbound name keeps working; a deployment that has put its agent in a container has no use
+for that promise.
+
 Inside the container, point the hooks at `/opt/reflex/adapters/claude_code_hook.py` and
 `claude_code_post_hook.py` exactly as `adapters/README.md` says; `REFLEX_CONSOLE` and
 `REFLEX_AGENT_TOKEN` are already in the environment. The first request binds the agent name
@@ -228,6 +241,42 @@ $ echo '{"tool_name":"Bash","tool_input":{"command":"rm -rf /work/x"},"cwd":"/wo
  the console answered HTTP 403 to `irreversible` for 'claude-code:container'. …"}}
 ```
 
+## What the container can still do
+
+The adversarial review of this workstream found this, and it is the most important line on
+the page. The container's one permitted call carries a JSON body, and the body says which
+agent the request is for. The console trusts that name — that is I-3's compatibility
+clause: **a name nobody has bound is a name anything can speak for**, and "anything"
+includes the container. So by default, from inside the isolation recipe, an agent can:
+
+* tick another (unbound) agent's circuit under its name, moving its cooldown and streak;
+* **spend a confirm a person left for another unbound agent**, if it can produce the exact
+  `reason` that confirm was bound to;
+* bind a name the real agent has not claimed yet and lock it out (`403` for the owner
+  afterwards, until someone rotates it).
+
+Two things limit it, and neither is a defence you should rely on: `/api/state` is not
+reachable through the gateway, so it cannot *read* what another agent has waiting (it would
+have to guess the `reason` string, and a confirm is bound to one); and every one of those
+requests is in the transcript under the name it used.
+
+The fix is the one above: `REFLEX_REQUIRE_AGENT_TOKEN=1` on the console, plus binding every
+agent name you care about at install time so there is nothing left to squat. Proof, on a
+console started with it:
+
+```sh
+$ curl -s -X POST http://127.0.0.1:8855/api/request -H 'content-type: application/json' \
+    -d '{"agent":"someone-elses-name","class":"exec","intent":1,"reason":"[exec] not mine"}'
+{"error": "'someone-elses-name' is not bound to any token and this console requires one
+(REFLEX_REQUIRE_AGENT_TOKEN). Send that agent's REFLEX_AGENT_TOKEN in X-Reflex-Agent-Token;
+a person can drop a binding with `c3s token rotate --agent <name>`."}
+
+$ # with a token of its own, the first request still binds (trust on first use):
+$ curl … -H 'X-Reflex-Agent-Token: mine' … → http=200
+$ # and afterwards that name refuses any other token:
+{"error": "'someone-elses-name' is bound to its own agent token and this is not it. …"}
+```
+
 ## What this does not do
 
 * **The agent still needs the network for its model.** This recipe gives the agent *no*
@@ -268,6 +317,11 @@ README 承认的那条限制（同一台机器、同一个用户下，agent 能�
   也报不上去。
 * 上面每一段输出都是本机 2026-09-16 真跑出来的：带着操作者令牌写 `confirm` 仍然 403；
   按地址和按名字都连不上后台；换个令牌冒充同一个 agent 名 403 并进流水 `kind: "spoof"`。
+* **对抗审查在这个配方上找到的高危**：那唯一一条允许的请求里，agent 名字是 body 说的，
+  而"没人绑过的名字任何人都能用"是 I-3 写在 `docs/API.md` 里的兼容承诺——于是容器里的 agent
+  默认可以顶着别的**未绑定** agent 的名字发请求、花掉人给它留的 confirm（需要猜中那条
+  `reason`）、甚至抢先把名字绑走把真身锁在外面。修法：后台加 `REFLEX_REQUIRE_AGENT_TOKEN=1`
+  （上面"Run it"已写，带真实输出），并在安装时就把每个 agent 名绑定，别留可抢的名字。
 * 还没解决的：容器**完全没有出网**，需要访问模型 API 的 agent 得自己加一层只放行模型域名的
   代理（未验证、未提供配置）；容器不是对抗内核逃逸的沙箱；挂进 `/work` 的东西 agent 仍然
   能改。
