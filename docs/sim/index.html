@@ -422,7 +422,7 @@
     <div class="tabs-scroll">
       <div class="tabs" role="tablist" aria-label="Views">
         <button type="button" role="tab" id="tab-handheld" data-tab="handheld" aria-controls="panel-handheld" aria-selected="true" data-i18n="tabHandheld">Handheld</button>
-        <button type="button" role="tab" id="tab-fly" data-tab="fly" aria-controls="panel-3d" aria-selected="false" tabindex="-1" data-i18n="tabFly">Fly brain</button>
+        <button type="button" role="tab" id="tab-fly" data-tab="fly" aria-controls="panel-3d" aria-selected="false" tabindex="-1" data-i18n="tabFly">Fly cells</button>
         <button type="button" role="tab" id="tab-wiring" data-tab="wiring" aria-controls="panel-3d" aria-selected="false" tabindex="-1" data-i18n="tabWiring">Wiring</button>
         <button type="button" role="tab" id="tab-chain" data-tab="chain" aria-controls="panel-chain" aria-selected="false" tabindex="-1" data-i18n="tabChain">On chain</button>
         <button type="button" role="tab" id="tab-fingerprint" data-tab="fingerprint" aria-controls="panel-fingerprint" aria-selected="false" tabindex="-1" data-i18n="tabFingerprint">Fingerprint</button>
@@ -487,7 +487,7 @@
 
     <div id="panel-3d" class="panel-3d wrap" role="tabpanel" aria-labelledby="tab-fly" hidden>
       <div class="panel-head">
-        <h2 id="title-cells" data-i18n="flyTitle">Fly brain: the cells the first circuit was built from</h2>
+        <h2 id="title-cells" data-i18n="flyTitle">Fly cells: the ones the first circuit was built from</h2>
         <h2 id="title-graph" data-i18n="wiringTitle" hidden>Measured wiring</h2>
         <span class="modes"><button type="button" id="stage-launch" data-i18n="stageLaunch">Launch a loom</button></span>
       </div>
@@ -587,7 +587,7 @@ const I18N = {
     agentNote: "真机上，Agent 页（菜单 3）的内容由边界值班台经 USB 串口送来，它的按键把 confirm 或 blocked 写回值班台。这个模拟器没有接值班台，所以这一页显示 no host。",
     diff4: "真机用 16 位色绘制，门阵每跑一遍主循环转一步；这里是 24 位色，门阵每个浏览器帧转一步。摘要页和自检页上的耗时是本浏览器的。",
     kMenu: "菜单", kOpen: "打开", kUp: "上移", kDown: "下移", kConfirm: "确认", kAgent: "Agent", kLattice: "门阵", kDigest: "摘要",
-    kMFly: "反射", kMBrain: "果蝇脑", kMAgent: "Agent", kMLattice: "门阵", kMDigest: "摘要", kMTest: "自检", kMKeys: "按键",
+    kMFly: "反射", kMBrain: "果蝇细胞", kMAgent: "Agent", kMLattice: "门阵", kMDigest: "摘要", kMTest: "自检", kMKeys: "按键",
     lede: "逃逸核心的 Cardputer ADV 固件，在浏览器里运行。解码网表字节、逐门求值 173 NAND + 6 LATCH、逼近几何、16 位感觉编码和开机自检，都是固件自己的 C 代码编译成的 WebAssembly；屏幕按固件的绘制代码用 JavaScript 重画。",
     bootTitle: "开机自检",
     loading: "正在加载 WebAssembly 模块…",
@@ -725,7 +725,7 @@ const I18N = {
 };
 Object.assign(I18N.en, {
   kMenu: "menu", kOpen: "open", kUp: "up", kDown: "down", kConfirm: "confirm", kAgent: "agent", kLattice: "lattice", kDigest: "digest",
-  kMFly: "reflex", kMBrain: "brain", kMAgent: "agent", kMLattice: "lattice", kMDigest: "digest", kMTest: "self-test", kMKeys: "keys",
+  kMFly: "reflex", kMBrain: "cells", kMAgent: "agent", kMLattice: "lattice", kMDigest: "digest", kMTest: "self-test", kMKeys: "keys",
   kGo: "launch", kLvUp: "l/v up", kLvDown: "l/v down", kAzL: "az left", kAzR: "az right",
   kPause: "pause", kStep: "tick", kAuto: "auto", kSound: "sound", kTest: "self-test", kHelp: "keys",
   fNetlist: "Core netlist", fPolicy: "Policy netlist", fModule: "Module", fScreen: "Screen",
@@ -1271,7 +1271,7 @@ function mix(a, b, k) {
 function drawBrain() {
   const t0 = millis();
   const text3 = () => {
-    text(4, 3, kText, "FLY BRAIN");
+    text(4, 3, kText, "FLY CELLS");
     text(64, 3, kMuted, "26 real cells");
   };
   if (!brain && skel) brain = buildBrain(skel);
@@ -1341,14 +1341,14 @@ function drawBrain() {
   text(4, 125, kDim, "MaleCNS v1.0 CC-BY  ENT loom  ` menu");
 
   brainMsSum += millis() - t0;
-  if (++brainFrames === 60) log(`brain view: ${Math.floor(brainMsSum / 60)} ms per frame over 60 frames`);
+  if (++brainFrames === 60) log(`cell view: ${Math.floor(brainMsSum / 60)} ms per frame over 60 frames`);
 }
 
 // ---------------------------------------------------------------- menu (drawMenu)
 
 const MENU = [
   ["1", "Fly escape reflex", "the circuit decides takeoff, live", "main"],
-  ["2", "Fly brain, real cells", "26 published cells lit by the circuit", "brain"],
+  ["2", "Fly cells, real shapes", "26 published cells lit by the circuit", "brain"],
   ["3", "Agent confirm key", "approve what the boundary held back", "agent"],
   ["4", "Gate lattice", "173 NAND gates, each lit by its value", "lattice"],
   ["5", "Whole-domain digest", "8,388,608 rows in this browser", "digest"],

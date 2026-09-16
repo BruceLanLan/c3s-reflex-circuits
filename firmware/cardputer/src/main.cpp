@@ -692,7 +692,7 @@ void drawBrain() {
   }
 
   char buf[48];
-  text(4, 3, kText, "FLY BRAIN");
+  text(4, 3, kText, "FLY CELLS");
   text(64, 3, kMuted, "26 real cells");
   if (haveTick) {
     snprintf(buf, sizeof buf, "%s", c3s_motor_names[last.motor & 3]);
@@ -705,7 +705,7 @@ void drawBrain() {
 
   brainMsSum += millis() - t0;
   if (++brainFrames == 60) {
-    Serial.printf("brain view: %lu ms per frame over 60 frames\n", (unsigned long)(brainMsSum / 60));
+    Serial.printf("cell view: %lu ms per frame over 60 frames\n", (unsigned long)(brainMsSum / 60));
   }
 }
 
@@ -719,7 +719,7 @@ struct MenuEntry {
 };
 const MenuEntry kMenu[] = {
     {'1', "Fly escape reflex", "the circuit decides takeoff, live", Page::Main},
-    {'2', "Fly brain, real cells", "26 published cells lit by the circuit", Page::Brain},
+    {'2', "Fly cells, real shapes", "26 published cells lit by the circuit", Page::Brain},
     {'3', "Agent confirm key", "approve what the boundary held back", Page::Agent},
     {'4', "Gate lattice", "173 NAND gates, each lit by its value", Page::Lattice},
     {'5', "Whole-domain digest", "8,388,608 rows on this chip, ~10 s", Page::Digest},
