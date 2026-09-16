@@ -925,6 +925,57 @@ def chain_check(entry: dict, decisive: dict, cls: str) -> None:
                           "circuits": circuits, "deployed": False}
 
 
+def _own_ipv4_addresses() -> set[str]:
+    """The IPv4 addresses this machine answers to on a network, computed once at startup.
+
+    Bound to 127.0.0.1 the console is reachable from here only and this set is unused.
+    Bound to 0.0.0.0 — which `c3s up --lan` does so that a phone on the same Wi-Fi can
+    approve — a request from that phone arrives with `Host: 192.168.x.y:8765`, a name this
+    machine really does answer to; refusing it would refuse the phone. Loopback and
+    link-local are left out (127.* is already allowed by name, 169.254.* reaches no
+    phone), and an IPv6 address is not covered: the pairing URL is IPv4.
+
+    This does not weaken the DNS-rebinding check: another site's page still arrives under
+    that site's name, which is not in here. It is the set `c3s_cli/paths.py:lan_ipv4()`
+    puts in the pairing QR, computed the same way, so the address a phone scans is one the
+    console accepts.
+    """
+    import socket
+
+    addresses: set[str] = set()
+    try:                                     # the address the default route would use
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            probe.connect(("192.0.2.1", 9))  # a documentation address; nothing is sent
+            addresses.add(probe.getsockname()[0])
+        finally:
+            probe.close()
+    except OSError:
+        pass
+    try:                                     # every interface that has an IPv4 address
+        import fcntl
+        import struct
+
+        for _index, name in socket.if_nameindex():
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                packed = fcntl.ioctl(sock.fileno(), 0xC0206921,  # SIOCGIFADDR
+                                     struct.pack("16s16x", name.encode()[:15]))
+                addresses.add(socket.inet_ntoa(packed[20:24]))
+            except OSError:
+                pass
+            finally:
+                sock.close()
+    except (ImportError, OSError):
+        pass
+    return {a for a in addresses if not a.startswith(("127.", "169.254.")) and a != "0.0.0.0"}
+
+
+# Only when the console is bound to every interface is a LAN name of this machine a name
+# it answers to; on loopback the set stays empty and nothing changes.
+LAN_HOSTS = _own_ipv4_addresses() if HOST in ("0.0.0.0", "", "::") else set()
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "reflex-console"
 
@@ -955,9 +1006,14 @@ class Handler(BaseHTTPRequestHandler):
         127.0.0.1 sends its own name here). A browser always sends Origin on a POST, so a POST
         from any other site's page is refused; programs (the adapters, curl) send none. And a
         POST must say application/json, which a page on another site cannot send without a
-        preflight this server never answers — no plain-form or text/plain request gets in."""
+        preflight this server never answers — no plain-form or text/plain request gets in.
+
+        "Its own name" includes this machine's own LAN addresses when the console is bound
+        to every interface (LAN_HOSTS, computed at startup), because that is the name a
+        phone that scanned the pairing QR arrives under."""
         host = (self.headers.get("Host") or "").lower()
         allowed_hosts = {f"127.0.0.1:{PORT}", f"localhost:{PORT}", f"[::1]:{PORT}", f"{HOST}:{PORT}"}
+        allowed_hosts |= {f"{ip}:{PORT}" for ip in LAN_HOSTS}
         if host not in allowed_hosts:
             self._json(403, {"error": "host not allowed: the console answers only to this machine by its own name"})
             return False
@@ -1068,7 +1124,6 @@ class Handler(BaseHTTPRequestHandler):
             TRANSCRIPTS.appendleft(note)
             self._json(200, summary)
         elif self.path == "/api/tool":
-                return
             bits = {k: v for k, v in payload.items() if k not in ("agent", "for_reason", "token", "code", "note")}
             # The person's bits need the operator token; the adapter's own (irreversible,
             # failed) do not, because setting either can only make a decision stricter.
