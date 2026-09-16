@@ -64,8 +64,11 @@ download mode, then upload again.
 
 Pinned: `espressif32` 6.9.0 (Arduino-ESP32 2.0.17), M5Cardputer 1.1.1, M5Unified
 0.2.22, M5GFX 0.2.29. A build on 2026-09-15 used 48,700 bytes of RAM (14.9 %) and
-532,769 bytes of flash (15.9 %). The prefix maps in `build_flags` keep the build
-machine's directories out of the image.
+532,769 bytes of flash (15.9 %); with the Wi-Fi link of W11 (below) a build on
+2026-09-16 used 159,420 bytes of RAM (48.7 %) and 1,118,993 bytes of flash (33.5 %) —
+the radio stack is most of that, and it is linked in whether or not a network is
+stored. The prefix maps in `build_flags` keep the build machine's directories out of
+the image.
 
 Without PlatformIO, write the image attached to the
 [v0.2.0 release](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0)
@@ -75,6 +78,110 @@ Without PlatformIO, write the image attached to the
 pip install esptool
 python -m esptool --chip esp32s3 write_flash 0x0 c3s-escape-core-cardputer-adv-v0.2.0.bin
 ```
+
+Writing an image is safe; **reading one back off a device that has joined a Wi-Fi
+network is not** — see "A provisioned device's flash is a secret" below.
+
+## A provisioned device's flash is a secret
+
+Until W11 this device held nothing: no credential, no key, no state that outlived a
+reset. That changed the moment it could reach the console over Wi-Fi. A device that
+has been through the **Network** page keeps, in its NVS partition:
+
+- the name of the Wi-Fi network and **its password**;
+- the address of the boundary console;
+- a **device token**, which is enough to write a person's `confirm` for a call that
+  console is waiting on.
+
+So, plainly:
+
+- **Never publish a flash dump of a provisioned device**, and never attach one to an
+  issue, a release or a message. It is not an image of this firmware; it is a copy of
+  a household's Wi-Fi password and a key to a person's approvals. (There is precedent
+  here: the very first backup taken from this device was flagged as possibly holding
+  the Wi-Fi credentials of the stock firmware that came on it.)
+- **A released image is built from an unprovisioned tree.** Credentials never enter a
+  build in the first place — `scripts/check_credentials.py` runs before every
+  `pio run` (`extra_scripts` in `platformio.ini`) and fails the build on a Wi-Fi name,
+  a password or a token in a source file or a build flag — so `firmware.bin` from a
+  clean checkout is safe to publish, and what must never be published is a dump read
+  back *off a device* (`esptool read_flash`).
+- **Forgetting really forgets.** `WiFi.persistent(false)` keeps the radio driver from
+  writing a second copy of the credentials into its own NVS namespace, so *Forget
+  network* on the Network page removes the only copy; *Unpair* removes the token. A
+  device you hand on, sell or send for repair should have both.
+- **Nothing is printed.** The password and the token are never written to the serial
+  log, never sent anywhere but the router and the console, and never shown on screen
+  (the password is masked as it is typed).
+
+## Over Wi-Fi
+
+USB is the default and the stronger arrangement: over a cable the relay runs inside the
+console's own process, there is no token to steal and no address to reach. Wi-Fi is a
+convenience — the device can sit on a desk across the room, or in a pocket — and it is
+built so that the one property that matters cannot be lost: **nothing on the network can
+press this key.**
+
+- The device **never listens**. There is no server on it, no subscription, nothing
+  inbound that makes it write. It connects out to the console, polls `GET
+  /api/device/frame` once a second for the same frame the cable carries, and posts to
+  `/api/tool` only when a finger presses a key.
+- The device **says who it is**: a device token, paired once, kept in NVS. The console
+  accepts it on `/api/tool` alone, for `confirm`, `confirm_b` or `blocked`, for an agent
+  that is in `pending[]` at that moment, with the two-digit matching code (I-2) of the
+  call on the screen — and for nothing else. Not `/api/policy`, not `/api/stop-all`, not
+  an agent nobody is waiting on. It is exactly as powerful as the cable, and no more.
+- Lifting a block and writing `heartbeat` are **refused over the network**, on purpose. A
+  block is lifted on the console or over USB; the heartbeat over Wi-Fi is the device's
+  *presence*, which the console works out from the polls themselves. A dead man's switch
+  a network write could hold open would not be a dead man's switch.
+- **No Wi-Fi never means "the person is there."** When the radio drops, the screen says
+  so and the polls stop; with a `heartbeat_ticks` halt installed, every agent stops
+  within a few ticks. The way back is a person's confirm, as it is when the cable is
+  pulled.
+- When **both** links are live the cable wins, and the Agent page's header says which
+  link the frame on the screen came in on (`host ok USB` / `host ok Wi-Fi`).
+
+### Pairing, by matching four digits
+
+The same idea as the approval codes: approving requires reading the same screen the
+request is on.
+
+```sh
+# on the computer, where the console runs
+c3s pair-device                       # (W1's CLI; today: python -m cardputer_relay open)
+# on the device: Network > 4 pair by code. It shows four digits.
+c3s pair-device --confirm 0263        # (today: python -m cardputer_relay confirm 0263)
+```
+
+The console generates the token inside an open window, hands it to the one device that
+claims that window, and derives four digits **from the token itself** — so digits that
+match mean both sides hold the same token. The console does not print them: the device
+shows them and the console asks for them, because a code both sides display can be
+confirmed without looking at the device. Until a person confirms, the token is accepted
+for nothing at all; a wrong code cancels the pairing rather than asking again; a second
+device that tries to take an open window is refused, and that refusal is the alarm.
+
+Paired devices live in `~/.c3s-circuit-agent/devices.json` (mode 600), which holds each
+token's SHA-256 and never a token. `python -m cardputer_relay status` lists them;
+`python -m cardputer_relay forget <device-id>` drops one.
+
+### The Network page
+
+| Key | Action |
+| --- | --- |
+| `1` | scan, and pick a network from the list |
+| `2` | type a network's name by hand (a hidden network) |
+| `3` | the console's address, `<ip>:<port>` — the one it prints at startup |
+| `4` | pair with the console: shows the four digits |
+| `5` | forget the network (and its password) |
+| `6` | unpair (forget the device token) |
+| DEL | back; on an empty entry line, out of the entry |
+
+The console has to be reachable from the device, which means starting it bound to every
+interface (`CONSOLE_HOST=0.0.0.0`); on loopback only the cable works. The console answers
+only to its own names, and its own LAN addresses count as its own names when it is bound
+that way.
 
 ## What the device checks at boot
 
@@ -144,6 +251,7 @@ The screen is 240 × 135:
 | `m` | sound on takeoff |
 | `t`, `h` | self-test report, key help |
 | `d` | digest the whole 8,388,608-row step relation on the device and show it with the time it took; sending `d` over the serial port does the same and prints the result |
+| `8` | the Network page: reach the console over Wi-Fi instead of the cable (above) |
 | `w` | the circuit as itself: one dot per cell, lines to the two signals each NAND reads, laid out left to right by logic depth and turning. Each dot's brightness is that gate's value on the tick being shown, recomputed from the netlist every frame — the geometry is the circuit's, not a picture of a fly |
 
 Each serial line is one tick, for example:
@@ -161,10 +269,14 @@ significant first).
 ```
 firmware/cardputer/platformio.ini
 firmware/cardputer/src/main.cpp            display, keyboard, speaker and tick scheduling
+firmware/cardputer/src/c3s_net.{h,cpp}     Wi-Fi, NVS, the outbound HTTP client, pairing
+firmware/cardputer/pio_check_credentials.py the pre-build credential check (below)
 firmware/cardputer/lib/c3s_core/c3s_core.* portable C99: netlist decoder and evaluator,
                                            SHA-256, looming geometry, encoding, episode
                                            runner, self-test
 firmware/cardputer/lib/c3s_core/c3s_data.* generated by scripts/build_firmware.py
+scripts/check_credentials.py               refuses a build that carries a network,
+                                           a password or a token
 firmware/host/c3s_host.c                   host driver for tests/test_firmware.py
 firmware/wasm/sim.c                        WebAssembly exports for the online simulator
 firmware/wasm/include/                     math.h and string.h for the freestanding build
@@ -174,7 +286,7 @@ docs/sim/                                  the simulator page, c3s_core.wasm and
 
 After a rebuild of the circuits, run `python scripts/build_demo.py` and then
 `python scripts/build_firmware.py`; `scripts/verify.sh` checks that both reproduce
-byte for byte. Only `main.cpp` and `platformio.ini` are specific to this device.
+byte for byte. Only `main.cpp`, `c3s_net.*` and `platformio.ini` are specific to this device.
 
 ## Limitations
 
@@ -193,4 +305,14 @@ byte for byte. Only `main.cpp` and `platformio.ini` are specific to this device.
 - First run on hardware, 2026-09-15, Cardputer ADV (ESP32-S3 revision v0.2): self-test
   PASS in 4,546 ms, both hashes ok, reference episodes 3/3, core against policy at
   rest 131,072/131,072, live geometry 3/3.
+- Over Wi-Fi the device is no longer credential-free: it holds the network's password
+  and a device token, and a person's `confirm` reaches the console over HTTP on the
+  local network instead of down a cable. The token is limited to what the cable could
+  do, and the console records which device wrote each bit, but the honest summary is
+  that Wi-Fi trades a cable's unreachability for reach. USB remains the default.
+- The Wi-Fi link is plain HTTP on the local network, exactly as the console's own page
+  is: the frame the device polls (what is waiting for a person, and why) and its writes
+  are readable by anything that can already read the console's own traffic. The console
+  answers only to its own names, and the token is a header, not a URL — but this is a
+  home LAN's protection, not a transport's.
 - Nothing here adds a claim about the fly. See [LIMITATIONS.md](LIMITATIONS.md).
