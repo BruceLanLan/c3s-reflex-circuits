@@ -18,7 +18,9 @@ Wire format, one ASCII line each, fields separated by `|` (stripped from the val
       L|<G or R>|<agent>|<class>|<why or reason>            the latest decision
       E|<items>                                             commit the frame
     device -> host
-      K|confirm|<agent>   K|confirm_b|<agent>   K|block|<agent>   K|unblock|<agent>
+      K|confirm|<agent>|<i>   K|confirm_b|<agent>|<i>   K|block|<agent>   K|unblock|<agent>
+                          <i> is the item the device had selected; the confirm is bound to that
+                          item's call, so it cannot be spent on a different one
       K|stop_all|*        K|resume_all|*        (every agent the console knows)
       H|                  the device is present, every 2 s while a console listens
 
@@ -74,12 +76,13 @@ def pending_items(state: dict) -> list[dict]:
         for w in e.get("why") or []:
             bit = next((b for rx, b in RESOLVE if rx.search(w)), None)
             if bit:
-                out.append({"agent": e["agent"], "class": key[1], "tick": e.get("tick", 0), "why": w, "bit": bit})
+                out.append({"agent": e["agent"], "class": key[1], "tick": e.get("tick", 0), "why": w, "bit": bit,
+                            "reason": e.get("reason", "")})
                 break
     return out
 
 
-def frame(state: dict) -> tuple[list[str], set[str]]:
+def frame(state: dict) -> tuple[list[str], list[dict]]:
     policies = state.get("policies", {})
     parts = []
     for cls in ("spend", "message", "exec", "files", "halt"):
@@ -95,7 +98,8 @@ def frame(state: dict) -> tuple[list[str], set[str]]:
     chain = "off"
     if state.get("chain", {}).get("enabled"):
         latest = next((e for e in requests if e.get("chain")), None)
-        chain = "idle" if latest is None else ("err" if latest["chain"].get("error") else ("ok" if latest["chain"].get("agrees") else "DISAGREE"))
+        chain = ("idle" if latest is None else "..." if latest["chain"].get("pending")
+                 else "err" if latest["chain"].get("error") else "ok" if latest["chain"].get("agrees") else "DISAGREE")
     blocked = sum(1 for a in state.get("agents", []) if a.get("armed", {}).get("blocked"))
     lines = [f"S|{clean(' '.join(parts), 40)}|{granted}|{len(requests) - granted}|{chain}|{blocked}"]
 
@@ -109,14 +113,14 @@ def frame(state: dict) -> tuple[list[str], set[str]]:
         said = "; ".join(e.get("why") or []) or e.get("reason", "")
         lines.append(f"L|{'G' if e.get('granted') else 'R'}|{clean(e['agent'], 30)}|{e.get('class', 'exec')}|{clean(said, 60)}")
     lines.append(f"E|{len(items)}")
-    return lines, {it["agent"] for it in items}
+    return lines, items
 
 
 class Relay(threading.Thread):
     def __init__(self, boundary, port: str, log=print) -> None:
         super().__init__(daemon=True, name="cardputer-relay")
         self.boundary, self.want, self.log = boundary, port, log
-        self.shown: set[str] = set()
+        self.shown: list[dict] = []
         self.connected = False
         self.last_key, self.last_key_at = None, 0.0
         self.heard_at = 0.0
@@ -147,9 +151,10 @@ class Relay(threading.Thread):
 
     def _key(self, line: str) -> None:
         parts = line.split("|")
-        if len(parts) != 3 or parts[0] != "K":
+        if len(parts) not in (3, 4) or parts[0] != "K":
             return
-        _, action, agent = parts
+        action, agent = parts[1], parts[2]
+        index = int(parts[3]) if len(parts) == 4 and parts[3].isdigit() else None
         if action in ("stop_all", "resume_all") and agent == "*":
             now = time.time()
             if self.last_key == (action, agent) and now - self.last_key_at < 0.5:
@@ -170,12 +175,24 @@ class Relay(threading.Thread):
                 "block": {"blocked": 1}, "unblock": {"blocked": 0}}.get(action)
         if bits is None:
             return
-        # Only an agent the device was just shown; block/unblock also any known agent.
+        # Block/unblock: any known agent. Confirm: only an item the device was just shown,
+        # and bound to that item's call.
         known = {a["agent"] for a in self.boundary.status()["agents"]}
-        if agent not in self.shown and not (action in ("block", "unblock") and agent in known):
-            self.log(f"cardputer: ignored {action} for {agent!r} (not on its screen)")
+        bind_to = None
+        if action in ("confirm", "confirm_b"):
+            mine = [it for it in self.shown if it["agent"] == agent]
+            if index is not None and 0 <= index < len(self.shown) and self.shown[index]["agent"] == agent:
+                item = self.shown[index]
+            else:
+                item = mine[0] if mine else None  # older firmware sends no index: the newest item shown
+            if item is None:
+                self.log(f"cardputer: ignored {action} for {agent!r} (not on its screen)")
+                return
+            bind_to = item.get("reason") or None
+        elif agent not in known:
+            self.log(f"cardputer: ignored {action} for {agent!r} (unknown agent)")
             return
-        entry = self.boundary.arm(agent, bits)
+        entry = self.boundary.arm(agent, bits, bind_to)
         entry["source"] = "cardputer"
         self.log(f"cardputer: {action} for {agent} (a person pressed a key)")
 

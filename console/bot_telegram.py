@@ -14,8 +14,10 @@ Any chat is an agent's channel. It may write what an agent may write:
 
 A chat listed in TOOL_LAYER_CHATS is the person's. Only there:
     /pending                what is waiting for a person, in the circuits' own words
-    /confirm [agent]        write confirm for that agent (default: the newest waiting)
-    /confirm_b [agent]      the second key, under a two-key rule
+    /confirm [n|agent]      confirm one waiting call: its /pending number, or an agent's
+                            newest; the confirm is held for that exact call and cannot be
+                            spent on a different one
+    /confirm_b [n|agent]    the second key, under a two-key rule
     /block <agent>          /unblock <agent>
     /stop                   block every agent          /resume   lift every block
 and those chats are told, once, whenever something new starts waiting for a person.
@@ -56,7 +58,7 @@ HELP_AGENT = (
 HELP_PERSON = (
     "\n\nThis chat is a person's (tool layer):\n"
     "/pending — what waits for you\n"
-    "/confirm [agent] · /confirm_b [agent]\n"
+    "/confirm [n|agent] · /confirm_b [n|agent] — for that call only\n"
     "/block <agent> · /unblock <agent>\n"
     "/stop — block every agent · /resume"
 )
@@ -88,15 +90,20 @@ def verdict_line(v: dict) -> str:
     if v.get("why"):
         lines.append("; ".join(v["why"]))
     chain = v.get("chain") or {}
-    if chain.get("error"):
+    if chain.get("pending"):
+        lines.append("BSC re-check still running — see the console's log")
+    elif chain.get("error"):
         lines.append(f"chain check unavailable: {chain['error']}")
     elif chain:
         lines.append(f"BSC {'agrees' if chain.get('agrees') else 'DISAGREES'} — read-only, nothing deployed")
     return "\n".join(lines)
 
 
-def pending_line(it: dict) -> str:
-    return f"{it['agent']} · {it['class']} · tick {it['tick']}\n  {it['why']}\n  /{it['bit']} {it['agent']}"
+def pending_line(it: dict, n: int | None = None) -> str:
+    head = f"{n}. " if n is not None else ""
+    call_line = f"\n  call: {it['reason']}" if it.get("reason") else ""
+    return (f"{head}{it['agent']} · {it['class']} · tick {it['tick']}{call_line}\n  {it['why']}\n"
+            f"  /{it['bit']} {n if n is not None else it['agent']}")
 
 
 def split_class(rest: list[str]) -> tuple[str, str]:
@@ -151,15 +158,24 @@ def handle(chat_id, text: str) -> None:
         agents = [a["agent"] for a in s["agents"]]
         waiting = pending_items(s)
         if command == "/pending":
-            say(chat_id, "\n\n".join(pending_line(it) for it in waiting) or "nothing is waiting for a person")
+            say(chat_id, "\n\n".join(pending_line(it, i + 1) for i, it in enumerate(waiting)) or "nothing is waiting for a person")
         elif command in ("/confirm", "/confirm_b"):
+            # A confirm is for one call: the item by its /pending number, or an agent's
+            # newest waiting item; the console holds it for that exact call.
             bit = command[1:]
-            target = rest[0] if rest else next((it["agent"] for it in waiting if it["bit"] == bit), None)
-            if target is None or target not in agents:
-                say(chat_id, f"no such agent waiting for {bit}" + (f": {target}" if target else ""))
+            mine = [it for it in waiting if it["bit"] == bit]
+            if rest and rest[0].isdigit():
+                n = int(rest[0])
+                item = waiting[n - 1] if 1 <= n <= len(waiting) and waiting[n - 1]["bit"] == bit else None
+            elif rest:
+                item = next((it for it in mine if it["agent"] == rest[0]), None)
+            else:
+                item = mine[0] if mine else None
+            if item is None:
+                say(chat_id, f"nothing waiting for {bit}" + (f" matches {rest[0]}" if rest else "") + "; see /pending")
                 return
-            call("/api/tool", {"agent": target, bit: 1})
-            say(chat_id, f"{bit} written for {target}; its next call reads it")
+            call("/api/tool", {"agent": item["agent"], bit: 1, "for_reason": item.get("reason", "")})
+            say(chat_id, f"{bit} written for {item['agent']}, for this call only: {item.get('reason') or '(no reason given)'}")
         elif command in ("/block", "/unblock"):
             if not rest or rest[0] not in agents:
                 say(chat_id, f"usage: {command} <agent>  (known: {', '.join(agents) or 'none'})")
