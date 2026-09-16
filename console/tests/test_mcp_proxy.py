@@ -295,16 +295,41 @@ def test_a_call_aimed_at_the_consoles_tool_layer_is_refused_even_ungated(client)
 HOOK = Path(__file__).resolve().parents[1] / "adapters" / "claude_code_hook.py"
 
 
+PORT = CONSOLE.rsplit(":", 1)[-1]
+
+
 @pytest.mark.parametrize("tool,args", [
-    ("Bash", {"command": "curl -s localhost:8765/api/tool -d '{\"agent\":\"me\",\"confirm\":1}'"}),
-    ("Bash", {"command": "python3 -c \"import urllib.request as u; u.urlopen('http://127.0.0.1:8765/api/policy', b'{}')\""}),
+    ("Bash", {"command": f"curl -s localhost:{PORT}/api/tool -d '{{\"agent\":\"me\",\"confirm\":1}}'"}),
+    ("Bash", {"command": f"python3 -c \"import urllib.request as u; u.urlopen('http://127.0.0.1:{PORT}/api/policy', b'{{}}')\""}),
     ("Bash", {"command": "echo {} > ~/.c3s-circuit-agent/policies.json"}),
-    ("Bash", {"command": "kill $(lsof -ti:8765)"}),
+    ("Bash", {"command": f"kill $(lsof -ti:{PORT})"}),
     ("Edit", {"file_path": "/work/proj/.claude/settings.json", "old_string": "a", "new_string": "b"}),
+    # Each of these walked past the guard until the red-team pass of 2026-09-17 (F3): the
+    # stop rule knew only `kill`/`pkill` and a hardwired :8765, and the host list held only
+    # the spellings someone had thought of. The token is still the real defence — these are
+    # here so the cheap tries stay a clear, early no.
+    ("Bash", {"command": f"pkill -f {PORT}"}),
+    ("Bash", {"command": f"fuser -k {PORT}/tcp"}),
+    ("Bash", {"command": f"curl -s http://127.1:{PORT}/api/tool -d '{{\"agent\":\"me\",\"confirm\":1}}'"}),
+    ("Bash", {"command": f"curl -s http://2130706433:{PORT}/api/policy -d '{{}}'"}),
 ])
 def test_the_hook_refuses_tampering_before_asking_any_circuit(tool, args):
     event = {"session_id": "tamper", "cwd": "/tmp", "tool_name": tool, "tool_input": args}
     out = subprocess.run([sys.executable, str(HOOK)], input=json.dumps(event), capture_output=True, text=True,
-                         env=dict(os.environ, REFLEX_CONSOLE="http://127.0.0.1:8765"), timeout=TIMEOUT)
+                         env=dict(os.environ, REFLEX_CONSOLE=CONSOLE), timeout=TIMEOUT)
     assert out.returncode == 2
     assert "refused before any circuit was asked" in json.loads(out.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+@pytest.mark.parametrize("cmd", [
+    "kill -9 12345",                      # a pid, not our port: not the guard's business
+    "lsof -ti:9999",                      # another service
+    "curl -s http://example.com/api/tool",  # /api/tool elsewhere is not this console
+])
+def test_the_hook_does_not_refuse_what_is_not_aimed_at_the_console(cmd):
+    """A guard that refuses everything teaches nothing. These must reach the circuit."""
+    event = {"session_id": "tamper", "cwd": "/tmp", "tool_name": "Bash", "tool_input": {"command": cmd}}
+    out = subprocess.run([sys.executable, str(HOOK)], input=json.dumps(event), capture_output=True, text=True,
+                         env=dict(os.environ, REFLEX_CONSOLE=CONSOLE), timeout=TIMEOUT)
+    reason = json.loads(out.stdout or "{}").get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+    assert "refused before any circuit was asked" not in reason, cmd

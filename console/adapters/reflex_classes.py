@@ -278,3 +278,34 @@ def matching_irreversible(tool_name: str, patterns: Sequence[str] = DEFAULT_IRRE
 def classify(tool_name: str, rules: Sequence[tuple[str, str]] = DEFAULT_RULES) -> str:
     hit = matching_rule(tool_name, rules)
     return hit[1] if hit else DEFAULT_CLASS
+
+
+# -- where the console is, for the adapters' self-protection guard ---------------------
+# Both adapters refuse a call aimed at the console's own host:port before asking any
+# circuit. That guard is defence in depth — the operator token is the real defence — but
+# it was keyed to literal spellings, and a red-team pass walked past it with `127.1`,
+# the decimal form of 127.0.0.1, and a hardwired `:8765` in the stop rule
+# (docs/REDTEAM-2026-09-17.md, F3). One definition now, so the two cannot drift apart.
+
+LOOPBACK_ALIASES = (
+    "127.0.0.1", "localhost", "0.0.0.0",
+    # Spellings the shell and the resolver accept and a substring check does not:
+    "127.1", "127.0.1", "2130706433", "0x7f000001", "017700000001",
+    "[::1]", "::1", "ip6-localhost",
+)
+
+
+def console_port(console_url: str) -> str:
+    from urllib.parse import urlsplit
+
+    u = urlsplit(console_url)
+    return str(u.port or (443 if u.scheme == "https" else 80))
+
+
+def console_markers(console_url: str) -> tuple[str, ...]:
+    """`host:port` spellings that mean "this console", lowercased for substring checks."""
+    from urllib.parse import urlsplit
+
+    port = console_port(console_url)
+    hosts = {(urlsplit(console_url).hostname or "127.0.0.1").lower(), *LOOPBACK_ALIASES}
+    return tuple(sorted({f"{h}:{port}" for h in hosts}))

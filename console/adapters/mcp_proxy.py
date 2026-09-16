@@ -57,7 +57,8 @@ import urllib.request
 from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from reflex_classes import CLASSES, classify, is_irreversible_tool, load_irreversible_tools, load_rules  # noqa: E402  (sibling file)
+from reflex_classes import (CLASSES, classify, console_markers, is_irreversible_tool,  # noqa: E402
+                            load_irreversible_tools, load_rules)  # (sibling file)
 
 LAUNCHERS =("python", "python3", "node", "npx", "uvx", "uv", "bun", "bunx", "deno", "npm", "pnpm", "yarn")
 
@@ -179,13 +180,8 @@ class Proxy:
         return self.refuse(msg, name, refusal)
 
     def reaches_the_guard(self, arguments: dict) -> Optional[str]:
-        from urllib.parse import urlsplit
-
-        u = urlsplit(self.console)
-        port = u.port or (443 if u.scheme == "https" else 80)
         text = json.dumps(arguments, ensure_ascii=False).lower()
-        hosts = {u.hostname or "127.0.0.1", "127.0.0.1", "localhost", "0.0.0.0", "[::1]"}
-        if any(f"{h}:{port}" in text for h in hosts) and ("/api/tool" in text or "/api/policy" in text):
+        if any(m in text for m in console_markers(self.console)) and ("/api/tool" in text or "/api/policy" in text):
             return "it would write to the boundary console's tool-layer or rules endpoint"
         return None
 
