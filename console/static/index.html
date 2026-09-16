@@ -194,6 +194,7 @@
   .log { display: grid; gap: 6px; }
   .e { display: grid; grid-template-columns: 62px 1fr; gap: 10px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-left-width: 3px; border-radius: 6px; font-size: 13px; min-width: 0; }
   .e.ok { border-left-color: var(--ok); } .e.no { border-left-color: var(--faint); } .e.tool { border-left-color: var(--tool); } .e.policy { border-left-color: var(--agent); } .e.err { border-left-color: var(--bad); }
+  .e.spoof { border-left-color: var(--bad); border-left-style: double; } .e.spoof .verdict { background: rgba(227,106,82,.14); color: var(--bad); }
   .e .t { font-family: var(--mono); font-size: 12px; color: var(--faint); padding-top: 2px; }
   .e .h { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-width: 0; }
   .e .h .agent { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
@@ -602,7 +603,8 @@ const T = {
     "ac.tester": "发一条请求", "ac.tester.sub": "演示用：这里两栏都是你在按，所以只是演示", "ac.intent": "intent 为高", "ac.send": "发出（1 拍）",
     "ac.log": "决策流水", "ac.sub": "最近 {n} 条 · 放行 {g} · 拒绝 {r}", "ac.none": "还没有记录。",
     "f.all": "全部", "f.granted": "放行", "f.refused": "拒绝", "f.tool": "工具层", "f.policy": "规则",
-    "v.grant": "放行", "v.refuse": "拒绝", "v.tool": "工具层", "v.policy": "规则",
+    "v.grant": "放行", "v.refuse": "拒绝", "v.tool": "工具层", "v.policy": "规则", "v.spoof": "冒名",
+    "e.spoof.missing": "这个名字已绑定令牌，请求却没带令牌 —— 没问任何电路就拒了。", "e.spoof.wrong": "这个名字已绑定令牌，请求带的不是它的令牌 —— 没问任何电路就拒了。",
     "e.tick": "第 {n} 拍", "e.gap": "距上次放行 {n} 拍", "e.why": "拒绝原因（电路原话）：", "e.granted": "每条检查都过，电路输出 grant = 1。",
     "e.ungated": "这一类没有电路：未设限。", "e.halt.no": "共享停机电路拒绝", "e.halt.ok": "共享停机电路放行",
     "e.chain.ok": "BSC（链 {id}）只读复核一致 · 未部署，无钱包", "e.chain.dis": "BSC（链 {id}）复核不一致：节点算出 grant = {g}", "e.chain.err": "链上复核不可用：{err}（裁决不受影响）",
@@ -715,7 +717,8 @@ const T = {
     "ac.tester": "Send a request", "ac.tester.sub": "for demos: you press both channels here, so it is only a demonstration", "ac.intent": "intent high", "ac.send": "Send (1 tick)",
     "ac.log": "Decision log", "ac.sub": "last {n} · {g} granted · {r} refused", "ac.none": "No entries yet.",
     "f.all": "all", "f.granted": "granted", "f.refused": "refused", "f.tool": "tool layer", "f.policy": "rules",
-    "v.grant": "GRANTED", "v.refuse": "REFUSED", "v.tool": "TOOL LAYER", "v.policy": "RULES",
+    "v.grant": "GRANTED", "v.refuse": "REFUSED", "v.tool": "TOOL LAYER", "v.policy": "RULES", "v.spoof": "NOT ITS TOKEN",
+    "e.spoof.missing": "This name is bound to a token and the request sent none — refused before any circuit was asked.", "e.spoof.wrong": "This name is bound to a token and the request sent a different one — refused before any circuit was asked.",
     "e.tick": "tick {n}", "e.gap": "{n} ticks since the previous grant", "e.why": "refused because (the circuit's own words):", "e.granted": "every check passed; the circuit output grant = 1.",
     "e.ungated": "no circuit for this class: not gated.", "e.halt.no": "shared halt circuit refused", "e.halt.ok": "shared halt circuit granted",
     "e.chain.ok": "BSC (chain {id}) read-only re-check agrees · nothing deployed, no wallet", "e.chain.dis": "BSC (chain {id}) DISAGREES: node computed grant = {g}", "e.chain.err": "chain check unavailable: {err} (verdict unaffected)",
@@ -1223,10 +1226,10 @@ function renderActivity(s) {
   $("ac-filters").querySelectorAll("[data-fc]").forEach((b) => b.addEventListener("click", () => { FILTER_CLS = b.dataset.fc; renderActivity(STATE); }));
   $("ac-filters").querySelectorAll("[data-fk]").forEach((b) => b.addEventListener("click", () => { FILTER_KIND = b.dataset.fk; renderActivity(STATE); }));
   const rows = tr.filter((e) => {
-    if (FILTER_CLS !== "all" && (e.kind === "request" || e.kind === "policy") && (e.class || "exec") !== FILTER_CLS) return false;
+    if (FILTER_CLS !== "all" && (e.kind === "request" || e.kind === "policy" || e.kind === "spoof") && (e.class || "exec") !== FILTER_CLS) return false;
     if (FILTER_CLS !== "all" && e.kind === "tool") return false;
     if (FILTER_KIND === "granted") return e.kind === "request" && e.granted;
-    if (FILTER_KIND === "refused") return e.kind === "request" && !e.granted;
+    if (FILTER_KIND === "refused") return (e.kind === "request" && !e.granted) || e.kind === "spoof";
     if (FILTER_KIND === "tool") return e.kind === "tool";
     if (FILTER_KIND === "policy") return e.kind === "policy";
     return true;
@@ -1245,6 +1248,14 @@ function entryHtml(e, compact) {
     const cz = e.circuit;
     return `<div class="e policy">${at}<div><div class="h"><span class="verdict">${t("v.policy")}</span>${chipFor(e.class || "exec")}<span class="agent">${cz ? t("e.policy", { cls: esc(e.class || "exec"), rules: esc((e.rules || []).join("; ")) }) : t("e.policy.none", { cls: esc(e.class || "exec") })}</span></div>` +
       (cz ? `<div class="d">${t("e.policy.s", { nand: num(cz.nand), latch: num(cz.latch), rows: num(e.rows), holds: `<span class="${e.every_rule_holds ? "ok" : "bad"}">${t(e.every_rule_holds ? "holds" : "fails")}</span>` })}</div>` : "") + `</div></div>`;
+  }
+  if (e.kind === "spoof") {
+    // A request under a bound name without that name's token: refused before any circuit
+    // was asked, so it has no tick and no inputs — only who claimed to be whom.
+    return `<div class="e spoof">${at}<div><div class="h"><span class="verdict">${t("v.spoof")}</span>${e.class ? chipFor(e.class) : ""}<span class="agent">${esc(e.agent)}</span></div>` +
+      `<div class="d">${t(e.token === "missing" ? "e.spoof.missing" : "e.spoof.wrong")}</div>` +
+      (e.reason ? `<div class="d reason">${esc(e.reason)}</div>` : "") +
+      (compact ? "" : `<ul class="why"><li>${esc((e.why || []).join("; "))}</li></ul>`) + `</div></div>`;
   }
   if (e.error) return `<div class="e err">${at}<div><div class="h"><span class="verdict">400</span></div><div class="d">${esc(e.error)}</div></div></div>`;
   const ok = !!e.granted;
@@ -1410,7 +1421,7 @@ $("cn-manifest-go").addEventListener("click", async () => {
   const note = $("cn-manifest-note"), pre = $("cn-manifest"), cls = CN_CLS;
   note.textContent = t("cn.manifest.busy");
   try {
-    const r = await fetch(`/api/manifest?class=${encodeURIComponent(cls)}`, { cache: "no-store" });
+    const r = await fetch(`/api/manifest?class=${encodeURIComponent(cls)}`, { cache: "no-store", headers: TOKEN ? { "x-reflex-token": TOKEN } : {} });
     const d = await r.json();
     if (!r.ok) { note.textContent = d.error || String(r.status); pre.hidden = true; return; }
     pre.textContent = d.manifest_canonical;  // byte for byte what the hash covers; do not reformat
@@ -1680,7 +1691,9 @@ $("cn-probe").addEventListener("click", async () => {
 // ---------- live ----------
 async function refresh() {
   try {
-    const r = await fetch("/api/state", { cache: "no-store" });
+    // Over the LAN the state needs the operator token (the phone that scanned the QR has it);
+    // on this machine the header is ignored.
+    const r = await fetch("/api/state", { cache: "no-store", headers: TOKEN ? { "x-reflex-token": TOKEN } : {} });
     if (!r.ok) throw new Error(r.status);
     render(await r.json());
     lastOk = Date.now();
@@ -1695,6 +1708,16 @@ function liveTick() {
   $("clock").textContent = new Date(now).toLocaleTimeString(locale(), { hour12: false });
 }
 
+// A pairing link carries the operator token in the fragment (`#approvals&token=…`). The
+// fragment never leaves the browser, so it is in no server log; it is kept here and then
+// taken off the address bar, so a screenshot or a forwarded link does not carry it on.
+(function takeTokenFromFragment() {
+  const m = /^#?([a-z]*)&token=([A-Za-z0-9_\-]+)$/.exec(location.hash || "");
+  if (!m) return;
+  TOKEN = m[2];
+  try { localStorage.setItem("reflex.token", TOKEN); } catch (e) { /* private window: this visit only */ }
+  history.replaceState(null, "", "#" + (m[1] || "approvals"));
+})();
 setLang(lang);
 show(location.hash.slice(1) || "overview");
 refresh();

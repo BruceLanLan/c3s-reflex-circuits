@@ -295,3 +295,20 @@ def test_an_agent_first_seen_after_the_stop_is_not_blocked_by_it(url, boundary):
     assert blocked == ["old"]
     call(url, "/api/stop-all", {})  # pressed again: it catches up with the newcomer
     assert not boundary.request("new", 1, "x")["granted"]
+
+
+def test_resume_all_also_lifts_a_sticky_halt(url, boundary):
+    """A sticky halt waits for "a confirm"; but the person's resume is that act. Arming a
+    confirm to lift it would hand the same bit to a call waiting in a class, so resume
+    resets the halt state instead — what installing the halt circuit does to everyone."""
+    boundary.install("halt", Policy(sticky_block=True, forbid_when_blocked=True))
+    boundary.request("a", 1, "x")
+    call(url, "/api/stop-all", {})
+    assert not boundary.request("a", 1, "x")["granted"]           # blocked, and the halt latched
+    boundary.arm("a", {"blocked": 0})
+    r = boundary.request("a", 1, "x")
+    assert not r["granted"] and "halted until a confirm lifts it" in r["why"][0]  # the latch outlives a plain unblock
+    status, body = call(url, "/api/resume-all", {})
+    assert status == 200 and body["stopped"] is False
+    r = boundary.request("a", 1, "x")
+    assert r["granted"] and r["halt"]["granted"] is True, r["why"]
