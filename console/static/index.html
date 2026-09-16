@@ -627,15 +627,17 @@ const T = {
     "ap.needs.note": "电路要一个人写一位才放行。", "ap.blocked.note": "这个 agent 正被封锁：它的请求一律被拒。先解除封锁（右边开关面板，或下面的「解除全部封锁」），确认才有意义。",
     "ap.code": "匹配码", "ap.code.hint": "按钮上的两位数要和这里一样——同一块屏幕上读到的才算。聊天里批准必须带它。",
     "ap.note": "备注（可选）", "ap.h.note": "备注：{note}",
-    "ap.stop.title": "全部停下", "ap.stop.sub": "一下把所有 agent 的 blocked 拉高；要解除得再做一次明确动作",
-    "ap.stop": "全部停下", "ap.stop.all": "已全部封锁 · {m}/{n}", "ap.stop.some": "全部停下（已封锁 {m}/{n}）",
-    "ap.stop.done": "已封锁 {n} 个 agent：它们的下一次请求都会被拒。",
-    "ap.stopped.banner": "封锁生效中：{m}/{n} 个 agent 的下一次请求都会被拒。blocked 是电平，会一直保持，直到有人明确解除。",
-    "ap.drill": "演练 / Test", "ap.drill.none": "现在还没有 agent：按下去不会有封锁对象。（演练，什么都没有改变。）",
-    "ap.drill.out": "演练：按下去会给这 {n} 个 agent 写 blocked = 1 —— {list}。现在什么都没有改变。",
+    "ap.stop.title": "全部停下", "ap.stop.sub": "一下拒掉所有 agent 的所有请求——认识的、还没出现的都算；要解除得再做一次明确动作",
+    "ap.stop": "全部停下", "ap.stop.all": "已全部停下 · 含尚未出现的 agent", "ap.stop.some": "全部停下（已手动封锁 {m}/{n}）",
+    "ap.stop.done": "已全部停下：所有请求一律被拒，直到有人解除——包括还没出现过的 agent。这里认识的 {n} 个 agent 的 blocked 也已拉高。",
+    "ap.stopped.banner": "全停生效中：任何 agent 的任何请求都会被拒——这里认识的 {n} 个，以及之后才出现或改了名的——直到有人在下面明确解除。这个闩重启也不会松。",
+    "ap.blocked.banner": "{m}/{n} 个 agent 被手动封锁；红键没有按下——不在这份名单里的 agent 仍在运行。",
+    "ap.stop.note": "有人按了全部停下。只有解除（下面，或 `c3s stop-all --resume`）能放开它；confirm 帮不上。",
+    "ap.drill": "演练 / Test", "ap.drill.none": "现在还没有 agent；按下去也会拒掉之后出现的任何 agent。（演练，什么都没有改变。）",
+    "ap.drill.out": "演练：按下去会拒掉所有 agent 的所有请求——这 {n} 个已知的（{list}）以及之后才出现的。现在什么都没有改变。",
     "ap.resume.open": "解除全部封锁", "ap.resume.word": "解除", "ap.resume.go": "确认解除",
     "ap.resume.ask": "解除是第二个动作：先点「解除全部封锁」，再输入 {word}，然后确认。故意麻烦。",
-    "ap.resume.done": "已解除 {n} 个 agent 的封锁。",
+    "ap.resume.done": "已解除全停：请求重新由电路决定；{n} 个已知 agent 的封锁也已放开。",
     "eff.read": "读取 read", "eff.send": "发出 send", "eff.delete": "删除 delete", "eff.move": "移动 move", "eff.write": "写入 write", "eff.pay": "付款 pay", "eff.exec": "执行 exec",
     "eff.rev": "可逆", "eff.irrev": "不可逆", "eff.unknown": "可逆性未知", "eff.more": "其他字段",
     "ap.switches": "工具层的其他开关", "ap.switches.sub": "按 agent",
@@ -667,7 +669,8 @@ const T = {
     "ac.tester": "发一条请求", "ac.tester.sub": "演示用：这里两栏都是你在按，所以只是演示", "ac.intent": "intent 为高", "ac.send": "发出（1 拍）",
     "ac.log": "决策流水", "ac.sub": "最近 {n} 条 · 放行 {g} · 拒绝 {r}", "ac.none": "还没有记录。",
     "f.all": "全部", "f.granted": "放行", "f.refused": "拒绝", "f.tool": "工具层", "f.policy": "规则",
-    "v.grant": "放行", "v.refuse": "拒绝", "v.tool": "工具层", "v.policy": "规则", "v.spoof": "冒名", "v.task": "任务",
+    "v.grant": "放行", "v.refuse": "拒绝", "v.tool": "工具层", "v.policy": "规则", "v.spoof": "冒名", "v.task": "任务", "v.stop": "全停",
+    "e.stop.on": "有人按了全部停下：所有 agent 的所有请求一律被拒（当时认识 {n} 个），直到解除。", "e.stop.off": "有人解除了全停：请求重新由电路决定（{n} 个已知 agent 放开）。", "e.stop.from": "来自 {source}",
     "e.task.filed": "你交了一件事", "e.task.closed": "这件事关掉了", "e.task.cap": "上限 {n} 次放行",
     "e.spoof.missing": "这个名字已绑定令牌，请求却没带令牌 —— 没问任何电路就拒了。", "e.spoof.wrong": "这个名字已绑定令牌，请求带的不是它的令牌 —— 没问任何电路就拒了。",
     "e.tick": "第 {n} 拍", "e.gap": "距上次放行 {n} 拍", "e.why": "拒绝原因（电路原话）：", "e.granted": "每条检查都过，电路输出 grant = 1。",
@@ -762,15 +765,17 @@ const T = {
     "ap.needs.note": "The circuit wants one bit from a person before it grants this.", "ap.blocked.note": "This agent is blocked: everything it asks is refused. Lift the block first (the switches panel, or \"lift every block\" below) — a confirm cannot help while it stands.",
     "ap.code": "matching code", "ap.code.hint": "The two digits on the button must be the two digits here — read off the same screen as the request. A chat channel must send them.",
     "ap.note": "note (optional)", "ap.h.note": "note: {note}",
-    "ap.stop.title": "Stop everything", "ap.stop.sub": "raises blocked for every agent at once; getting back needs a second, deliberate action",
-    "ap.stop": "Stop everything", "ap.stop.all": "everything blocked · {m}/{n}", "ap.stop.some": "Stop everything ({m}/{n} blocked)",
-    "ap.stop.done": "Blocked {n} agent(s): the next thing each one asks is refused.",
-    "ap.stopped.banner": "Block in force: the next request from {m} of {n} agents is refused. blocked is a level — it stays until a person lifts it deliberately.",
-    "ap.drill": "Drill / Test", "ap.drill.none": "No agents yet: there is nothing for the button to block. (A drill: nothing changed.)",
-    "ap.drill.out": "Drill: pressing it writes blocked = 1 for these {n} agent(s) — {list}. Nothing has changed.",
+    "ap.stop.title": "Stop everything", "ap.stop.sub": "one press refuses every request from every agent, known or not yet seen; getting back needs a second, deliberate action",
+    "ap.stop": "Stop everything", "ap.stop.all": "everything stopped · including agents not seen yet", "ap.stop.some": "Stop everything ({m}/{n} blocked by hand)",
+    "ap.stop.done": "Stopped everything: every request is refused until a person lifts it — including from agents not seen yet. blocked is also high for the {n} known agent(s).",
+    "ap.stopped.banner": "Stop in force: every request from every agent is refused — the {n} known here, and any that appears or renames itself — until a person lifts it below. The latch survives a restart.",
+    "ap.blocked.banner": "{m} of {n} agents are blocked by hand; the stop button is not pressed — an agent not on that list still runs.",
+    "ap.stop.note": "A person pressed stop. Only the resume (below, or `c3s stop-all --resume`) lifts this; a confirm cannot.",
+    "ap.drill": "Drill / Test", "ap.drill.none": "No agents known yet; pressing it would still refuse any that appears. (A drill: nothing changed.)",
+    "ap.drill.out": "Drill: pressing it refuses every request from every agent — these {n} known ({list}) and any that appears later. Nothing has changed.",
     "ap.resume.open": "lift every block", "ap.resume.word": "RESUME", "ap.resume.go": "confirm lift",
     "ap.resume.ask": "Lifting is a second action: press \"lift every block\", type {word}, then confirm. Deliberately awkward.",
-    "ap.resume.done": "Lifted the block on {n} agent(s).",
+    "ap.resume.done": "Lifted the stop: requests are decided by the circuits again, and the {n} known agent(s) are unblocked.",
     "eff.read": "read", "eff.send": "send", "eff.delete": "delete", "eff.move": "move", "eff.write": "write", "eff.pay": "pay", "eff.exec": "exec",
     "eff.rev": "reversible", "eff.irrev": "irreversible", "eff.unknown": "reversibility unknown", "eff.more": "other fields",
     "ap.switches": "The tool layer's other switches", "ap.switches.sub": "per agent",
@@ -801,7 +806,8 @@ const T = {
     "ac.tester": "Send a request", "ac.tester.sub": "for demos: you press both channels here, so it is only a demonstration", "ac.intent": "intent high", "ac.send": "Send (1 tick)",
     "ac.log": "Decision log", "ac.sub": "last {n} · {g} granted · {r} refused", "ac.none": "No entries yet.",
     "f.all": "all", "f.granted": "granted", "f.refused": "refused", "f.tool": "tool layer", "f.policy": "rules",
-    "v.grant": "GRANTED", "v.refuse": "REFUSED", "v.tool": "TOOL LAYER", "v.policy": "RULES", "v.spoof": "NOT ITS TOKEN", "v.task": "TASK",
+    "v.grant": "GRANTED", "v.refuse": "REFUSED", "v.tool": "TOOL LAYER", "v.policy": "RULES", "v.spoof": "NOT ITS TOKEN", "v.task": "TASK", "v.stop": "STOP",
+    "e.stop.on": "a person pressed stop: every request from every agent is refused ({n} known at the time) until a person resumes.", "e.stop.off": "a person lifted the stop: requests are decided by the circuits again ({n} known agent(s) unblocked).", "e.stop.from": "from {source}",
     "e.task.filed": "you filed a job", "e.task.closed": "the job was closed", "e.task.cap": "a ceiling of {n} grants",
     "e.spoof.missing": "This name is bound to a token and the request sent none — refused before any circuit was asked.", "e.spoof.wrong": "This name is bound to a token and the request sent a different one — refused before any circuit was asked.",
     "e.tick": "tick {n}", "e.gap": "{n} ticks since the previous grant", "e.why": "refused because (the circuit's own words):", "e.granted": "every check passed; the circuit output grant = 1.",
@@ -925,6 +931,7 @@ const NOTE_FOR = [
 ];
 function itemNote(p) {
   const why = p.why || [];
+  if (why.some((w) => String(w).startsWith("stopped:"))) return "ap.stop.note";  // the operator-stop latch
   if (why.some((w) => String(w).startsWith("blocked is high"))) return "ap.blocked.note";
   for (const w of why) for (const [re, key] of NOTE_FOR) if (re.test(w)) return key;
   return p.bit && !p.waiting_on_time ? "ap.needs.note" : "ap.wait.note";
@@ -1339,31 +1346,36 @@ async function closeTask(id, btn) {
 }
 
 // -- the big red button --
-// One press writes blocked = 1 for every agent the console knows. blocked is a level, so
-// it latches: nothing lifts it on its own, and lifting it is a second, deliberate action
-// (press "lift every block", type the word, confirm) placed away from the stop itself.
-// Whether everything is stopped is read out of the state, not remembered here, so the
-// phone and the desktop always agree and a reload changes nothing.
+// One press sets the console's operator-stop latch: every request from every agent — the
+// names known now and any that appears or renames itself later — is refused before any
+// circuit is asked, until a person resumes. It also raises blocked for the known names, so
+// the switches panel agrees, but the latch is what holds. Lifting it is a second, deliberate
+// action (press "lift every block", type the word, confirm) placed away from the stop itself.
+// Whether everything is stopped is read out of the state (`operator_stop.on`), never counted
+// from blocked names: a count of names could not speak for the agents not seen yet.
 function stopCount(s) {
   const n = s.agents.length, m = s.agents.filter((a) => N((a.armed || {}).blocked)).length;
-  return { n, m, stopped: n > 0 && m === n };
+  return { n, m, stopped: !!(s.operator_stop && s.operator_stop.on) };
 }
 function renderStop(s) {
   const { n, m, stopped } = stopCount(s);
-  const label = stopped ? t("ap.stop.all", { m: num(m), n: num(n) }) : m ? t("ap.stop.some", { m: num(m), n: num(n) }) : t("ap.stop");
+  const label = stopped ? t("ap.stop.all") : m ? t("ap.stop.some", { m: num(m), n: num(n) }) : t("ap.stop");
   ["stop-all", "stop-all-2", "stop-big"].forEach((id) => {
     const b = $(id);
     if (!b) return;
     b.textContent = label;
-    b.disabled = stopped;  // everything already blocked: the way back is the resume control
+    b.disabled = stopped;  // the stop is already in force: the way back is the resume control
   });
   const banner = $("ap-stop-banner");
-  banner.hidden = !m;
-  banner.textContent = m ? t("ap.stopped.banner", { m: num(m), n: num(n) }) : "";
-  $("ap-resume").hidden = !m;
+  banner.hidden = !(stopped || m);
+  // Under the stop the honest reading is "everything, including agents not seen yet"; a
+  // count of blocked names is only meaningful when the stop is NOT pressed.
+  banner.textContent = stopped ? t("ap.stopped.banner", { n: num(n), since: s.operator_stop.since ? clock(s.operator_stop.since) : "" })
+    : m ? t("ap.blocked.banner", { m: num(m), n: num(n) }) : "";
+  $("ap-resume").hidden = !(stopped || m);
   $("ap-resume-hint").textContent = t("ap.resume.ask", { word: t("ap.resume.word") });
   $("resume-word").placeholder = t("ap.resume.word");
-  if (!m) closeResume();
+  if (!(stopped || m)) closeResume();
 }
 function closeResume() {
   $("resume-word").hidden = true; $("resume-go").hidden = true; $("resume-word").value = ""; $("resume-go").disabled = true;
@@ -1417,10 +1429,10 @@ function renderActivity(s) {
   $("ac-filters").querySelectorAll("[data-fk]").forEach((b) => b.addEventListener("click", () => { FILTER_KIND = b.dataset.fk; renderActivity(STATE); }));
   const rows = tr.filter((e) => {
     if (FILTER_CLS !== "all" && (e.kind === "request" || e.kind === "policy" || e.kind === "spoof") && (e.class || "exec") !== FILTER_CLS) return false;
-    if (FILTER_CLS !== "all" && (e.kind === "tool" || e.kind === "task")) return false;
+    if (FILTER_CLS !== "all" && (e.kind === "tool" || e.kind === "task" || e.kind === "stop")) return false;
     if (FILTER_KIND === "granted") return e.kind === "request" && e.granted;
     if (FILTER_KIND === "refused") return (e.kind === "request" && !e.granted) || e.kind === "spoof";
-    if (FILTER_KIND === "tool") return e.kind === "tool";
+    if (FILTER_KIND === "tool") return e.kind === "tool" || e.kind === "stop";  // both are a person's hand
     if (FILTER_KIND === "policy") return e.kind === "policy";
     return true;
   });
@@ -1446,6 +1458,14 @@ function entryHtml(e, compact) {
       `<div class="d reason">${esc(e.text || "")}</div>` +
       (N(e.max_grants) ? `<div class="d">${t("e.task.cap", { n: num(e.max_grants) })}</div>` : "") +
       (e.note ? `<div class="d">${t("tk.note", { note: esc(e.note) })}</div>` : "") + `</div></div>`;
+  }
+  if (e.kind === "stop") {
+    // The big red button, or its release. A person's act against every agent at once, so it
+    // is one line rather than one per name; the per-name `blocked` writes follow it.
+    const n = (e.agents || []).length;
+    return `<div class="e tool">${at}<div><div class="h"><span class="verdict">${t("v.stop")}</span><span class="agent">${t(e.stopped ? "e.stop.on" : "e.stop.off", { n: num(n) })}</span>` +
+      (e.source ? `<span class="mono muted">${t("e.stop.from", { source: esc(e.source) })}</span>` : "") + `</div>` +
+      (e.note ? `<div class="d reason">${t("ap.h.note", { note: esc(e.note) })}</div>` : "") + `</div></div>`;
   }
   if (e.kind === "spoof") {
     // A request under a bound name without that name's token: refused before any circuit

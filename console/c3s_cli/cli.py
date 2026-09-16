@@ -8,7 +8,7 @@
     c3s token         show the operator token; `c3s token rotate` replaces it
     c3s token bind --agent NAME   bind an agent name to its token from this machine (I-3);
                       `c3s token list` shows what is bound, `rotate --agent NAME` drops one
-    c3s stop-all      block every agent the console knows (needs the operator token)
+    c3s stop-all      stop every agent, known or not, until `c3s stop-all --resume` (operator token)
     c3s down          stop it (`--service` also unloads the launchd agent)
     c3s demo          the simulated workbench: mailbox, calendar, files, and one chore
                       decided call by call (docs/DEMO.md is the script)
@@ -542,32 +542,31 @@ def cmd_pair(args) -> int:
 
 
 def cmd_stop_all(args) -> int:
+    """The big red button from the shell. It presses the console's own `/api/stop-all`
+    rather than writing `blocked` name by name, because the stop is a latch the console
+    holds for every agent — the names it knows and any that appears or renames itself
+    afterwards — and a per-name write would leave that latch untouched."""
     token = client.operator_token()
     if not token:
         return bad(f"no operator token in {paths.TOKEN_FILE}: start the console first.")
+    path = "/api/resume-all" if args.resume else "/api/stop-all"
     try:
-        state = client.state(args.port)
-    except Exception as e:
+        status, body = client._call("POST", path, args.port, body={"source": "cli"}, token=token)
+    except client.ConsoleDown as e:
         return bad(f"{e}: nothing was changed.")
-    agents = [a["agent"] for a in state.get("agents", [])]
-    if not agents:
-        say("the console knows no agents yet, so there is nothing to stop. Rules stay as they are; "
-            "any agent that appears later meets them.")
-        return 0
-    bit = 0 if args.resume else 1
-    failed = []
-    for name in agents:
-        status, body = client.write_person_bit(name, {"blocked": bit}, args.port, token)
-        mark = "ok" if status == 200 else f"{status} {body.get('error', body)}"
-        if status != 200:
-            failed.append(name)
-        say(f"  {'unblocked' if args.resume else 'blocked'} {name}: {mark}")
-    done = "resumed" if args.resume else "stopped"
-    say(f"{len(agents) - len(failed)}/{len(agents)} agent(s) {done}")
-    if not args.resume:
-        say("`blocked` stays where it was put: every class whose rules forbid acting while blocked "
-            "refuses from now on. `c3s stop-all --resume` lifts it, as does the page or the device.")
-    return 1 if failed else 0
+    if status != 200:
+        return bad(f"the console answered {status}: {body.get('error', body)}. Nothing was changed.")
+    known = body.get("agents") or []
+    names = f" ({', '.join(known)})" if 0 < len(known) <= 8 else ""
+    if args.resume:
+        say(f"resumed: the stop is lifted, and {len(known)} known agent(s) unblocked{names}.")
+        say("  requests are decided by the circuits again, including from agents first seen during the stop.")
+    else:
+        say("stopped everything: every request from every agent is refused until `c3s stop-all --resume`,")
+        say(f"  including from agents not seen yet. blocked is also high for the {len(known)} known agent(s){names}.")
+        say("  The latch survives a restart of the console; only a person's resume lifts it "
+            "(here, or the page with the operator token).")
+    return 0
 
 
 # ------------------------------------------------------------------------------ the demo
@@ -995,7 +994,7 @@ def build_parser() -> argparse.ArgumentParser:
     pair.add_argument("--invert-qr", action="store_true", help="QR for a light terminal background")
     pair.set_defaults(func=cmd_pair)
 
-    stop = subs.add_parser("stop-all", help="block every agent the console knows")
+    stop = subs.add_parser("stop-all", help="stop every agent, known or not, until --resume")
     stop.add_argument("--resume", action="store_true", help="lift it again")
     stop.set_defaults(func=cmd_stop_all)
 
