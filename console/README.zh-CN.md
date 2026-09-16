@@ -10,6 +10,8 @@ python console.py                                 # 打开 http://127.0.0.1:8765
 REFLEX_CARDPUTER=1 python console.py              # 同上，并把 USB 上的 Cardputer 当确认键
 ```
 
+首次启动时后台会打印一个**操作者令牌**（也存在 `~/.c3s-circuit-agent/operator-token`，权限 600）。它是人的钥匙：安装规则、写人的位（`confirm`/`confirm_b`/`blocked`/`heartbeat`）都需要它。网页只问一次、只存在这个浏览器里；Telegram bot 读文件；模型的适配器永远拿不到它，所以 agent 就算连上后台也写不了自己的 confirm——除非它能读那个文件，这就是为什么要把 agent 跑在读不到的地方（另一个系统用户、容器）。`/api/request` 和适配器自己的位（`irreversible`/`failed`）不需要令牌。
+
 1. **边界（Boundaries）**：每类工具选一个模板——**不能转钱**（spend 整类拒绝）、**删东西要人点头**（files）、**发消息要人点头**（message）、**连续失败就停**（exec）、**停机+心跳**（所有类共享）。编译并安装后，证据面板会显示门数、逐行核对的行数、每条规则是否成立。
 2. **接入（Connect）**：把你的模型接进来：
    * Claude Code：`adapters/claude_code_hook.py` 作为 PreToolUse 钩子（再加一个 PostToolUse 钩子上报失败），Bash、Write、Edit 和所有 MCP 工具都会经过它。
