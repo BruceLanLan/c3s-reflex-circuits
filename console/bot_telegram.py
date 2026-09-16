@@ -70,6 +70,10 @@ OPERATOR_TOKEN = os.environ.get("REFLEX_OPERATOR_TOKEN") or (
     open(os.path.expanduser(_TOKEN_FILE)).read().strip() if os.path.exists(os.path.expanduser(_TOKEN_FILE)) else "")
 API = f"https://api.telegram.org/bot{TOKEN}"
 CLASSES = ("spend", "message", "exec", "files")
+# Stamped on every write this bot makes, so Activity can say a press came from a chat
+# rather than from the page or the device (docs/API.md, I-2). The console clamps it to
+# 20 characters and never treats it as a bit.
+SOURCE = "telegram"
 
 HELP_AGENT = (
     "/ask [class] [why] — one tick, no intent\n"
@@ -253,7 +257,7 @@ def handle_press(chat_id, data: str, callback_id: str, message_id=None) -> None:
             say(chat_id, "that button predates a restart, so the bot no longer knows which agent it named. "
                          "Nothing was written — /pending, or /block <agent>.")
             return
-        call("/api/tool", {"agent": name, "blocked": 1})
+        call("/api/tool", {"agent": name, "blocked": 1, "source": SOURCE})
         answer(callback_id, f"{name} blocked")
         say(chat_id, f"{name} blocked; /unblock {name} lifts it")
         strip_keyboard(chat_id, message_id)
@@ -288,7 +292,7 @@ def handle_press(chat_id, data: str, callback_id: str, message_id=None) -> None:
         strip_keyboard(chat_id, message_id)
         return
     try:
-        call("/api/tool", {"agent": item["agent"], action: 1,
+        call("/api/tool", {"agent": item["agent"], action: 1, "source": SOURCE,
                            "for_reason": item.get("reason", ""), "code": item["code"]})
     except urllib.error.HTTPError as e:
         why = json.loads(e.read()).get("error", str(e))
@@ -378,7 +382,7 @@ def handle(chat_id, text: str) -> None:
             # A chat channel sends the code as well (docs/API.md, I-2): the console only
             # checks a code it is given, so it is this bot's job to always give one, and a
             # typed confirm is then bound as tightly as a press.
-            body = {"agent": item["agent"], bit: 1, "for_reason": item.get("reason", "")}
+            body = {"agent": item["agent"], bit: 1, "for_reason": item.get("reason", ""), "source": SOURCE}
             if item.get("code"):
                 body["code"] = item["code"]
             try:
@@ -392,7 +396,7 @@ def handle(chat_id, text: str) -> None:
             if not rest or rest[0] not in agents:
                 say(chat_id, f"usage: {command} <agent>  (known: {', '.join(agents) or 'none'})")
                 return
-            call("/api/tool", {"agent": rest[0], "blocked": int(command == "/block")})
+            call("/api/tool", {"agent": rest[0], "blocked": int(command == "/block"), "source": SOURCE})
             say(chat_id, f"{rest[0]} {'blocked' if command == '/block' else 'unblocked'}")
         else:
             # The same big red button as the page and the CLI, so it does the same thing:

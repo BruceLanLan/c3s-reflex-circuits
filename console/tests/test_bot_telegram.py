@@ -116,7 +116,8 @@ def test_a_typed_confirm_also_carries_the_two_digits(sent, monkeypatch):
     monkeypatch.setattr(bot, "call", lambda p, payload=None, **kw: (
         bodies.append(payload) if p == "/api/tool" else None) or real(p, payload, **kw))
     bot.handle("person-chat", f"/confirm {name}")
-    assert bodies[-1] == {"agent": name, "confirm": 1, "for_reason": "rm typed.txt", "code": code}
+    assert bodies[-1] == {"agent": name, "confirm": 1, "for_reason": "rm typed.txt", "code": code,
+                          "source": "telegram"}
 
 
 def test_stop_blocks_everyone_and_resume_lifts_it(sent):

@@ -676,6 +676,7 @@ def _settings(policy: Policy) -> dict:
         "heartbeat_ticks": policy.heartbeat_ticks,
         "confirm_per_irreversible": policy.confirm_per_irreversible,
         "trip_after_failures": policy.trip_after_failures,
+        "trip_after_refusals": policy.trip_after_refusals,
         "two_key": policy.two_key,
     }
 
@@ -1166,7 +1167,14 @@ class Boundary:
             bit = None
             halt = e.get("halt")
             if e.get("operator_stop"):
-                pass  # a person said stop; no bit lifts that, only resume-all
+                # A person said stop; no bit lifts that, only resume-all. And once they
+                # have resumed, the refusal is history: the agent has not asked again, so
+                # nothing is waiting for anyone. Leaving it in kept a card on the page
+                # that said a person had pressed stop, after that stop was lifted, with
+                # no button on it — an instruction to do nothing, which is worse on the
+                # approvals page than on any other.
+                if not self.operator_stop["on"]:
+                    continue
             elif halt and not halt.get("granted"):
                 # The shared halt refused, and the class's circuit then said "blocked is
                 # high" because the halt made it so — not because a person blocked this
@@ -1439,6 +1447,15 @@ def policy_from(payload: dict) -> Policy:
         heartbeat_ticks=whole("heartbeat_ticks", 255),
         confirm_per_irreversible=flag("confirm_per_irreversible", False),
         trip_after_failures=whole("trip_after_failures", 255),
+        # The eleventh rule is deliberately NOT installable from here. It compiles and its
+        # safety half is proven — nothing is granted while it is tripped — but its reset
+        # does not work: once tripped, every tick is a refusal, so the tick carrying the
+        # person's confirm re-trips the breaker before the reset can take effect, and no
+        # confirm ever lifts it. Checked against c3s.policy's own reference implementation
+        # on 2026-09-17: ticks 4, 6 and 9 each carried a confirm and `refused_tripped`
+        # stayed 1 throughout. A rule whose refusal says "a confirm resets it" and means
+        # "nothing ever will" is worse than an absent rule, so the console does not offer
+        # it until the circuit is fixed and a liveness monitor covers it.
         two_key=flag("two_key", False),
     )
 

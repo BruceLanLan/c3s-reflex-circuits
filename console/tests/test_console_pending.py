@@ -359,6 +359,27 @@ def test_stop_all_with_nobody_known_still_stops_everything(url, boundary):
     assert console.TRANSCRIPTS[1]["kind"] == "stop"  # the press is on the record even with nobody to block
 
 
+def test_a_lifted_stop_leaves_nothing_waiting_for_a_person(url, boundary):
+    """A refusal under the stop is not something a person can answer — resume is the only
+    thing that lifts it — so once they have resumed it must leave the approvals page. It
+    used to stay: a card saying a person had pressed stop, after that stop was lifted,
+    with no button on it. On the one page whose whole job is "here is what needs you",
+    an item that needs nobody is worse than no item."""
+    call(url, "/api/stop-all", {})
+    assert not boundary.request("left-behind", 1, "x")["granted"]
+    stopped = [p for p in boundary.status()["pending"] if p["agent"] == "left-behind"]
+    assert stopped and stopped[0]["bit"] is None, "while stopped, the refusal is on the list"
+
+    call(url, "/api/resume-all", {})
+    assert [p for p in boundary.status()["pending"] if p["agent"] == "left-behind"] == []
+    # and a real refusal still lists, so this did not just empty the page
+    boundary.install("files", IRREVERSIBLE)
+    boundary.arm("left-behind", {"irreversible": 1})
+    assert not boundary.request("left-behind", 1, TRASH, cls="files")["granted"]
+    again = [p for p in boundary.status()["pending"] if p["agent"] == "left-behind"]
+    assert len(again) == 1 and again[0]["bit"] == "confirm" and again[0]["code"]
+
+
 def test_the_operator_stop_survives_a_restart(tmp_path):
     state = tmp_path / "policies.json"
     plain = Policy(forbid_when_blocked=True)  # no commitment rule, so a first request can be granted
