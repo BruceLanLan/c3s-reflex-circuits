@@ -9,9 +9,9 @@ Two kinds of assertion here:
 * invariants that MUST keep holding — the shared-halt reset and the big-red-button need the
   operator token, and a paired Wi-Fi device cannot loosen (unblock / hold the heartbeat).
   These guard against a regression that would hand the person's authority away.
-* one assertion that PINS A KNOWN GAP — a name first seen after `stop-all` walks out from
-  under it. It is written to fail the day someone closes the gap (the global-stop latch in
-  the report), which is the point: the test will announce the fix.
+* one assertion that PINNED A KNOWN GAP and now pins its closure — a name first seen after
+  `stop-all` used to walk out from under it. The global-stop latch closed that the same
+  night, the assertion was flipped, and the test's name is kept so the history reads.
 """
 
 import json
@@ -125,6 +125,15 @@ def test_condition_based_halt_does_catch_a_brand_new_name():
         name = _name()
         # tick a few times: the first tick arms nothing, the halt bites once the heartbeat is missed
         verdicts = [_agent_req(name)[1] for _ in range(3)]
+        # A Cardputer on the cable, or one polling over Wi-Fi, *is* the heartbeat — that is the
+        # product's dead-man's switch working, not a failure of this claim. The console reports
+        # the bit it read, so ask it rather than assume an empty desk: this test was written on
+        # one and failed the first time someone plugged a device in.
+        presence = any(((v.get("halt") or {}).get("inputs") or {}).get("heartbeat") for v in verdicts)
+        if presence:
+            pytest.skip("a device is supplying presence, so a heartbeat halt cannot bite here; "
+                        "the operator-stop latch covers the same claim without that dependency "
+                        "(test_a_name_first_seen_after_stop_all_walks_out_from_under_it, which now asserts it is caught)")
         assert any("halt" in "; ".join(v.get("why", [])).lower() for v in verdicts), \
             "a condition-based halt should catch even a name first seen now"
     finally:
