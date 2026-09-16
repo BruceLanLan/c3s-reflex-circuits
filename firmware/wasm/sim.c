@@ -93,6 +93,37 @@ int sim_step(int which, int inputs, int state) {
   return (int)(out | nxt << 8);
 }
 
+/* The circuit's own structure and its live values, so a view can show the gates
+ * switching instead of a picture of a fly. Signals are numbered as in the netlist:
+ * 0 and 1 are the constants, then the inputs, then one per cell. */
+static uint8_t trace[C3S_MAX_SIGNALS];
+
+/* One tick that also records every signal; returns as sim_step. */
+EXPORT(sim_trace)
+int sim_trace(int which, int inputs, int state) {
+  uint32_t nxt;
+  uint32_t out = c3s_step_trace(which == 0 ? &core : &policy, (uint32_t)inputs, (uint32_t)state, &nxt, trace);
+  return (int)(out | nxt << 8);
+}
+
+EXPORT(sim_signal)
+int sim_signal(int signal) { return signal >= 0 && signal < C3S_MAX_SIGNALS ? trace[signal] : 0; }
+
+/* field: 0 signals, 1 cells, 2 the first cell's signal number. */
+EXPORT(sim_shape)
+int sim_shape(int which, int field) {
+  const c3s_prog *p = which == 0 ? &core : &policy;
+  return field == 0 ? p->n_signals : field == 1 ? p->n_cells : 2 + p->n_in;
+}
+
+/* One cell: field 0 its first operand signal, 1 its second, 2 whether it is a latch. */
+EXPORT(sim_cell)
+int sim_cell(int which, int i, int field) {
+  const c3s_prog *p = which == 0 ? &core : &policy;
+  if (i < 0 || i >= p->n_cells) return -1;
+  return field == 0 ? (int)p->cells[i].a : field == 1 ? (int)p->cells[i].b : p->cells[i].latch;
+}
+
 EXPORT(sim_encode)
 int sim_encode(double theta_deg, double dtheta_dps, double azimuth_deg) {
   return (int)c3s_encode(theta_deg, dtheta_dps, azimuth_deg);

@@ -134,6 +134,7 @@ The screen is 240 × 135:
 | `m` | sound on takeoff |
 | `t`, `h` | self-test report, key help |
 | `d` | digest the whole 8,388,608-row step relation on the device and show it with the time it took; sending `d` over the serial port does the same and prints the result |
+| `w` | the circuit as itself: one dot per cell, lines to the two signals each NAND reads, laid out left to right by logic depth and turning. Each dot's brightness is that gate's value on the tick being shown, recomputed from the netlist every frame — the geometry is the circuit's, not a picture of a fly |
 
 Each serial line is one tick, for example:
 

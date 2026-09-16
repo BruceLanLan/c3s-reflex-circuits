@@ -50,6 +50,12 @@ int c3s_decode(c3s_prog *p, const uint8_t *bytes, size_t len, int n_in, int n_ou
  * stores the latch values after the tick. */
 uint32_t c3s_step(const c3s_prog *p, uint32_t inputs, uint32_t state, uint32_t *next_state);
 
+/* One tick that also reports every signal's value, so a view can show the circuit
+ * switching instead of a picture of a fly. `signals` receives one byte per signal,
+ * in netlist order (0 and 1 are the constants, then the inputs, then one per cell),
+ * and must hold at least `p->n_signals` bytes. Returns the outputs as `c3s_step`. */
+uint32_t c3s_step_trace(const c3s_prog *p, uint32_t inputs, uint32_t state, uint32_t *next_state, uint8_t *signals);
+
 void c3s_sha256(const uint8_t *data, size_t len, uint8_t digest[32]);
 void c3s_hex(const uint8_t *bytes, size_t len, char *out); /* 2 * len characters and a NUL */
 

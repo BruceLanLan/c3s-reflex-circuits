@@ -58,8 +58,7 @@ int c3s_decode(c3s_prog *p, const uint8_t *bytes, size_t len, int n_in, int n_ou
   return C3S_OK;
 }
 
-uint32_t c3s_step(const c3s_prog *p, uint32_t inputs, uint32_t state, uint32_t *next_state) {
-  uint8_t s[C3S_MAX_SIGNALS];
+uint32_t c3s_step_trace(const c3s_prog *p, uint32_t inputs, uint32_t state, uint32_t *next_state, uint8_t *s) {
   uint32_t out = 0, nxt = 0;
   int i, k = 2 + p->n_in;
   s[0] = 0;
@@ -73,6 +72,11 @@ uint32_t c3s_step(const c3s_prog *p, uint32_t inputs, uint32_t state, uint32_t *
   for (i = 0; i < p->n_state; i++) nxt |= (uint32_t)s[p->latch_d[i]] << i;
   if (next_state) *next_state = nxt;
   return out;
+}
+
+uint32_t c3s_step(const c3s_prog *p, uint32_t inputs, uint32_t state, uint32_t *next_state) {
+  uint8_t s[C3S_MAX_SIGNALS];
+  return c3s_step_trace(p, inputs, state, next_state, s);
 }
 
 /* ---- SHA-256 (FIPS 180-4) ---------------------------------------------------- */

@@ -40,7 +40,7 @@ bool autoDemo = true;
 bool paused = false;
 bool sound = true;
 
-enum class Page { Main, SelfTest, Help, Digest };
+enum class Page { Main, SelfTest, Help, Digest, Lattice };
 enum class Phase { Idle, Looming, TookOff, Ended };
 Page page = Page::SelfTest;
 Phase phase = Phase::Idle;
@@ -322,6 +322,93 @@ void drawHelp() {
   for (int i = 0; i < 9; i++) text(4, 4 + i * 14, i == 0 ? kText : kMuted, lines[i]);
 }
 
+// ---- circuit lattice -------------------------------------------------------------
+// The netlist drawn as itself: one dot per cell, lines to the two signals each NAND
+// reads, and every dot's brightness is that gate's value on the tick being shown.
+// Nothing here is anatomy or a guess; the geometry is the circuit's logic depth.
+uint8_t traceBuf[C3S_MAX_SIGNALS];
+int16_t latY[C3S_MAX_CELLS], latZ[C3S_MAX_CELLS];
+uint8_t latX[C3S_MAX_CELLS];
+float latSpin = 0;
+bool latReady = false;
+
+void buildLattice() {
+  static uint8_t depth[C3S_MAX_SIGNALS];
+  const int first = 2 + core.n_in;
+  for (int i = 0; i < first; i++) depth[i] = 0;
+  int maxd = 1;
+  for (int i = 0; i < core.n_cells; i++) {
+    const c3s_cell *c = &core.cells[i];
+    int d = 0;
+    if (!c->latch) {
+      int da = depth[c->a], db = depth[c->b];
+      d = 1 + (da > db ? da : db);
+      if (d > 120) d = 120;
+    }
+    depth[first + i] = (uint8_t)d;
+    if (d > maxd) maxd = d;
+  }
+  for (int i = 0; i < core.n_cells; i++) {
+    const float a = i * 2.39996f;  // golden angle, so cells of one depth spread out
+    const float r = 30.0f + (i % 3) * 7.0f;
+    latX[i] = (uint8_t)(16 + (200 * depth[first + i]) / maxd);
+    latY[i] = (int16_t)(cos(a) * r);
+    latZ[i] = (int16_t)(sin(a) * r);
+  }
+  latReady = true;
+}
+
+void latticeProject(int i, float c, float s, int *sx, int *sy) {
+  const float y = latY[i] * c - latZ[i] * s;
+  const float z = latY[i] * s + latZ[i] * c;
+  const float k = 1.0f / (1.5f - z / 140.0f);
+  *sx = latX[i];
+  *sy = (int)(66 + y * k * 0.78f);
+}
+
+void drawLattice() {
+  if (!latReady) buildLattice();
+  char buf[64];
+  const int first = 2 + core.n_in;
+  c3s_step_trace(&core, haveTick ? last.x : 0u, haveTick ? last.state : 0u, NULL, traceBuf);
+  const float c = cos(latSpin), s = sin(latSpin);
+  const int outFirst = core.n_signals - core.n_out;
+
+  for (int i = 0; i < core.n_cells; i++) {
+    const c3s_cell *cell = &core.cells[i];
+    if (cell->latch) continue;
+    int sx, sy;
+    latticeProject(i, c, s, &sx, &sy);
+    for (int k = 0; k < 2; k++) {
+      const uint32_t op = k ? cell->b : cell->a;
+      if ((int)op < first) continue;
+      int ox, oy;
+      latticeProject((int)op - first, c, s, &ox, &oy);
+      canvas.drawLine(ox, oy, sx, sy, traceBuf[op] ? kDim : kPanel);
+    }
+  }
+  for (int i = 0; i < core.n_cells; i++) {
+    const c3s_cell *cell = &core.cells[i];
+    int sx, sy;
+    latticeProject(i, c, s, &sx, &sy);
+    const int sig = first + i;
+    uint32_t col = traceBuf[sig] ? kText : kPanel;
+    if (cell->latch) col = traceBuf[sig] ? kLatch : kPanel;
+    if (sig >= outFirst) col = (sig == outFirst) ? kPar : kGf;
+    canvas.fillRect(sx, sy, 2, 2, col);
+  }
+
+  snprintf(buf, sizeof buf, "%d NAND + %d LATCH, live", core.n_cells - core.n_state, core.n_state);
+  text(4, 4, kText, buf);
+  if (haveTick) {
+    snprintf(buf, sizeof buf, "tick %d x %05lx motor %lu", last.tick, (unsigned long)last.x, (unsigned long)last.motor);
+    text(4, 16, kMuted, buf);
+  } else {
+    text(4, 16, kMuted, "at rest; ENTER on the main page to drive it");
+  }
+  text(4, 122, kMuted, "logic depth left to right; any key to go back");
+}
+
 void drawDigest() {
   char buf[64];
   text(4, 4, kText, "WHOLE-DOMAIN DIGEST");
@@ -352,6 +439,8 @@ void draw() {
     drawHelp();
   } else if (page == Page::Digest) {
     drawDigest();
+  } else if (page == Page::Lattice) {
+    drawLattice();
   } else {
     drawTopBar();
     drawArena();
@@ -375,6 +464,7 @@ void onKey(char c) {
     case 'a': autoDemo = !autoDemo; phaseMs = millis(); break;
     case 'm': sound = !sound; break;
     case 'd': page = Page::Digest; pageUntil = 0; digestRows = 0; digestPending = true; break;
+    case 'w': page = Page::Lattice; pageUntil = 0; break;
     case 't': page = Page::SelfTest; pageUntil = 0; break;
     case 'h': page = Page::Help; break;
     default: break;
@@ -481,6 +571,10 @@ void loop() {
     draw();
     lastDrawMs = now;
     dirty = false;
+  }
+  if (page == Page::Lattice) {
+    latSpin += 0.03f;
+    dirty = true;  // the lattice turns, so it needs a frame even when nothing ticks
   }
   // Only once the "computing" frame is on the screen: this blocks for seconds.
   if (digestPending && page == Page::Digest && !dirty) {
