@@ -165,6 +165,10 @@ know it is a tenth rule; no API shape changed.
 
 ## I-5 · `/api/task` — the task entrance
 
+> **Read I-6 first if you are building against this.** The runner described below — the
+> part that starts `claude -p` as a subprocess — is **not built**. The request shape is
+> real and stable; the thing behind it is a ledger. I-6 says exactly what ships.
+
 ```json
 POST /api/task        (operator token)
 {"text": "把收件箱里骗 seed phrase 的邮件扔垃圾箱，给 Lena 回信说周四 15:00 可以",
