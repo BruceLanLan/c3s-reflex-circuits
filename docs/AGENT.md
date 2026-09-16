@@ -159,6 +159,29 @@ mode of putting a verified circuit anywhere near an agent.
 * **No claim about the model.** Whatever proposes is untrusted, and the demo treats a
   malformed proposal as a lost turn rather than an error to recover from.
 
+### What no rule of this kind can express
+
+The compiled policies are finite-state monitors that can only withhold a grant. That
+class is well understood, and its limits are not ours to negotiate away:
+
+* **Only safety.** A monitor that observes and withholds enforces exactly the
+  properties whose violation shows up in a finite prefix — "never two grants within
+  eight ticks", "never a grant while halted". It cannot enforce that anything *does*
+  happen: "the task eventually completes", "every request is eventually granted" are
+  not even decidable from a finite prefix, let alone enforceable by refusing.
+* **Suppression, not repair.** The circuit withholds `grant`. It cannot undo a granted
+  action, insert a compensating one, or roll anything back; "if X happened, Y must
+  also happen" is out of reach.
+* **Flags, not values.** Amounts, timestamps, addresses and strings do not fit in a
+  few bits. Whatever reduces "this transfer exceeds the limit" to `blocked = 1` is
+  outside the circuit and has to be trusted on its own account.
+* **Logic, not judgement.** Every proof here is of the form *given these bits, this
+  verdict*. Whether `irreversible` was set on the right calls, whether `failed` was
+  reported honestly, whether `heartbeat` came from a live process — those are promises
+  by the tool layer, and the circuit cannot tell a kept one from a broken one.
+* **Per class, not across.** With one policy per tool class, nothing checks a rule
+  that mentions two classes at once.
+
 A short way to say it: the circuit can bound *how often* and *in what order* an agent
 acts, and can be checked to do so. It cannot make an agent honest, and this
 repository does not say it can.

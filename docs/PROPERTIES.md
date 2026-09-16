@@ -82,6 +82,44 @@ from 1, which is the point of proving each property twice: a disagreement betwee
 the methods would have pointed at the tooling, and their agreement pointed at the
 specification.
 
+## Beyond the brute-force ceiling
+
+Everything above, and every compiled policy in `c3s/policy.py`, is checked by
+enumerating the whole domain: `2^(inputs + state)` rows, about a second and a gigabyte
+at 24 bits on the machine used here, four gigabytes at 26. That is the reason the
+policy document recommends one circuit per tool class — the classes measured there are
+9 to 15 bits, so the sentence "every row was checked" stays literally true.
+
+If a policy ever has to exceed that, the plan is written down now so the wording does
+not drift when it happens:
+
+* **Per block, plus glue.** The latches of a compiled policy already fall into blocks
+  (cooldown, streak, budget, window, halt, token, breaker, keys) whose next state reads
+  only their own latches, the inputs, and `grant`. Each block can be checked on its own
+  domain with `grant` as a free input, the AND that combines them checked over all its
+  rows, and the partition itself checked mechanically from the netlist's cones. The
+  earned sentence is then "every row of each block, and every row of the glue" — not
+  "every row of the whole circuit". Note that the blocks are not independent of one
+  another: `grant` is the AND of every condition and reloads the cooldown and the
+  budget, so a per-block claim is sound only because `grant` enters the next state and
+  never the same tick's condition.
+* **Per monitor.** `properties()` walks the product of the circuit with all its
+  monitors at once. Monitors observe and never feed back, so each can be walked with
+  the circuit alone; the joint walk is only needed for a property that mentions two
+  monitors.
+* **A certificate, when enumeration is gone.** For a rule that genuinely couples
+  blocks, equivalence becomes a SAT problem on a miter of the circuit and a second
+  encoding of the reference, with the solver's proof archived and re-checked by an
+  independent checker, and each temporal rule an IC3 or k-induction proof with a
+  witness a third party can re-run. The earned sentence is "proven for all rows
+  without enumerating them, by solver X, proof hash Y, checker Z" — and the encoder
+  that produced the problem is named as trusted, because the proof covers the problem
+  it was given and nothing before that.
+
+None of this is implemented, and none of it is needed for any circuit in this
+repository. It is here so that the day a claim has to change shape, the shape is
+already chosen and the old sentence is not quietly kept.
+
 ## 中文摘要
 
 穷尽等价只能说明"电路逐行等于规格"，说不出"随时间演化会保证什么"。这里给逃逸
@@ -106,3 +144,12 @@ specification.
 把"距上次起飞的拍数"在起飞那一拍记成 0，于是最早合法的下一次起飞（8 拍后）读到 7，
 触发断言。电路实际封锁的正好是 7 拍。两套方法同时失败、又同时通过，这正是"每条证
 两遍"的用处：两者不一致会指向工具，两者一致则指向规格本身。
+
+**超过穷举上限怎么办。** 这里的一切、以及 `c3s/policy.py` 编译出的每个策略，都是把整个
+定义域 `2^(输入+状态)` 行枚举一遍核出来的——本机 24 位约 1 秒 1 GB，26 位 4 GB。这正是
+策略文档建议"一类工具一张电路"的原因：量到的几类是 9–15 位，"每一行都核过"这句话字面
+成立。真有一天要超过，方案已经写在上面英文一节：按块各自穷举加胶合逻辑全行核（措辞改成
+"每块每行"，并说明各块通过 `grant` 耦合）；监视器逐个与电路做乘积搜索；真耦合时改用
+SAT 证明加独立复核器（措辞改成"未枚举而证明，求解器 X、证明哈希 Y、复核器 Z，编码器
+列为信任项"）。目前都没实现，也都不需要——写下来是为了到那天措辞跟着变，而不是悄悄沿用
+旧句子。
