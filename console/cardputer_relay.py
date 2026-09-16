@@ -167,13 +167,16 @@ class Relay(threading.Thread):
                     continue
                 self.connected = True
                 self.log(f"cardputer: relaying on {ser.port}")
-                last = 0.0
+                last, sent = 0.0, None
                 while True:
                     now = time.time()
-                    if now - last >= 1.0:
-                        lines, self.shown = frame(self.boundary.status())
-                        ser.write(("\n".join(lines) + "\n").encode("ascii"))
-                        last = now
+                    if now - last >= 0.5:
+                        lines, shown = frame(self.boundary.status())
+                        # Send on change, and every 2 s as a heartbeat: less traffic for a
+                        # device that is also animating.
+                        if lines != sent or now - last >= 2.0:
+                            ser.write(("\n".join(lines) + "\n").encode("ascii"))
+                            sent, self.shown, last = lines, shown, now
                     chunk = ser.read(256)
                     if chunk:
                         buf += chunk
