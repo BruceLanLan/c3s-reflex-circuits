@@ -355,23 +355,34 @@ def wrap_latches(comb: Circuit, n_inputs: int, n_outputs: int) -> Circuit:
     return b.finish(outs[:n_outputs])
 
 
-def circuit_to_seq_blif(circuit: Circuit) -> str:
-    """BLIF with `.latch` lines (initial value 0) for NAND and LATCH cells."""
+def circuit_to_seq_blif(circuit: Circuit, model: str = "c3s", expose_state: bool = False) -> str:
+    """BLIF with `.latch` lines (initial value 0) for NAND and LATCH cells.
+
+    `model` names the model, so two circuits can be read into one design.
+    `expose_state` adds one output `sK` per latch Q, in cell order: a formal tool
+    cannot reach into a BLIF module, so a property about the state needs ports."""
     _no_refs(circuit)
     first = circuit.first_cell_signal
-    name = {0: "c0", 1: "c1", **{2 + i: f"x{i}" for i in range(circuit.n_inputs)}}
+    li = latch_indices(circuit)
+    net = {0: "c0", 1: "c1", **{2 + i: f"x{i}" for i in range(circuit.n_inputs)}}
     for i, c in enumerate(circuit.cells):
-        name[first + i] = f"{'q' if isinstance(c, Latch) else 'n'}{first + i}"
-    lines = [".model c3s", ".inputs " + " ".join(f"x{i}" for i in range(circuit.n_inputs))]
-    lines.append(".outputs " + " ".join(f"y{k}" for k in range(circuit.n_outputs)))
-    for i in latch_indices(circuit):
-        lines.append(f".latch {name[circuit.cells[i].d]} {name[first + i]} 0")  # type: ignore[union-attr]
+        net[first + i] = f"{'q' if isinstance(c, Latch) else 'n'}{first + i}"
+    lines = [f".model {model}", ".inputs " + " ".join(f"x{i}" for i in range(circuit.n_inputs))]
+    outs = [f"y{k}" for k in range(circuit.n_outputs)]
+    if expose_state:
+        outs += [f"s{k}" for k in range(len(li))]
+    lines.append(".outputs " + " ".join(outs))
+    for i in li:
+        lines.append(f".latch {net[circuit.cells[i].d]} {net[first + i]} 0")  # type: ignore[union-attr]
     lines += [".names c0", ".names c1", "1"]
     for i, c in enumerate(circuit.cells):
         if isinstance(c, Nand):
-            lines += [f".names {name[c.a]} {name[c.b]} {name[first + i]}", "0- 1", "-0 1"]
+            lines += [f".names {net[c.a]} {net[c.b]} {net[first + i]}", "0- 1", "-0 1"]
     for k, sig in enumerate(circuit.output_signals()):
-        lines += [f".names {name[sig]} y{k}", "1 1"]
+        lines += [f".names {net[sig]} y{k}", "1 1"]
+    if expose_state:
+        for k, i in enumerate(li):
+            lines += [f".names {net[first + i]} s{k}", "1 1"]
     lines.append(".end")
     return "\n".join(lines) + "\n"
 

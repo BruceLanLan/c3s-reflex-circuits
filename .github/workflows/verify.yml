@@ -87,6 +87,8 @@ jobs:
           command -v yosys-abc
           python --version
           forge --version
+      - name: Temporal properties by Yosys induction, with negative controls
+        run: python scripts/check_properties.py --controls
       - name: verify.sh
         env:
           PYTHON: python

@@ -76,6 +76,7 @@ limitations: [docs/FIRMWARE.md](docs/FIRMWARE.md).
 | **Policy circuit** | 16 sensory bits → 2 pathway bits in **74 NAND**, depth 11, exactly equal to the teacher on all 65,536 inputs |
 | **Stateful escape core** | **173 NAND + 6 LATCH** (1,235 bytes); step relation equal to its specification on all 8,388,608 (input, state) rows |
 | **Minimal cores** | the same step relation in **113 NAND + 6 LATCH**, 35 % smaller, equal on all 8,388,608 rows; relaxing the specification to the 12 states reachable from reset removed nothing further, against thresholds registered beforehand |
+| **Temporal properties** | five properties — refractory window, raising prerequisite, quiet-tick hold, short-mode guard, state invariant — each proven twice, by this repository's evaluator (all 8,388,608 rows, or a trace search from reset) and by Yosys temporal induction with no assumptions, each with a control that must and does fail |
 | **Behaviour vs continuous teacher** | escape agreement 1.00; short/long-mode agreement 0.83 (train) and 0.90 (holdout); takeoff within ~1 tick (5 ms) |
 | **Firmware** | the Cardputer ADV firmware's C evaluator, compiled for the host and to WebAssembly (the online simulator), equals the Python engine on all 8,388,608 (input, state) rows of the core; the device itself checks the hashes, the reference episodes and 131,072 rows at rest on every boot |
 | **EVM** | full-domain differential test of 20 circuits passes; one tick of the core costs ~370k gas on the reference evaluator |
@@ -137,8 +138,9 @@ data/           derived connectome aggregate (CC-BY source)
 circuits/       every circuit as a manifest: metrics, SHA-256, netlist bytes, evidence
 contracts/      NandMachine and ReflexCore (Solidity) with Foundry tests
 firmware/       Cardputer ADV firmware (PlatformIO) and the host driver for its test
-docs/           connectome, teacher, circuits, evaluation, firmware, limitations,
-                references; docs/demo/ is the web demo
+formal/         SystemVerilog property spec proven by Yosys induction
+docs/           connectome, teacher, circuits, properties, evaluation, firmware,
+                limitations, references; docs/demo/ is the web demo
 tests/          pytest suite
 ```
 
@@ -162,6 +164,8 @@ Individual stages:
 ```sh
 python scripts/extract_connectome.py      # L0
 python scripts/build_loom_escape.py       # L1–L3: calibration, table, circuits, cores
+python scripts/build_minimal_cores.py     # smaller cores with the same behaviour
+python scripts/check_properties.py --controls   # temporal properties, two methods
 python scripts/train_dlgn.py --widths 128,128,64
 python scripts/run_controls.py
 python scripts/export_evm_fixtures.py && (cd contracts && forge test)
@@ -169,9 +173,10 @@ python scripts/export_evm_fixtures.py && (cd contracts && forge test)
 
 `.github/workflows/verify.yml` repeats this on a clean machine for every push: the
 test suite, a byte-for-byte rebuild of the EVM fixtures and the demo data, and the
-Foundry suite including the full-domain differential test. A third job runs the
-whole of `scripts/verify.sh` with Yosys 0.68 and reports, without gating, whether
-the ABC-produced netlists also reproduce byte for byte there.
+Foundry suite including the full-domain differential test. A third job proves the
+temporal properties by Yosys induction, then runs the whole of `scripts/verify.sh`
+with Yosys 0.68 and reports, without gating, whether the ABC-produced netlists also
+reproduce byte for byte there.
 
 ## Common tasks
 

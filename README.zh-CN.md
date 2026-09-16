@@ -48,6 +48,7 @@ MaleCNS v1.0 连接组 ─► 显式教师模型 ─► 16 位决策表
 | **策略电路** | 16 位感觉输入 → 2 位通路输出，**74 个 NAND**，深度 11，在全部 65,536 个输入上与教师模型完全一致 |
 | **带状态的逃逸核心** | **173 NAND + 6 LATCH**（1,235 字节）；单拍转移关系在全部 8,388,608 个（输入, 状态）组合上与规格一致 |
 | **最小化核心** | 同一转移关系只需 **113 NAND + 6 LATCH**，小 35 %，8,388,608 行全部相等；把规格放宽到从复位可达的 12 个状态后，再没有省下任何一个门——判据事先登记 |
+| **时序性质** | 五条性质（不应期封锁、长模式起飞的抬翅前提、静默拍必 hold、短模式起飞的门限、状态不变式）各用两套独立方法证明：本仓库求值器（全部 8,388,608 行，或从复位出发的轨迹搜索）与 Yosys 时序归纳（不加任何假设）；每条都配一个必须失败的反向对照，十个全部如期失败 |
 | **与连续教师模型的行为对照** | 逃不逃一致率 1.00；短/长模式一致率 0.83（训练族）与 0.90（留出族）；起飞时刻误差约 1 拍（5 ms） |
 | **EVM** | 20 个电路的全域差分测试通过；核心每一拍在参考求值器上约 37 万 gas |
 | **TapeOut 字节布局** | 与 tapeout.net 公开的解码器和求值器交叉验证：4,800 个随机拍与最终电路均 0 差异 |
@@ -65,7 +66,7 @@ git clone https://github.com/BruceLanLan/c3s-reflex-circuits.git
 cd c3s-reflex-circuits
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,learn]"
-pytest -q                                  # 100 个测试，含穷举等价检查
+pytest -q                                  # 132 个测试，含穷举等价检查
 ```
 
 在 Python 里拿起一个已提交的电路，喂一帧刺激：
@@ -90,6 +91,9 @@ print("巨纤维", outs[x] & 1, "并行通路", outs[x] >> 1 & 1)
 pip install -e ".[dev,learn,connectome]"
 scripts/verify.sh          # 测试、完整重建、逐字节核对产物、EVM 测试
 scripts/verify.sh --full   # 另外重新下载并抽取 MaleCNS 子图（约 1.1 GB）
+
+python scripts/build_minimal_cores.py           # 更小的核心，见 docs/CIRCUITS.md
+python scripts/check_properties.py --controls    # 时序性质两套方法，见 docs/PROPERTIES.md
 ```
 
 ## 目录地图
@@ -104,10 +108,12 @@ scripts/verify.sh --full   # 另外重新下载并抽取 MaleCNS 子图（约 1.
 | `c3s/calibrate.py` | 教师参数网格标定与约束 C1–C3 | 想改标定目标 |
 | `c3s/reflex.py` | 手写策略电路、带状态的逃逸核心、核心回合模拟 | 想改运动状态机 |
 | `c3s/synth.py` | ABC 桥接（不可信优化器，结果回读后重新穷举验证） | 想换综合配方 |
+| `c3s/reach.py` | 可达态与闭合、从复位出发的乘积机等价（含反例轨迹）、任意行集上的单粘滞故障可检性与去冗余、锁存切割、带锁存器的 ABC 通道 | 想缩小电路或证时序性质 |
 | `c3s/dlgn.py` | 可微逻辑门网络的独立实现，训练后硬化为网表 | 想做学习电路 |
 | `scripts/` | 各阶段入口脚本与 `verify.sh` | 想重建某一层 |
 | `circuits/` | 每个电路一个 JSON 清单：指标、SHA-256、网表字节、证据 | 想直接用电路 |
 | `contracts/` | `NandMachine`、`ReflexCore`（Solidity）与 Foundry 测试 | 想上链重放 |
+| `formal/` | Yosys 归纳证明用的 SystemVerilog 性质规格 | 想加一条时序性质 |
 | `firmware/` | Cardputer ADV 固件（PlatformIO）；`lib/c3s_core` 是设备和主机测试共用的 C 求值器 | 想在设备上跑核心 |
 | `data/` | 连接组聚合数据（源数据 CC-BY） | 想核对生物学来源 |
 | `docs/` | 英文详细文档；`docs/demo/` 是网页演示 | 想看方法与局限 |
