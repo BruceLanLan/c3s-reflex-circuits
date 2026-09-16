@@ -976,6 +976,457 @@ def _own_ipv4_addresses() -> set[str]:
 LAN_HOSTS = _own_ipv4_addresses() if HOST in ("0.0.0.0", "", "::") else set()
 
 
+# ======= W2: the tool layer's own map — which tool, which class, what cannot be undone ===
+#
+# Two questions the circuits cannot answer about themselves:
+#
+#   which circuit answers a call    the tool's *class*, decided from its name by the
+#                                   adapters (spend / message / exec / files)
+#   must a person confirm it        whether the call is *irreversible*, which arms the
+#                                   tool-layer bit a `confirm_per_irreversible` rule reads
+#
+# Both are promises made by the layer that runs the tools, not properties the circuit
+# proves. The circuit proves "irreversible and no unspent confirm ⇒ no grant"; that
+# `send_email` is irreversible is this layer's word, and a person's to correct — which is
+# what GET/POST /api/classes is for. The names come from three places, and the answer says
+# which: the rules this project ships, the user's own override files, or nowhere at all
+# (a name no rule mentions lands in `exec`, which always has a circuit).
+
+CONSOLE_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(CONSOLE_DIR / "adapters"))
+import reflex_classes as tool_classes  # noqa: E402  (the adapters' own module: one map, not two)
+
+# The override files. Defaulted under CONFIG_DIR, where `reflex_classes` looks for them
+# when an adapter was started without REFLEX_CLASS_FILE / REFLEX_IRREVERSIBLE_TOOLS_FILE,
+# so writing the table here reaches an adapter nobody reconfigured.
+CLASS_FILE = Path(os.environ.get("REFLEX_CLASS_FILE") or (CONFIG_DIR / tool_classes.CLASS_FILE_NAME)).expanduser()
+IRREVERSIBLE_TOOLS_FILE = Path(os.environ.get("REFLEX_IRREVERSIBLE_TOOLS_FILE")
+                               or (CONFIG_DIR / tool_classes.IRREVERSIBLE_FILE_NAME)).expanduser()
+# The one file "write it for me" may touch. Fixed here, at startup, and never taken from a
+# request: an endpoint that writes JSON wherever the body says is a file-write primitive.
+CLAUDE_SETTINGS = Path(os.environ.get("REFLEX_CLAUDE_SETTINGS") or (Path.home() / ".claude" / "settings.json")).expanduser()
+
+CLASS_FILE_HEADER = (
+    "# Which class of circuit answers a tool call: one `glob class` per line, first match\n"
+    "# wins, `#` starts a comment, and `!default` keeps the built-in rules after your own.\n"
+    "# Written by the console's \"My tools\" table; safe to edit by hand. The adapters\n"
+    "# re-read it when it changes — nothing needs restarting.\n"
+)
+IRREVERSIBLE_FILE_HEADER = (
+    "# Tool names whose effect cannot be taken back: one glob per line, `#` comments, and\n"
+    "# `!default` keeps the built-in list after your own. A name here arms the tool-layer\n"
+    "# bit `irreversible`, which a `confirm_per_irreversible` rule requires a person's\n"
+    "# confirm for. Written by the console's \"My tools\" table; safe to edit by hand.\n"
+)
+
+# `[class] tool_name [irreversible]: args` — what every adapter writes as the reason
+# (claude_code_hook.py:219, mcp_proxy.py:174). The `: ` is required, so a hand-written
+# reason without one ("[exec] the one call a person approved") is not mistaken for a tool.
+# The bnbagent wallet's reasons name a signing method rather than a tool and do not match,
+# by design: its class is configured, not derived from a name.
+TOOL_IN_REASON = re.compile(r"^\[(?:spend|message|exec|files)\]\s+(?P<tool>[^\n]{1,80}?)(?:\s+\[irreversible\])?:(?:\s|$)")
+GLOB_CHARS = set("*?[")
+
+
+def tools_seen_in_transcript() -> dict[str, dict]:
+    """Every tool name this console has been asked about, from the transcript.
+
+    Since this console started, and no further back: the transcript is in memory and
+    bounded (TRANSCRIPT entries), so a name that scrolled off is gone from here too.
+    """
+    out: dict[str, dict] = {}
+    for e in list(TRANSCRIPTS):
+        if e.get("kind") != "request":
+            continue
+        m = TOOL_IN_REASON.match(str(e.get("reason") or ""))
+        if not m:
+            continue
+        tool = m.group("tool").strip()
+        if not tool:
+            continue
+        rec = out.setdefault(tool, {"seen": 0, "agents": [], "last_at": 0.0, "asked_as": []})
+        rec["seen"] += 1
+        rec["last_at"] = max(rec["last_at"], float(e.get("at") or 0))
+        for key, value in (("agents", e.get("agent")), ("asked_as", e.get("class"))):
+            if value and value not in rec[key] and len(rec[key]) < 8:
+                rec[key].append(value)
+    return out
+
+
+def writable_as_a_rule(tool: str) -> str | None:
+    """Why this name cannot be written to the rule files, or None if it can.
+
+    The file format is one rule per line, split on whitespace, `#` starting a comment —
+    so a name with a space in it (a name only a hostile or careless caller produces) can
+    be *shown*, and classified by the built-in rules, but not written as an override.
+    Saying so beats writing a line that would silently parse as something else.
+    """
+    if not tool or len(tool) > 120:
+        return "a tool name is 1 to 120 characters"
+    if any(c.isspace() for c in tool):
+        return "the rule files split each line on whitespace, so a name with a space cannot be written as a rule"
+    if "#" in tool:
+        return "`#` starts a comment in the rule files"
+    if tool.startswith("!"):
+        return "a line starting with `!` is reserved (`!default`)"
+    return None
+
+
+def read_overrides() -> dict:
+    """One read of each override file: the user's own lines, whether the built-ins are
+    kept after them, and the effective list the adapters compute from the same file."""
+    rules_read = tool_classes.read_override_rules(str(CLASS_FILE)) if CLASS_FILE.exists() else None
+    irr_read = tool_classes.read_override_irreversible(str(IRREVERSIBLE_TOOLS_FILE)) if IRREVERSIBLE_TOOLS_FILE.exists() else None
+    own_rules, keeps_rules = rules_read if rules_read else ((), True)
+    own_irr, keeps_irr = irr_read if irr_read else ((), True)
+    return {
+        "own_rules": list(own_rules), "keeps_rules": bool(keeps_rules), "rules_file_read": rules_read is not None,
+        "own_irreversible": list(own_irr), "keeps_irreversible": bool(keeps_irr),
+        "irreversible_file_read": irr_read is not None,
+        "rules": list(own_rules) + (list(tool_classes.DEFAULT_RULES) if keeps_rules else []),
+        "irreversible": list(own_irr) + (list(tool_classes.DEFAULT_IRREVERSIBLE_TOOLS) if keeps_irr else []),
+    }
+
+
+def tool_row(tool: str, ov: dict, seen: dict | None) -> dict:
+    """One row of "My tools": the class, the irreversible flag, and where each came from."""
+    idx = tool_classes.matching_rule_index(tool, ov["rules"])
+    cls = ov["rules"][idx][1] if idx is not None else tool_classes.DEFAULT_CLASS
+    pattern = ov["rules"][idx][0] if idx is not None else None
+    source = "unseen" if idx is None else ("override" if idx < len(ov["own_rules"]) else "builtin")
+
+    own_hit = tool_classes.matching_irreversible(tool, ov["own_irreversible"])
+    builtin_hit = tool_classes.matching_irreversible(tool, tool_classes.DEFAULT_IRREVERSIBLE_TOOLS) if ov["keeps_irreversible"] else None
+    hit = own_hit or builtin_hit
+    why_not_writable = writable_as_a_rule(tool)
+    return {
+        "tool": tool,
+        "class": cls,
+        "class_pattern": pattern,
+        "source": source,               # override | builtin | unseen (no rule names it)
+        "irreversible": hit is not None,
+        "irreversible_pattern": hit,
+        "irreversible_source": "override" if own_hit else ("builtin" if builtin_hit else "unseen"),
+        # A built-in *glob* that marks this name cannot be turned off for one tool: the
+        # file format has no "not this one". The checkbox says so instead of pretending.
+        "locked_irreversible": builtin_hit is not None,
+        "writable": why_not_writable is None,
+        "why_not_writable": why_not_writable,
+        "seen": (seen or {}).get("seen", 0),
+        "agents": (seen or {}).get("agents", []),
+        "last_at": (seen or {}).get("last_at") or None,
+        "asked_as": (seen or {}).get("asked_as", []),
+    }
+
+
+def hook_command(script: str, agent: str) -> str:
+    """The command a Claude Code hook entry runs, with real absolute paths.
+
+    The class and irreversible files are named explicitly even though `reflex_classes`
+    would find them anyway: a hook installed today must keep working if someone later
+    starts the console with a different config dir."""
+    return (f"REFLEX_AGENT={agent} REFLEX_CONSOLE=http://127.0.0.1:{PORT} "
+            f"REFLEX_CLASS_FILE={CLASS_FILE} REFLEX_IRREVERSIBLE_TOOLS_FILE={IRREVERSIBLE_TOOLS_FILE} "
+            f"{sys.executable} {CONSOLE_DIR / 'adapters' / script}")
+
+
+HOOK_MATCHER = "Bash|Write|Edit|MultiEdit|NotebookEdit|mcp__.*"
+
+
+def claude_settings_block(agent: str) -> dict:
+    """Exactly what goes in settings.json for both hooks — the block the page shows, the
+    block the clipboard gets, and the block "write it for me" merges. One source."""
+    return {"hooks": {
+        "PreToolUse": [{"matcher": HOOK_MATCHER, "hooks": [
+            {"type": "command", "timeout": 20, "command": hook_command("claude_code_hook.py", agent)}]}],
+        "PostToolUse": [{"matcher": HOOK_MATCHER, "hooks": [
+            {"type": "command", "timeout": 10, "command": hook_command("claude_code_post_hook.py", agent)}]}],
+    }}
+
+
+def bnbagent_snippet() -> str:
+    """The indented example at the top of adapters/bnbagent_boundary.py's own docstring,
+    read from the file rather than copied: importing it would need the bnbagent package,
+    which is not in this console's environment."""
+    try:
+        text = (CONSOLE_DIR / "adapters" / "bnbagent_boundary.py").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    out: list[str] = []
+    for line in text.splitlines()[1:]:
+        if line.startswith("    "):
+            out.append(line[4:])
+        elif out and not line.strip():
+            out.append("")
+        elif out:
+            break
+    return "\n".join(out).strip("\n")
+
+
+def merge_claude_settings(existing: dict, block: dict) -> tuple[dict, list[str]]:
+    """`existing` plus the hooks in `block`, without touching anything else.
+
+    A matcher that is already there gets the command appended to its own hooks list; an
+    identical command is left alone (so this is idempotent and never duplicates). Nothing
+    is removed, reordered or rewritten: the user's file is the user's.
+    """
+    merged = json.loads(json.dumps(existing))  # a copy: the caller keeps its "before"
+    added: list[str] = []
+    hooks = merged.setdefault("hooks", {})
+    if not isinstance(hooks, dict):
+        raise ValueError("`hooks` in that file is not an object; the console will not rewrite it")
+    for event, entries in block["hooks"].items():
+        current = hooks.setdefault(event, [])
+        if not isinstance(current, list):
+            raise ValueError(f"`hooks.{event}` in that file is not a list; the console will not rewrite it")
+        for entry in entries:
+            mine = entry["hooks"][0]
+            same_matcher = next((c for c in current if isinstance(c, dict) and c.get("matcher") == entry["matcher"]
+                                 and isinstance(c.get("hooks"), list)), None)
+            if same_matcher is None:
+                current.append(json.loads(json.dumps(entry)))
+                added.append(f"{event}: a new matcher {entry['matcher']!r} running {Path(mine['command'].split()[-1]).name}")
+                continue
+            if any(isinstance(h, dict) and h.get("command") == mine["command"] for h in same_matcher["hooks"]):
+                continue  # already exactly this command
+            same_matcher["hooks"].append(json.loads(json.dumps(mine)))
+            added.append(f"{event}: one more command under the existing matcher {entry['matcher']!r}")
+    return merged, added
+
+
+def settings_diff(before: dict | None, after: dict) -> str:
+    import difflib
+
+    old = (json.dumps(before, indent=2, ensure_ascii=False) + "\n").splitlines(keepends=True) if before is not None else []
+    new = (json.dumps(after, indent=2, ensure_ascii=False) + "\n").splitlines(keepends=True)
+    label = str(CLAUDE_SETTINGS)
+    return "".join(difflib.unified_diff(old, new, fromfile=f"{label} (now)" if before is not None
+                                        else f"{label} (does not exist)", tofile=f"{label} (after)", n=3))
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def write_overrides(changes: list[dict]) -> dict:
+    """Apply the table's changes to the two override files, or explain why one cannot be.
+
+    A class is written as an exact-name line ahead of the built-ins (first match wins), and
+    dropped again when the built-ins already give that answer — so the file stays the list
+    of the user's *differences*, and the table can honestly say where each answer came from.
+
+    Turning irreversible *off* for a name a built-in glob covers is refused rather than
+    done, because the only way to express it in this format is to drop the glob, which
+    would also unmark every tool the glob covers that this console has never seen. That is
+    exactly the silent widening the whole project exists to avoid; a person who means it
+    edits the file by hand.
+    """
+    ov = read_overrides()
+    own_rules = list(ov["own_rules"])
+    own_irr = list(ov["own_irreversible"])
+    changed: list[str] = []
+
+    for change in changes:
+        tool = str(change.get("tool", ""))
+        why = writable_as_a_rule(tool)
+        if why:
+            raise ValueError(f"{tool!r} cannot be written as a rule: {why}")
+        if "class" in change and change["class"] is not None:
+            cls = str(change["class"])
+            if cls not in TOOL_CLASSES:
+                raise ValueError(f"class must be one of {', '.join(TOOL_CLASSES)}; {cls!r} is not")
+            rest = [r for r in own_rules if r[0] != tool]
+            without = rest + (list(tool_classes.DEFAULT_RULES) if ov["keeps_rules"] else [])
+            if tool_classes.classify(tool, without) == cls:
+                if len(rest) != len(own_rules):
+                    own_rules = rest  # the rules already say this: no line of our own needed
+                    changed.append(f"{tool}: class {cls} (the built-in rules already say so; the override line is gone)")
+            else:
+                own_rules = [(tool, cls)] + rest
+                changed.append(f"{tool}: class {cls}")
+        if "irreversible" in change and change["irreversible"] is not None:
+            want = bool(change["irreversible"])
+            builtin_hit = (tool_classes.matching_irreversible(tool, tool_classes.DEFAULT_IRREVERSIBLE_TOOLS)
+                           if ov["keeps_irreversible"] else None)
+            has_own = tool_classes.matching_irreversible(tool, own_irr) is not None
+            if want:
+                if not builtin_hit and not has_own:
+                    own_irr = own_irr + [tool]
+                    changed.append(f"{tool}: irreversible — a person must confirm it")
+            else:
+                if builtin_hit:
+                    raise ValueError(
+                        f"{tool!r} is irreversible because of the built-in pattern {builtin_hit!r}, and this file "
+                        f"format has no way to say \"not this one\". Turning it off for {tool!r} alone would mean "
+                        f"dropping {builtin_hit!r}, which also unmarks every tool it covers that this console has "
+                        f"never seen. Edit {IRREVERSIBLE_TOOLS_FILE} by hand — remove the `!default` line and write "
+                        f"the list you want — if that is really what you mean.")
+                if has_own:
+                    own_irr = [p for p in own_irr if p != tool]
+                    changed.append(f"{tool}: reversible again (the override line is gone)")
+
+    written: list[str] = []
+    if own_rules != ov["own_rules"] or (own_rules and not ov["rules_file_read"]):
+        body = "".join(f"{pattern} {cls}\n" for pattern, cls in own_rules)
+        _atomic_write(CLASS_FILE, CLASS_FILE_HEADER + "\n" + body + ("!default\n" if ov["keeps_rules"] else ""))
+        written.append(str(CLASS_FILE))
+    if own_irr != ov["own_irreversible"] or (own_irr and not ov["irreversible_file_read"]):
+        body = "".join(f"{pattern}\n" for pattern in own_irr)
+        _atomic_write(IRREVERSIBLE_TOOLS_FILE,
+                      IRREVERSIBLE_FILE_HEADER + "\n" + body + ("!default\n" if ov["keeps_irreversible"] else ""))
+        written.append(str(IRREVERSIBLE_TOOLS_FILE))
+    return {"written": written, "changed": changed}
+
+
+def class_map(handler: "Handler | None" = None, agent: str = "claude-code:mine") -> dict:
+    """GET /api/classes: the whole tool→class map, and what a person needs to connect.
+
+    Read fresh from the files every time, never cached: an adapter picks the files up
+    without a restart, and an answer here that lagged behind them would be a lie about
+    what the next call will be judged by.
+    """
+    ov = read_overrides()
+    seen = tools_seen_in_transcript()
+    names = set(seen) | {p for p, _c in ov["own_rules"] if not (set(p) & GLOB_CHARS)} \
+        | {p for p in ov["own_irreversible"] if not (set(p) & GLOB_CHARS)}
+    rows = [tool_row(tool, ov, seen.get(tool)) for tool in sorted(names)]
+    local = bool(handler is not None and handler.client_address and handler.client_address[0] in ("127.0.0.1", "::1"))
+    return {
+        "classes": list(TOOL_CLASSES),
+        "default_class": tool_classes.DEFAULT_CLASS,
+        "class_file": str(CLASS_FILE), "class_file_exists": CLASS_FILE.exists(),
+        "irreversible_file": str(IRREVERSIBLE_TOOLS_FILE), "irreversible_file_exists": IRREVERSIBLE_TOOLS_FILE.exists(),
+        "builtin": {"rules": [list(r) for r in tool_classes.DEFAULT_RULES],
+                    "irreversible": list(tool_classes.DEFAULT_IRREVERSIBLE_TOOLS)},
+        "override": {"rules": [list(r) for r in ov["own_rules"]], "irreversible": list(ov["own_irreversible"]),
+                     "keeps_builtin_rules": ov["keeps_rules"], "keeps_builtin_irreversible": ov["keeps_irreversible"]},
+        "effective": {"rules": [list(r) for r in ov["rules"]], "irreversible": list(ov["irreversible"])},
+        "tools": rows,
+        "what_it_decides": {
+            "class": "which circuit answers the call (spend / message / exec / files); an unclassified name lands in exec",
+            "irreversible": "whether a person must confirm it, under a `confirm_per_irreversible` rule",
+            "promise": "both are the tool layer's promise about a name, not something the circuit proves",
+        },
+        "hot_reload": ("the hook is a fresh process per tool call, and the MCP proxy re-reads these files when they "
+                       "change, so a change here applies to the next call without restarting anything"),
+        "connect": {
+            "local": local,
+            "console_url": f"http://127.0.0.1:{PORT}",
+            "agent": agent,
+            "python": sys.executable,
+            "repo": str(CONSOLE_DIR),
+            "hook_pre": str(CONSOLE_DIR / "adapters" / "claude_code_hook.py"),
+            "hook_post": str(CONSOLE_DIR / "adapters" / "claude_code_post_hook.py"),
+            "proxy": str(CONSOLE_DIR / "adapters" / "mcp_proxy.py"),
+            "bnbagent": str(CONSOLE_DIR / "adapters" / "bnbagent_boundary.py"),
+            "claude_settings": str(CLAUDE_SETTINGS),
+            "claude_settings_exists": CLAUDE_SETTINGS.exists(),
+            "claude_settings_block": claude_settings_block(agent),
+            "bnbagent_snippet": bnbagent_snippet(),
+        },
+    }
+
+
+def api_classes_get(h: "Handler") -> None:
+    from urllib.parse import parse_qs, urlsplit
+
+    agent = (parse_qs(urlsplit(h.path).query).get("agent") or ["claude-code:mine"])[0][:40] or "claude-code:mine"
+    h._json(200, class_map(h, agent))
+
+
+def api_classes_post(h: "Handler", payload: dict) -> None:
+    """Writing the map is the person's: an agent that could put its own tools in a class
+    with no circuit, or unmark them as irreversible, would be writing its own boundary."""
+    if not h._has_token(payload):
+        h._json(403, {"error": "changing what a tool is and whether it needs a confirm is the operator's: "
+                               "send the token (see the console's log)"})
+        return
+    changes = payload.get("tools")
+    if not isinstance(changes, list) or len(changes) > 500 or not all(isinstance(c, dict) for c in changes):
+        h._json(400, {"error": "send {\"tools\": [{\"tool\": \"send_email\", \"class\": \"message\", "
+                               "\"irreversible\": true}, …]}, at most 500 entries"})
+        return
+    try:
+        result = write_overrides(changes)
+    except ValueError as e:
+        h._json(400, {"error": str(e)})
+        return
+    except OSError as e:
+        h._json(400, {"error": f"could not write the rule files: {e}"})
+        return
+    if result["written"]:
+        print(f"tool classes: {'; '.join(result['changed'])} → {', '.join(result['written'])} "
+              f"(a person changed them from the page)", flush=True)
+    h._json(200, dict(result, **{"map": class_map(h)}))
+
+
+def api_write_claude_settings(h: "Handler", payload: dict) -> None:
+    """The one file-writing action in this console, and the narrowest one it could be:
+    one fixed path, chosen at startup; the operator's token; only from this machine's
+    loopback; a backup first; and a refusal, never a guess, if the file is not JSON we
+    can read back. `preview` shows the exact diff and writes nothing."""
+    if not h._has_token(payload):
+        h._json(403, {"error": "writing your settings.json is the operator's: send the token (see the console's log)"})
+        return
+    if not h.client_address or h.client_address[0] not in ("127.0.0.1", "::1"):
+        h._json(403, {"error": "this writes a file on the console's own machine, so it is offered only to a browser "
+                               "on that machine; copy the block instead"})
+        return
+    action = str(payload.get("action", "preview"))
+    if action not in ("preview", "write"):
+        h._json(400, {"error": "action is 'preview' or 'write'"})
+        return
+    agent = str(payload.get("agent", "claude-code:mine"))[:40] or "claude-code:mine"
+    before: dict | None = None
+    if CLAUDE_SETTINGS.exists():
+        try:
+            raw = CLAUDE_SETTINGS.read_text(encoding="utf-8")
+        except OSError as e:
+            h._json(400, {"error": f"cannot read {CLAUDE_SETTINGS}: {e}"})
+            return
+        try:
+            before = json.loads(raw) if raw.strip() else {}
+        except ValueError as e:
+            h._json(400, {"error": f"{CLAUDE_SETTINGS} is not valid JSON ({e}); the console will not touch a file it "
+                                   f"cannot read back. Fix or move it, or copy the block in by hand."})
+            return
+        if not isinstance(before, dict):
+            h._json(400, {"error": f"{CLAUDE_SETTINGS} is not a JSON object; the console will not rewrite it"})
+            return
+    try:
+        after, added = merge_claude_settings(before or {}, claude_settings_block(agent))
+    except ValueError as e:
+        h._json(400, {"error": str(e)})
+        return
+    diff = settings_diff(before, after)
+    out = {"path": str(CLAUDE_SETTINGS), "exists": before is not None, "added": added,
+           "already_installed": not added, "diff": diff, "written": False, "backup": None}
+    if action == "preview" or not added:
+        h._json(200, out)
+        return
+    backup = None
+    if before is not None:
+        backup = CLAUDE_SETTINGS.with_name(CLAUDE_SETTINGS.name + f".bak-{time.strftime('%Y%m%d-%H%M%S')}")
+        try:
+            backup.write_text(CLAUDE_SETTINGS.read_text(encoding="utf-8"), encoding="utf-8")
+        except OSError as e:
+            h._json(400, {"error": f"refusing to write without a backup first ({e})"})
+            return
+    try:
+        _atomic_write(CLAUDE_SETTINGS, json.dumps(after, indent=2, ensure_ascii=False) + "\n")
+    except OSError as e:
+        h._json(400, {"error": f"could not write {CLAUDE_SETTINGS}: {e}"})
+        return
+    print(f"wrote both hooks into {CLAUDE_SETTINGS} (backup {backup}); a person pressed it on the page", flush=True)
+    h._json(200, dict(out, written=True, backup=str(backup) if backup else None))
+
+
+# ======= end W2 block ====================================================================
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "reflex-console"
 
@@ -1036,7 +1487,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if not self._local_only():
             return
-        if self.path in ("/", "/index.html"):
+        if self.path.split("?")[0] == "/api/classes":  # W2: the tool→class map (see the W2 block above)
+            return api_classes_get(self)
+        if self.path.startswith("/api/device/"):  # W11
+            device_get(self, BOUNDARY)
+        elif self.path in ("/", "/index.html"):
             self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         elif self.path == "/api/state":
             self._json(200, BOUNDARY.status())
@@ -1098,6 +1553,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         name = str(payload.get("agent", "anonymous"))[:40] or "anonymous"
 
+        if self.path == "/api/classes":          # W2: what a tool is, and whether a person must confirm it
+            return api_classes_post(self, payload)
+        if self.path == "/api/hooks/claude-code":  # W2: "write it for me" (one fixed file, backed up first)
+            return api_write_claude_settings(self, payload)
         if self.path == "/api/policy":
             if not self._has_token(payload):
                 self._json(403, {"error": "installing rules is the operator's: send the token (see the console's log)"})
