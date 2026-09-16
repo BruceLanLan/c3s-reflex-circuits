@@ -11,6 +11,8 @@ first: five workstreams read it. Endpoints are on `http://127.0.0.1:8765` by def
 | `POST /api/tool` — `irreversible`, `failed` | the adapters (the tool runner describing the call) | none |
 | `POST /api/tool` — `confirm`, `confirm_b`, `blocked`, `heartbeat` | **a person** (page, Cardputer, chat) | operator token |
 | `POST /api/policy`, `POST /api/task` | **a person** | operator token |
+| `POST /api/stop-all`, `POST /api/resume-all` | **a person** | operator token |
+| `GET/POST /api/classes` | read: anything local · write: **a person** | operator token to write |
 | `GET /api/state`, `GET /api/manifest` | anything local | none |
 
 **Pairing a phone**: the token travels in the URL **fragment**, never the query string —
@@ -156,6 +158,25 @@ POST /api/task/t_9f2a/cancel   (operator token)
 - A task's tool calls are ordinary requests against that agent's circuits — **the task
   entrance grants nothing on its own**, and a task blocked on an approval simply waits.
 - `reply_to` is stored for the channel to consume; the console itself never sends to a chat.
+
+## Stop everything · `POST /api/stop-all` / `POST /api/resume-all`
+
+Operator token. Optional `note` (≤ 200) and `source` (≤ 20, default `"page"`); returns
+`{"stopped": true|false, "agents": [...], "count": n, "source": "..."}`. Writes `blocked` for
+every agent the console knows, one tool entry each, carrying the `source` so Activity can say
+where the stop came from. It **latches**: resuming is a second, deliberate act — the page makes
+the person type the word, and a refusal of `"blocked is high"` offers no confirm, because no
+confirm can lift a block.
+
+## Tool classes · `GET /api/classes` / `POST /api/classes`
+
+`GET` returns the tool→class map the adapters use: the built-in rules, the override files, and
+every tool name this console has actually seen (harvested from `reason` prefixes), each with
+its class and whether it counts as irreversible. `POST` (operator token) writes the override
+files the adapters already parse; the adapters are short-lived processes and pick the change up
+on their next call. The class decides **which circuit answers**; `irreversible` decides
+**whether a person must confirm**. Both are the tool layer's promise, not something the circuit
+proves.
 
 ## Errors
 
