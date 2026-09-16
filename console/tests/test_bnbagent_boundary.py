@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "adapters"))
+from reflex_token import json_headers as _json_headers  # noqa: E402
 
 pytest.importorskip("bnbagent", reason="the BNBAgent SDK lives in its own venv (~/work/c3s-cache/bnbagent-venv)")
 
@@ -45,7 +46,7 @@ PAYEE = "0x3333333333333333333333333333333333333333"
 
 def console(path: str, payload=None) -> dict:
     req = urllib.request.Request(f"{CONSOLE}{path}", data=None if payload is None else json.dumps(payload).encode(),
-                                 headers={"content-type": "application/json"})
+                                 headers=_json_headers())
     with urllib.request.urlopen(req, timeout=5) as resp:
         return json.loads(resp.read())
 

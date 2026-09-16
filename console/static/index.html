@@ -436,6 +436,7 @@ const T = {
     "e.chain.ok": "BSC（链 {id}）只读复核一致 · 未部署，无钱包", "e.chain.dis": "BSC（链 {id}）复核不一致：节点算出 grant = {g}", "e.chain.err": "链上复核不可用：{err}（裁决不受影响）",
     "e.tool": "写入 {bits}", "e.policy": "{cls}：{rules}", "e.policy.s": "{nand} NAND + {latch} LATCH · 核对 {rows} 行 · {holds}", "e.policy.none": "{cls}：移除电路，不再设限",
     "l.sending": "已发出，等电路…", "l.neterr": "发不出去：{e}",
+    "tok.prompt": "操作者令牌（安装规则、写 confirm/blocked 需要）。在后台启动日志里，也在 ~/.c3s-circuit-agent/operator-token。只存在这个浏览器里，不会发给服务器。",
     // agents
     "ag.title": "接入的 agent", "ag.sub": "每个名字在每张电路上各有一份独立状态；一拍 = 该 agent 的一次请求",
     "ag.none": "还没有任何请求。",
@@ -534,6 +535,7 @@ const T = {
     "e.chain.ok": "BSC (chain {id}) read-only re-check agrees · nothing deployed, no wallet", "e.chain.dis": "BSC (chain {id}) DISAGREES: node computed grant = {g}", "e.chain.err": "chain check unavailable: {err} (verdict unaffected)",
     "e.tool": "wrote {bits}", "e.policy": "{cls}: {rules}", "e.policy.s": "{nand} NAND + {latch} LATCH · {rows} rows checked · {holds}", "e.policy.none": "{cls}: circuit removed, no longer gated",
     "l.sending": "sent, waiting for the circuit…", "l.neterr": "could not send: {e}",
+    "tok.prompt": "Operator token (needed to install rules and write confirm/blocked). It is in the console's startup log and in ~/.c3s-circuit-agent/operator-token. Kept in this browser only; never sent to the server.",
     "ag.title": "Connected agents", "ag.sub": "one independent state per circuit per name; a tick is one request from that agent",
     "ag.none": "No requests yet.",
     "ag.name": "agent", "ag.ticks": "ticks", "ag.by": "per class ticks/grants", "ag.cool": "cooldown", "ag.latch": "latches", "ag.armed": "armed", "ag.seen": "last seen",
@@ -782,9 +784,8 @@ $("r-remove").addEventListener("click", async () => {
   if (BCLS === "exec") return;
   INSTALL = { status: "sending" }; showInstall();
   try {
-    const r = await fetch("/api/policy", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ class: BCLS, remove: true }) });
-    const d = await r.json();
-    INSTALL = r.ok ? { status: 200, removed: true, cls: BCLS } : { status: r.status, error: d.error };
+    const d = await post("/api/policy", { class: BCLS, remove: true }, { token: true });
+    INSTALL = d.error ? { status: "refused", error: d.error } : { status: 200, removed: true, cls: BCLS };
   } catch (err) { INSTALL = { status: "neterr", error: err.message }; }
   showInstall(); await refresh(); if (STATE) fillFromInstalled(BCLS);
 });
@@ -806,9 +807,8 @@ $("rules").addEventListener("submit", async (ev) => {
   $("install").disabled = true; INSTALL = { status: "sending" }; showInstall();
   const body = ($("r-denyall").checked && BCLS !== HALT) ? { class: BCLS, deny_all: true } : { class: BCLS, ...editorSettings() };
   try {
-    const r = await fetch("/api/policy", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    const d = await r.json();
-    INSTALL = r.ok ? { status: 200, summary: d } : { status: r.status, error: d.error };
+    const d = await post("/api/policy", body, { token: true });
+    INSTALL = d.error ? { status: "refused", error: d.error } : { status: 200, summary: d };
   } catch (err) { INSTALL = { status: "neterr", error: err.message }; }
   showInstall();
   $("install").disabled = false;
@@ -907,7 +907,7 @@ async function arm(agent, bit, v, btn, forReason) {
     // request with the same reason and lets other calls tick past it.
     const body = { agent, [bit]: v };
     if (forReason && (bit === "confirm" || bit === "confirm_b")) body.for_reason = forReason;
-    const d = await post("/api/tool", body);
+    const d = await post("/api/tool", body, { token: true });  // confirm/blocked/heartbeat need the operator token
     $("ap-msg").innerHTML = d.error ? `<span class="bad">${esc(d.error)}</span>` : `<span class="c-tool">${t("ap.done", { agent: esc(agent), bits: armedHtml(d.armed || {}, shownBits(d.armed)) })}</span>`;
   } catch (err) { $("ap-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
   await refresh();
@@ -975,8 +975,25 @@ function showLast(e) {
   LAST = e;
   $("last").innerHTML = e.error ? `<span class="bad">${esc(e.error)}</span>` : entryHtml(e, false).replace(/^<div class="e/, '<div style="padding:0;border:0;background:none" class="e');
 }
-async function post(path, body) {
-  const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+// The operator token gates installing rules and writing the person's bits. It is kept in
+// this browser only (localStorage), never fetched from the server — so an agent that reads
+// the page HTML learns nothing. The person pastes it once from the console's own log.
+let TOKEN = null;
+try { TOKEN = localStorage.getItem("reflex.token"); } catch (e) { /* private window */ }
+function askToken() {
+  const v = window.prompt(t("tok.prompt"));
+  if (v) { TOKEN = v.trim(); try { localStorage.setItem("reflex.token", TOKEN); } catch (e) { /* ignore */ } }
+  return TOKEN;
+}
+async function post(path, body, opts) {
+  const headers = { "content-type": "application/json" };
+  const needsToken = opts && opts.token;
+  if (needsToken) { if (!TOKEN) askToken(); if (TOKEN) headers["x-reflex-token"] = TOKEN; }
+  let r = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
+  if (r.status === 403 && needsToken && askToken()) {  // wrong or missing: ask once and retry
+    headers["x-reflex-token"] = TOKEN;
+    r = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
+  }
   const d = await r.json();
   if (!r.ok) d.error = d.error || `HTTP ${r.status}`;
   return d;
@@ -1022,6 +1039,7 @@ function renderAgents(s) {
 let CN_CLS = "spend";
 function renderStatic() {
   const o = esc(location.origin), H = "-H 'content-type: application/json'";
+  const HT = H + " -H \"x-reflex-token: $REFLEX_TOKEN\"";  // the person's endpoints need the token
   $("cn-hook").innerHTML = `{ "hooks": {
   "PreToolUse": [ { "matcher": "Bash|Write|Edit|mcp__.*",
     "hooks": [ { "type": "command", "timeout": 20,
@@ -1050,13 +1068,15 @@ python3 bot_telegram.py
 /block &lt;agent&gt;   /unblock &lt;agent&gt;   /stop   /resume`;
   $("cn-daily").innerHTML = [["Gmail", "d.gmail"], ["Slack", "d.slack"], ["Google Calendar", "d.cal"], [lang === "zh" ? "文件系统" : "Filesystem", "d.fs"], [lang === "zh" ? "Shell / 代码" : "Shell / code", "d.sh"]]
     .map(([n, k]) => `<div class="kv"><b>${esc(n)}</b><span>${esc(t(k))}</span></div>`).join("");
-  $("cn-curl").innerHTML = `<span class="c"># ${lang === "zh" ? "装一类规则（重编译、重证明，这一类的 agent 归零）" : "install one class's rules (recompiles, reproves, resets that class)"}</span>
-curl -s ${o}/api/policy ${H} -d '{"class":"exec","min_gap_ticks":8,"commit_ticks":4,"forbid_when_blocked":true}'
-curl -s ${o}/api/policy ${H} -d '{"class":"spend","deny_all":true}'
-<span class="c"># ${lang === "zh" ? "工具层（agent 写不到的一层）" : "tool layer (the layer the agent cannot write)"}</span>
-curl -s ${o}/api/tool ${H} -d '{"agent":"my-model","blocked":1}'
-curl -s ${o}/api/tool ${H} -d '{"agent":"my-model","confirm":1}'
-<span class="c"># ${lang === "zh" ? "agent：一次请求 = 一拍" : "agent: one request, one tick"}</span>
+  $("cn-curl").innerHTML = `<span class="c"># ${lang === "zh" ? "操作者令牌在后台启动日志里，也在 ~/.c3s-circuit-agent/operator-token" : "the operator token is in the console's startup log and in ~/.c3s-circuit-agent/operator-token"}</span>
+export REFLEX_TOKEN=<span class="t">…</span>
+<span class="c"># ${lang === "zh" ? "装一类规则（需要令牌；重编译、重证明，这一类的 agent 归零）" : "install one class's rules (needs the token; recompiles, reproves, resets that class)"}</span>
+curl -s ${o}/api/policy ${HT} -d '{"class":"exec","min_gap_ticks":8,"commit_ticks":4,"forbid_when_blocked":true}'
+curl -s ${o}/api/policy ${HT} -d '{"class":"spend","deny_all":true}'
+<span class="c"># ${lang === "zh" ? "工具层：人的位（confirm/blocked）需要令牌，agent 写不到" : "tool layer: the person's bits (confirm/blocked) need the token; the agent cannot write them"}</span>
+curl -s ${o}/api/tool ${HT} -d '{"agent":"my-model","blocked":1}'
+curl -s ${o}/api/tool ${HT} -d '{"agent":"my-model","confirm":1}'
+<span class="c"># ${lang === "zh" ? "agent：一次请求 = 一拍（不需要令牌）" : "agent: one request, one tick (no token)"}</span>
 curl -s ${o}/api/request ${H} -d '{"agent":"my-model","class":"files","intent":1,"reason":"write notes.txt"}'
 curl -s ${o}/api/state`;
 }

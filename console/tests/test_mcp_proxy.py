@@ -1,3 +1,4 @@
+from reflex_token import json_headers as _json_headers
 """End-to-end tests for adapters/mcp_proxy.py against the LIVE console.
 
 The proxy is driven as a subprocess with a scripted client; the downstream is
@@ -31,7 +32,7 @@ TIMEOUT = 5
 
 def console(path: str, payload=None) -> dict:
     req = urllib.request.Request(f"{CONSOLE}{path}", data=None if payload is None else json.dumps(payload).encode(),
-                                 headers={"content-type": "application/json"})
+                                 headers=_json_headers())
     with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
         return json.loads(resp.read())
 
