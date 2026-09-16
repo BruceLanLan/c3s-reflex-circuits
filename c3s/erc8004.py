@@ -355,6 +355,7 @@ def registration_file(name: str, description: str, manifest_uri: str, digest: st
         "image": image,
         "services": [{"name": SERVICE_NAME, "endpoint": manifest_uri, "version": FORMAT, "keccak256": digest}],
         "registrations": [],
+        "x402Support": False,
         "active": True,
     }
 

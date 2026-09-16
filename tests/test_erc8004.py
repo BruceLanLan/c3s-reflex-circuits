@@ -196,6 +196,24 @@ def test_manifest_naming_a_module_needs_the_chain_to_score_100(tmp_path):
     assert "skip module" in res.stdout and "score 0" in res.stdout
 
 
+@needs_cast
+def test_module_return_values_decode(manifest):
+    # What a ReflexModule's netlist() and safe() return, ABI-encoded by cast rather than
+    # by this code, so the decoder is checked against an independent encoder.
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import validate_boundary as vb
+
+    cast = shutil.which("cast") or str(Path("~/.foundry/bin/cast").expanduser())
+    netlist = manifest["circuit"]["netlist_hex"]
+    blob = subprocess.run([cast, "abi-encode", "f(bytes)", netlist], capture_output=True, text=True, check=True).stdout.strip()
+    assert "0x" + vb.decode_bytes_return(blob[2:]).hex() == netlist
+    with pytest.raises(ValueError):
+        vb.decode_bytes_return(blob[2:-64])
+    safe = "0x00000000000000000000000000000000000000a5"
+    blob = subprocess.run([cast, "abi-encode", "f(address)", safe], capture_output=True, text=True, check=True).stdout.strip()
+    assert vb.address_return(blob[2:]) == safe
+
+
 def _online(url: str) -> bool:
     try:
         body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_chainId", "params": []}).encode()

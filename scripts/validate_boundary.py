@@ -111,6 +111,20 @@ def _word(raw: str, i: int = 0) -> int:
     return int(raw[64 * i : 64 * (i + 1)], 16)
 
 
+def decode_bytes_return(raw: str) -> bytes:
+    """ABI-decode a single `bytes` return value (hex without 0x): offset, length, data."""
+    offset = _word(raw) * 2
+    length = int(raw[offset : offset + 64], 16)
+    data = raw[offset + 64 : offset + 64 + 2 * length]
+    if len(data) != 2 * length:
+        raise ValueError("short bytes return")
+    return bytes.fromhex(data)
+
+
+def address_return(raw: str) -> str:
+    return "0x" + raw[24:64]
+
+
 def module_checks(r: erc8004.Report, url: str, ctx: dict) -> None:
     m, policy = ctx["manifest"], ctx["policy"]
     onchain = m["onchain"]
@@ -128,16 +142,13 @@ def module_checks(r: erc8004.Report, url: str, ctx: dict) -> None:
 
     sha = "0x" + read("netlistSha256()")[:64]
     r.add("module.netlistSha256", sha.lower() == str(m["circuit"]["netlist_sha256"]).lower(), m["circuit"]["netlist_sha256"], sha)
-    raw = read("netlist()")
-    offset = _word(raw) * 2
-    length = int(raw[offset : offset + 64], 16)
-    stored = bytes.fromhex(raw[offset + 64 : offset + 64 + 2 * length])
+    stored = decode_bytes_return(read("netlist()"))
     r.add("module.netlist_bytes", stored == ctx["netlist"], f"{len(ctx['netlist'])} bytes equal to the manifest", f"{len(stored)} bytes, {'equal' if stored == ctx['netlist'] else 'different'}")
     for sig, want in (("nIn()", len(policy.input_names())), ("nState()", policy.state_bits), ("optionalInputs()", erc8004.optional_inputs_mask(policy))):
         got = _word(read(sig))
         r.add(f"module.{sig[:-2]}", got == want, want, got)
     if "safe" in onchain:
-        got = "0x" + read("safe()")[24:64]
+        got = address_return(read("safe()"))
         r.add("module.safe", got.lower() == str(onchain["safe"]).lower(), onchain["safe"], got)
 
 
