@@ -20,6 +20,9 @@ POLICIES = [
     Policy(min_gap_ticks=8, max_grants=7, confirm_per_irreversible=True, two_key=True),
     Policy(min_gap_ticks=4, commit_ticks=4, confirm_per_irreversible=True, trip_after_failures=3),
     Policy(sticky_block=True, heartbeat_ticks=8, forbid_when_blocked=True),
+    # the rule that reads the circuit's own verdict
+    Policy(trip_after_refusals=3),
+    Policy(min_gap_ticks=8, commit_ticks=4, trip_after_refusals=3, confirm_per_irreversible=True),
 ]
 IDS = [
     f"gap{p.min_gap_ticks}-commit{p.commit_ticks}-block{int(p.forbid_when_blocked)}"
@@ -28,6 +31,7 @@ IDS = [
     + (f"-heartbeat{p.heartbeat_ticks}" if p.heartbeat_ticks else "")
     + ("-oneshot" if p.confirm_per_irreversible else "")
     + (f"-breaker{p.trip_after_failures}" if p.trip_after_failures else "")
+    + (f"-refusals{p.trip_after_refusals}" if p.trip_after_refusals else "")
     + ("-twokey" if p.two_key else "")
     for p in POLICIES
 ]
@@ -72,11 +76,15 @@ def test_every_rule_holds_from_reset(policy):
         ),
         (Policy(trip_after_failures=3, forbid_when_blocked=False), Policy(trip_after_failures=2, forbid_when_blocked=False), "breaker"),
         (Policy(forbid_when_blocked=False), Policy(forbid_when_blocked=False, two_key=True), "two_key"),
+        # `blocked` stays enforced here on purpose: the window where the circuit still grants
+        # while a stricter claim says it should be halted is a tick where blocked drops. With a
+        # rule that refuses for ever (a spent budget) the stricter claim is vacuously true.
+        (Policy(trip_after_refusals=3), Policy(trip_after_refusals=2), "refusal_breaker"),
     ],
     ids=[
         "stricter-rate-limit", "longer-commitment", "smaller-budget", "unenforced-block", "shorter-confirm-window",
         "sticky-claimed-on-stateless-block", "shorter-heartbeat", "one-shot-claimed-on-a-window", "breaker-two-vs-three",
-        "two-key-claimed-on-none",
+        "two-key-claimed-on-none", "fewer-refusals-before-halt",
     ],
 )
 def test_claiming_more_than_the_circuit_enforces_is_caught(built, claimed, expected):

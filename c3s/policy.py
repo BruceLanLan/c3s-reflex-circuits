@@ -94,6 +94,12 @@ class Policy:
                         that grant spends it; reversible grants neither need nor spend
     trip_after_failures this many consecutive ticks with `failed` high trip a breaker
                         that grants nothing until a `confirm` resets it (0: off)
+    trip_after_refusals this many consecutive refused requests halt the agent until a
+                        `confirm` resets it (0: off). The only rule that reads the
+                        circuit's own verdict rather than an input: an agent that keeps
+                        asking for what it cannot have is stopped instead of left to
+                        hammer the boundary. A grant or a confirm clears the count; a
+                        tick with no request is not a refusal and leaves it alone.
     two_key             every grant needs both `confirm` and `confirm_b` to have
                         arrived since the last grant (or to arrive now); a grant
                         spends both
@@ -113,10 +119,12 @@ class Policy:
     heartbeat_ticks: int = 0
     confirm_per_irreversible: bool = False
     trip_after_failures: int = 0
+    trip_after_refusals: int = 0
     two_key: bool = False
 
     def __post_init__(self) -> None:
-        for name in ("min_gap_ticks", "commit_ticks", "max_grants", "confirm_window_ticks", "heartbeat_ticks", "trip_after_failures"):
+        for name in ("min_gap_ticks", "commit_ticks", "max_grants", "confirm_window_ticks", "heartbeat_ticks",
+                     "trip_after_failures", "trip_after_refusals"):
             value = getattr(self, name)
             if value < 0 or value > 255:
                 raise ValueError(f"{name}={value} outside 0..255")
@@ -179,6 +187,16 @@ class Policy:
         return 1 if self.trip_after_failures else 0
 
     @property
+    def refused_bits(self) -> int:
+        # Consecutive refused requests so far, like `fails`: the stored value only has to
+        # reach N-1, because the tick that reaches N trips the latch.
+        return _width(self.trip_after_refusals - 1) if self.trip_after_refusals > 1 else 0
+
+    @property
+    def refused_trip_bits(self) -> int:
+        return 1 if self.trip_after_refusals else 0
+
+    @property
     def key_bits(self) -> int:
         return 2 if self.two_key else 0
 
@@ -194,6 +212,8 @@ class Policy:
             ("token", self.token_bits),
             ("fails", self.fails_bits),
             ("tripped", self.trip_bits),
+            ("refused", self.refused_bits),
+            ("refused_tripped", self.refused_trip_bits),
             ("key_a", self.key_bits // 2),
             ("key_b", self.key_bits // 2),
         ]
@@ -227,6 +247,8 @@ class Policy:
             out.append("an irreversible grant needs its own confirm, and spends it")
         if self.trip_after_failures:
             out.append(f"{self.trip_after_failures} consecutive failures trip a breaker until a confirm resets it")
+        if self.trip_after_refusals:
+            out.append(f"{self.trip_after_refusals} refusals in a row halt everything until a confirm resets it")
         if self.two_key:
             out.append("a grant needs both confirm and confirm_b, and spends both")
         return out or ["every request is granted"]
@@ -284,7 +306,15 @@ class Policy:
         have_a, have_b = bool(st.get("key_a", 0) or confirm), bool(st.get("key_b", 0) or confirm_b)
         if self.two_key and not (have_a and have_b):
             allowed = False
+        # The refusal breaker reads only its own latch here: the tick that trips it is a
+        # refusal anyway, so gating on the latch alone keeps grant free of its own count.
+        if self.trip_after_refusals and st["refused_tripped"]:
+            allowed = False
         grant = int(allowed)
+
+        R = self.trip_after_refusals
+        refusal_now = bool(R and request and not grant)
+        trip_refusals = bool(refusal_now and (R == 1 or st["refused"] >= R - 1))
 
         nxt = {
             "gap": (min(self.min_gap_ticks - 1, _cap(self.gap_bits)) if self.gap_bits else 0) if grant else max(st["gap"] - 1, 0),
@@ -298,6 +328,9 @@ class Policy:
             "token": int((confirm or st["token"]) and not (grant and irreversible)) if self.token_bits else 0,
             "fails": (0 if (confirm or not failed) else min(st["fails"] + 1, _cap(self.fails_bits))) if self.fails_bits else 0,
             "tripped": int(break_now or (st["tripped"] and not confirm)) if self.trip_bits else 0,
+            "refused": (0 if (grant or confirm) else (min(st["refused"] + 1, _cap(self.refused_bits)) if refusal_now
+                                                       else st["refused"])) if self.refused_bits else 0,
+            "refused_tripped": int(trip_refusals or (st["refused_tripped"] and not confirm)) if self.refused_trip_bits else 0,
             "key_a": int(have_a and not grant) if self.two_key else 0,
             "key_b": int(have_b and not grant) if self.two_key else 0,
         }
@@ -349,7 +382,15 @@ class Policy:
             have_a = b.or_(q["key_a"][0], confirm)
             have_b = b.or_(q["key_b"][0], inp["confirm_b"])
             allowed = b.and_(allowed, b.and_(have_a, have_b))
+        R = self.trip_after_refusals
+        if R:
+            refused_tripped = q["refused_tripped"][0]
+            allowed = b.and_(allowed, b.not_(refused_tripped))
         grant = allowed
+        # Only now, once the verdict exists: a refusal of an actual request. `grant` reaches
+        # the next state and never a condition of this tick, so there is no loop.
+        refusal_now = b.and_(request, b.not_(grant)) if R else b.ZERO
+        trip_refusals = (b.and_(refusal_now, cmp.ge_const(b, q["refused"], R - 1)) if R > 1 else refusal_now) if R else b.ZERO
 
         def drive(name: str, d: list[int]) -> None:
             for qi, di in zip(q[name], d):
@@ -373,6 +414,12 @@ class Policy:
             drive("fails", cmp.mux_bits(b, clear, cmp.increment_saturating(b, q["fails"], b.ONE), cmp.const_bits(b, 0, self.fails_bits)))
         if k:
             drive("tripped", [b.or_(break_now, b.and_(tripped, b.not_(confirm)))])
+        if self.refused_bits:
+            clear = b.or_(grant, confirm)
+            stay = cmp.mux_bits(b, refusal_now, list(q["refused"]), cmp.increment_saturating(b, q["refused"], b.ONE))
+            drive("refused", cmp.mux_bits(b, clear, stay, cmp.const_bits(b, 0, self.refused_bits)))
+        if R:
+            drive("refused_tripped", [b.or_(trip_refusals, b.and_(refused_tripped, b.not_(confirm)))])
         if self.two_key:
             drive("key_a", [b.and_(have_a, b.not_(grant))])
             drive("key_b", [b.and_(have_b, b.not_(grant))])
@@ -415,6 +462,8 @@ class Policy:
                 out.append("breaker tripped until a confirm resets it")
             elif inp.get("failed", 0) and (k == 1 or st["fails"] >= k - 1):
                 out.append(f"breaker: {k} consecutive failures")
+        if self.trip_after_refusals and st["refused_tripped"]:
+            out.append(f"halted after {self.trip_after_refusals} refusals in a row; a confirm resets it")
         if self.two_key:
             missing = [n for n, have in (("confirm", st["key_a"] or inp["confirm"]), ("confirm_b", st["key_b"] or inp.get("confirm_b", 0))) if not have]
             if missing:
@@ -494,9 +543,10 @@ class Policy:
         # can reach from reset under any inputs is visited.
         violations = {
             name: 0
-            for name in ("rate_limit", "commitment", "forbidden", "budget", "confirm_window", "halted", "one_shot", "breaker", "two_key")
+            for name in ("rate_limit", "commitment", "forbidden", "budget", "confirm_window", "halted", "one_shot",
+                         "breaker", "refusal_breaker", "two_key")
         }
-        H, k = claim.heartbeat_ticks, claim.trip_after_failures
+        H, k, R = claim.heartbeat_ticks, claim.trip_after_failures, claim.trip_after_refusals
         gap_cap = max(claim.min_gap_ticks, 1)
         streak_cap = max(claim.commit_ticks, 1)
         spent_cap = claim.max_grants + 1 if claim.max_grants else 1
@@ -510,12 +560,13 @@ class Policy:
 
         # state, ticks since a grant (none yet), intent streak, grants, ticks since a
         # confirm (none yet), halt open, silent ticks, token held, consecutive failures,
-        # breaker open, key a held, key b held
-        start = (0, gap_cap, 0, 0, window_cap, 0, 0, 0, 0, 0, 0, 0)
+        # breaker open, key a held, key b held, consecutive refusals, refusal halt open
+        start = (0, gap_cap, 0, 0, window_cap, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         seen, frontier, checked = {start}, [start], 0
         while frontier:
             new = []
-            for state, since, streak, spent, since_confirm, halt_open, silence, token, consec, broken, key_a, key_b in frontier:
+            for (state, since, streak, spent, since_confirm, halt_open, silence, token, consec, broken, key_a, key_b,
+                 refusals, refusal_halt) in frontier:
                 for inputs, inp in enumerate(patterns):
                     request, intent, blocked, confirm = inp["request"], inp["intent"], inp["blocked"], inp["confirm"]
                     irreversible, failed, heartbeat, confirm_b = inp["irreversible"], inp["failed"], inp["heartbeat"], inp["confirm_b"]
@@ -543,6 +594,8 @@ class Policy:
                             violations["one_shot"] += 1
                         if k and (broken or break_now):
                             violations["breaker"] += 1
+                        if R and refusal_halt:
+                            violations["refusal_breaker"] += 1
                         if claim.two_key and not (have_a and have_b):
                             violations["two_key"] += 1
                     nxt_state = int(nxt[row])
@@ -562,6 +615,11 @@ class Policy:
                         int(bool(break_now or (broken and not confirm))) if k else 0,
                         int(bool(have_a and not grant)) if claim.two_key else 0,
                         int(bool(have_b and not grant)) if claim.two_key else 0,
+                        # a refusal is a request that was not granted; a grant or a confirm
+                        # clears the run, a tick with no request neither adds nor clears
+                        (0 if (grant or confirm) else (min(refusals + 1, max(R - 1, 0)) if request else refusals)) if R else 0,
+                        int(bool((R and request and not grant and (R == 1 or refusals >= R - 1))
+                                 or (refusal_halt and not confirm))) if R else 0,
                     )
                     if t not in seen:
                         seen.add(t)

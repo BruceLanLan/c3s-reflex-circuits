@@ -104,6 +104,20 @@ each is a boundary rather than a cost. Measured alone, with `forbid_when_blocked
 * **Two keys.** `two_key=True`: every grant needs both `confirm` and `confirm_b` to
   have arrived since the last grant (or to arrive now), and the grant spends both.
   16 NAND + 2 LATCH over 128 rows.
+* **A halt after refusals.** `trip_after_refusals=R`: `R` refused requests in a row halt
+  the agent until a `confirm` resets it. This is the one rule that reads the circuit's own
+  verdict rather than an input — an agent that keeps asking for what it cannot have is
+  stopped rather than left hammering the boundary — and it needs no new input at all: the
+  refusal is `request` with no `grant`. A grant or a confirm clears the run; a tick with no
+  request is not a refusal and leaves the count alone. `grant` reaches only the next state,
+  never a condition of the same tick, so nothing here is circular. 51 NAND + 3 LATCH over
+  128 rows for `R=3`.
+
+  Its control needed care, and the care is the lesson: claiming a stricter `R` than the
+  circuit enforces is only caught where the circuit would still *grant* — so the control
+  runs with `forbid_when_blocked` on, where a tick when `blocked` drops is grantable. State
+  a stricter claim against a policy that refuses for ever (a spent budget) and it passes
+  vacuously, which is exactly the shape of a proof that proves nothing.
 
 The four inputs these read — `irreversible`, `failed`, `heartbeat`, `confirm_b` — are
 appended to the circuit only when the rule that reads them is on, in that order, so
