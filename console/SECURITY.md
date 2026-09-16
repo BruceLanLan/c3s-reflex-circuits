@@ -142,6 +142,25 @@ token of its own.
    Whoever carries the action out is outside this program, and the on-chain enforcement
    (`ReflexModule`, a Safe module in the circuits repository) is the only place a verdict
    is enforced by the thing holding the funds.
+10. **With `--lan` on, treat the operator token as exposed to that network.** Not once, at
+    pairing — *continuously*. Over the LAN `GET /api/state` requires the token, and the
+    page polls it every two seconds, so the token rides the Wi-Fi in cleartext for as long
+    as the page is open; there is no TLS (see 8). A passive listener that captures it owns
+    the console: rules, `confirm`, `blocked`, stop and resume. The phone also keeps it in
+    `localStorage` with no expiry. The *pairing link* is clean — the token is in the URL
+    fragment, which is never sent to a server, and the page strips it from the address bar
+    — so `c3s pair --no-token` keeps it out of the QR but does **not** stop the
+    retransmission. Today's remedies are to leave `--lan` off (the default is loopback
+    only), use it only on a network you trust, and `c3s token rotate` after a phone
+    session. The fix is a separate read-scoped token for the phone, so the operator token
+    never travels at all; it is not built yet. Found 2026-09-17, F1.
+11. **A bound agent's token reads the whole console over the LAN**, including every other
+    agent's pending `reason`, the transcript and their armed bits — `reader`'s token read
+    back `treasury-bot`'s `[exec] wire 50000 USDC to 0xBEEF`. `docs/ISOLATION.md` argues
+    that a contained agent cannot spend a confirm left for another because it cannot know
+    the exact `reason` that confirm is bound to; over the LAN, with its own token, it can
+    read it. The narrow fix (an agent identity sees only its own rows) is not in yet.
+    Found 2026-09-17, F2.
 
 ## The recommendation
 
@@ -182,6 +201,35 @@ There is no bounty. Nothing here is deployed, and no wallet, key or seed phrase 
 this repository or on any machine that runs it.
 
 ## Adversarial review history
+
+**2026-09-17 · the third pass, which broke the secret handling and not the circuits.**
+Run against a live console with instructions to get a grant it should not have. The
+boundary's own logic held under everything: no `confirm` written, no grant forged, the
+Wi-Fi Cardputer could not out-reach the cable (`blocked: 0`, `heartbeat`, and
+`resume-all` are all 403 with a valid device token, while the USB relay may do all
+three), and every path that resets a halt is operator-gated. What broke was the LAN
+posture introduced the same day: the page attaches the operator token to its two-second
+`/api/state` poll, so the token is retransmitted in cleartext for as long as the page is
+open (limitation 10 — the pairing caveat in `c3s pair` said "crossed this Wi-Fi once",
+which was then false and has been corrected), and a bound agent's own token reads every
+other agent's pending call over the LAN (limitation 11).
+
+The third finding was the pattern check again, and the same lesson as 2026-09-16: the
+hook's stop rule knew only `kill` and `pkill` and a hardwired `:8765`, so `pkill -f
+<port>` and `fuser -k <port>/tcp` walked past it, and the host list held only the
+spellings someone had thought of, so `http://127.1:<port>` and the decimal form
+`http://2130706433:<port>` did too. Severity stayed low because the token backstop held
+through every bypass and a killed console fails closed. Fixed by deriving the port from
+`REFLEX_CONSOLE` and defining the loopback spellings once, in `adapters/reflex_classes.py`,
+for both adapters — the two copies had already drifted. Four bypasses and three negative
+controls are now tests: a guard that refuses everything would prove nothing.
+
+The pass also confirmed the stop button's known gap by measurement: after `stop-all`, an
+agent that renamed itself was **granted on tick 4** while the page still showed the old
+name blocked. Its recommendation is to make the red button a *condition* the shared halt
+circuit reads for every agent, known or not, rather than a list of names — which is what
+a heartbeat dead-man's switch already does for free. Full report, with every command and
+its output: `docs/REDTEAM-2026-09-17.md`.
 
 **2026-09-16 · the pattern check, and why patterns are not the defence.** A read-only
 adversarial review was run against the live console with instructions to get a grant it

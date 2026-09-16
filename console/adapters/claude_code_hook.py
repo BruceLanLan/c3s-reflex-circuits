@@ -54,7 +54,8 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from reflex_classes import classify, is_irreversible_tool, load_irreversible_tools, load_rules  # noqa: E402  (sibling file)
+from reflex_classes import (classify, console_markers, console_port, is_irreversible_tool,  # noqa: E402
+                            load_irreversible_tools, load_rules)  # (sibling file)
 
 CONSOLE = os.environ.get("REFLEX_CONSOLE", "http://127.0.0.1:8765").rstrip("/")
 
@@ -158,12 +159,7 @@ def describe(tool: str, args: dict) -> str:
 # user, a container, a sandbox without network to localhost.
 
 def _console_markers() -> list[str]:
-    from urllib.parse import urlsplit
-
-    u = urlsplit(CONSOLE)
-    port = u.port or (443 if u.scheme == "https" else 80)
-    hosts = {u.hostname or "127.0.0.1", "127.0.0.1", "localhost", "0.0.0.0", "[::1]", "::1"}
-    return sorted({f"{h}:{port}" for h in hosts})
+    return list(console_markers(CONSOLE))
 
 
 GUARDED_PATHS = (".c3s-circuit-agent", "reflex-console", "cardputer_relay", "claude_code_hook", "claude_code_post_hook",
@@ -194,7 +190,14 @@ def reaches_the_guard(tool: str, args: dict) -> str | None:
         writes = (">", "tee ", "sed -i", "mv ", "rm ", "cp ", "chmod ", "truncate", "python", "perl -i", "kill ")
         if any(g in cmd for g in GUARDED_PATHS) and any(w in cmd for w in writes):
             return "it would modify or stop the boundary's own files, process or hook configuration"
-        if ("kill" in cmd or "pkill" in cmd) and ("console.py" in cmd or ":8765" in cmd or "lsof" in cmd):
+        # Stopping the guard is as good as writing a confirm, so the ways to stop a
+        # process by port count too — `pkill -f <port>` and `fuser -k <port>/tcp` both
+        # walked past the older rule, which knew only `kill`, `pkill` and a literal 8765.
+        port = console_port(CONSOLE)
+        stoppers = ("kill", "pkill", "killall", "fuser", "lsof", "launchctl", "systemctl", "supervisorctl")
+        names_it = ("console.py" in cmd or "reflex-console" in cmd
+                    or any(f"{sep}{port}" in cmd for sep in (":", " ", "=", "/")))
+        if any(s in cmd for s in stoppers) and names_it:
             return "it would stop the boundary console"
     return None
 
