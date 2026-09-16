@@ -147,7 +147,7 @@ python scripts/check_properties.py --controls    # 时序性质两套方法，�
 | **L3** 等价性 | 每个电路是否就是它的规格？ | [docs/CIRCUITS.md](docs/CIRCUITS.md#how-equivalence-is-established) |
 | **L4** 公共机器 | 任何人能否在 EVM 上重放？ | `contracts/` |
 
-行为保真度、对照实验与密封测试见 [docs/EVALUATION.md](docs/EVALUATION.md)；简化、假设与不主张的内容见 [docs/LIMITATIONS.md](docs/LIMITATIONS.md)。
+行为保真度、对照实验与密封测试见 [docs/EVALUATION.md](docs/EVALUATION.md)；简化、假设与不主张的内容见 [docs/LIMITATIONS.md](docs/LIMITATIONS.md)。把电路放在 agent 的动作前面——证明给这种安排带来什么、以及四件它不带来的事——见 [docs/AGENT.md](docs/AGENT.md)（英文）；那里也讲 `c3s/policy.py`：你自己写的规则（冷却、承诺、禁止标志、预算、确认窗口）编译成同一种电路，逐行核对、在每个可达状态上证明。
 
 ## 常见开发任务
 

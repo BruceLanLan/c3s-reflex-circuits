@@ -104,7 +104,10 @@ Behavioural fidelity, controls and the sealed test are in
 [docs/EVALUATION.md](docs/EVALUATION.md). What is simplified, assumed or not
 claimed is in [docs/LIMITATIONS.md](docs/LIMITATIONS.md). Putting the circuit in
 front of an agent's actions — what the proofs give such an arrangement, and the four
-things they do not — is [docs/AGENT.md](docs/AGENT.md).
+things they do not — is [docs/AGENT.md](docs/AGENT.md), which also covers
+`c3s/policy.py`: rules you write (a cooldown, a commitment, a forbidding flag, a
+budget, a confirmation window) compiled to circuits of the same kind, checked on every
+row and proven over every reachable state.
 
 ## How it works
 
