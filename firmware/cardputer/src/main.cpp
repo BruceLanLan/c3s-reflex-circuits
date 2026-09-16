@@ -40,7 +40,7 @@ bool autoDemo = true;
 bool paused = false;
 bool sound = true;
 
-enum class Page { Main, SelfTest, Help, Digest, Lattice };
+enum class Page { Main, SelfTest, Help, Digest, Lattice, Agent };
 enum class Phase { Idle, Looming, TookOff, Ended };
 Page page = Page::SelfTest;
 Phase phase = Phase::Idle;
@@ -316,7 +316,7 @@ void drawHelp() {
       "1-4   speed 1x 4x 10x 40x slower",
       "p pause   n one tick when paused",
       "a auto  m sound  t self-test  d digest",
-      "serial 115200 logs every tick",
+      "w lattice   g agent: the confirm key",
       "any key to close",
   };
   for (int i = 0; i < 9; i++) text(4, 4 + i * 14, i == 0 ? kText : kMuted, lines[i]);
@@ -431,6 +431,157 @@ void drawDigest() {
   text(4, 122, kMuted, "any key to go back");
 }
 
+// ---- agent page: this device as the physical confirm key ---------------------------
+//
+// The boundary console (reflex-console, cardputer_relay.py) sends a frame a second over
+// USB serial: which circuits are installed, what is waiting for a person, the latest
+// decision. ENTER writes `confirm` for the selected agent, `b` blocks it, `u` lifts the
+// block. A model can write its own request; it cannot press this key. Nothing here
+// talks to a network, and nothing is stored.
+
+struct AgentItem {
+  char agent[31];
+  char cls[8];
+  char why[61];
+  char bit[10];
+  int tick;
+  bool armed;
+};
+
+const int kMaxItems = 4;
+AgentItem items[kMaxItems], itemsIn[kMaxItems];
+int itemCount = 0, itemsInCount = 0;
+char summary[41] = "", chainState[10] = "", lastLine[100] = "";
+bool lastGranted = false;
+int nGranted = 0, nRefused = 0, selected = 0;
+uint32_t hostSeenMs = 0;
+bool hostEver = false;
+char serialLine[200];
+int serialLen = 0;
+
+// Split `line` on '|' into at most n fields, in place.
+int fields(char *line, char **out, int n) {
+  int k = 0;
+  out[k++] = line;
+  for (char *p = line; *p && k < n; p++)
+    if (*p == '|') {
+      *p = 0;
+      out[k++] = p + 1;
+    }
+  return k;
+}
+
+void copyField(char *dst, size_t size, const char *src) {
+  strncpy(dst, src, size - 1);
+  dst[size - 1] = 0;
+}
+
+void onHostLine(char *line) {
+  char *f[9];
+  int n = fields(line, f, 9);
+  hostSeenMs = millis();
+  if (f[0][0] == 'S' && n >= 5) {
+    copyField(summary, sizeof summary, f[1]);
+    nGranted = atoi(f[2]);
+    nRefused = atoi(f[3]);
+    copyField(chainState, sizeof chainState, f[4]);
+    itemsInCount = 0;
+  } else if (f[0][0] == 'I' && n >= 8 && itemsInCount < kMaxItems) {
+    AgentItem &it = itemsIn[itemsInCount++];
+    copyField(it.agent, sizeof it.agent, f[2]);
+    copyField(it.cls, sizeof it.cls, f[3]);
+    it.tick = atoi(f[4]);
+    copyField(it.why, sizeof it.why, f[5]);
+    copyField(it.bit, sizeof it.bit, f[6]);
+    it.armed = f[7][0] == '1';
+  } else if (f[0][0] == 'L' && n >= 5) {
+    lastGranted = f[1][0] == 'G';
+    snprintf(lastLine, sizeof lastLine, "%s %s: %s", f[2], f[3], f[4]);
+  } else if (f[0][0] == 'E') {
+    // Keep the selection on the same agent across frames.
+    char keep[31] = "";
+    if (selected < itemCount) copyField(keep, sizeof keep, items[selected].agent);
+    int waitingBefore = 0, waitingNow = 0;
+    for (int i = 0; i < itemCount; i++) waitingBefore += !items[i].armed;
+    memcpy(items, itemsIn, sizeof items);
+    itemCount = itemsInCount;
+    selected = 0;
+    for (int i = 0; i < itemCount; i++) {
+      if (keep[0] && strcmp(items[i].agent, keep) == 0) selected = i;
+      waitingNow += !items[i].armed;
+    }
+    // The first frame from a host, or something new waiting for a person: show it.
+    if (!hostEver || waitingNow > waitingBefore) {
+      if (page == Page::Main || page == Page::Help) page = Page::Agent;
+      if (hostEver && sound) M5Cardputer.Speaker.tone(1900, 80);
+    }
+    hostEver = true;
+    if (page == Page::Agent) dirty = true;
+  }
+}
+
+void sendKey(const char *action) {
+  if (selected >= itemCount) return;
+  // One press, one event: the keyboard can report the same key on more than one scan.
+  static char lastAction[12] = "";
+  static uint32_t lastMs = 0;
+  const uint32_t now = millis();
+  if (strcmp(action, lastAction) == 0 && now - lastMs < 600) return;
+  copyField(lastAction, sizeof lastAction, action);
+  lastMs = now;
+  Serial.printf("K|%s|%s\n", action, items[selected].agent);
+  if (sound) M5Cardputer.Speaker.tone(strcmp(action, "block") == 0 ? 700 : 2600, 50);
+}
+
+void drawAgent() {
+  char buf[72];
+  const bool live = hostEver && millis() - hostSeenMs < 4000;
+  text(4, 3, kText, "C3S CIRCUIT AGENT");
+  text(live ? 190 : 172, 3, live ? kOk : kBad, live ? "host ok" : "no host");
+  if (!live) {
+    text(4, 30, kMuted, "waiting for the boundary console");
+    text(4, 44, kMuted, "on the computer, over USB:");
+    text(4, 60, kText, "REFLEX_CARDPUTER=1 python console.py");
+    text(4, 84, kMuted, "this key only writes confirm/blocked;");
+    text(4, 96, kMuted, "no network, nothing stored");
+    text(4, 124, kMuted, "` back to the fly");
+    return;
+  }
+  text(4, 15, kMuted, summary);
+  snprintf(buf, sizeof buf, "granted %d  refused %d  chain %s", nGranted, nRefused, chainState);
+  text(4, 26, kMuted, buf);
+  canvas.drawFastHLine(0, 37, 240, kDim);
+
+  if (itemCount == 0) {
+    text(4, 58, kOk, "nothing is waiting for a person");
+  }
+  for (int i = 0; i < itemCount && i < 3; i++) {
+    const AgentItem &it = items[i];
+    const int y = 41 + i * 23;
+    if (i == selected) {
+      canvas.fillRect(0, y - 1, 240, 22, kPanel);
+      canvas.fillRect(0, y - 1, 2, 22, kPar);
+    }
+    snprintf(buf, sizeof buf, "%.22s %s t%d", it.agent, it.cls, it.tick);
+    text(5, y, i == selected ? kText : kMuted, buf);
+    if (it.armed) {
+      snprintf(buf, sizeof buf, "%s given; waits for its next call", it.bit);
+      text(5, y + 10, kOk, buf);
+    } else {
+      snprintf(buf, sizeof buf, "%.38s", it.why);
+      text(5, y + 10, kPar, buf);
+    }
+  }
+  if (itemCount > 3) {
+    snprintf(buf, sizeof buf, "+%d more", itemCount - 3);
+    text(196, 26, kMuted, buf);
+  }
+  canvas.drawFastHLine(0, 110, 240, kDim);
+  snprintf(buf, sizeof buf, "%c %.37s", lastGranted ? '+' : 'x', lastLine);
+  text(4, 113, lastGranted ? kOk : kBad, buf);
+  text(4, 125, kMuted, "ENT confirm  b block  u unblock  ` back");
+}
+
 void draw() {
   canvas.fillScreen(kBg);
   if (page == Page::SelfTest) {
@@ -441,6 +592,8 @@ void draw() {
     drawDigest();
   } else if (page == Page::Lattice) {
     drawLattice();
+  } else if (page == Page::Agent) {
+    drawAgent();
   } else {
     drawTopBar();
     drawArena();
@@ -467,6 +620,7 @@ void onKey(char c) {
     case 'w': page = Page::Lattice; pageUntil = 0; break;
     case 't': page = Page::SelfTest; pageUntil = 0; break;
     case 'h': page = Page::Help; break;
+    case 'g': page = Page::Agent; break;
     default: break;
   }
   dirty = true;
@@ -474,6 +628,25 @@ void onKey(char c) {
 
 void readInput() {
   bool go = M5Cardputer.BtnA.wasPressed();
+  if (page == Page::Agent) {
+    if (go) sendKey("confirm");  // the side button is a confirm key here too
+    if (M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isPressed()) {
+      auto &keys = M5Cardputer.Keyboard.keysState();
+      if (keys.enter || keys.space) {
+        // A two-key rule shows which key is missing; ENTER writes that one.
+        if (selected < itemCount) sendKey(items[selected].bit);
+      }
+      for (char c : keys.word) {
+        if (c == ';' && selected > 0) selected--;
+        else if (c == '.' && selected + 1 < itemCount) selected++;
+        else if (c == 'b') sendKey("block");
+        else if (c == 'u') sendKey("unblock");
+        else if (c == '`' || c == 'h') page = Page::Main;
+      }
+      dirty = true;
+    }
+    return;
+  }
   if (M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isPressed()) {
     auto &keys = M5Cardputer.Keyboard.keysState();
     if (page != Page::Main) {
@@ -529,17 +702,30 @@ void setup() {
 void loop() {
   M5Cardputer.update();
   readInput();
-  // A host can ask for the digest over serial, so its timing can be recorded off-device.
+  // Serial carries two things: a bare `d` asks for the digest (so its timing can be
+  // recorded off-device), and `X|...` lines are frames from the boundary console.
   while (Serial.available()) {
-    if ((char)Serial.read() == 'd') {
+    const char c = (char)Serial.read();
+    if (c == '\n' || c == '\r') {
+      serialLine[serialLen] = 0;
+      if (serialLen >= 2 && serialLine[1] == '|') onHostLine(serialLine);
+      serialLen = 0;
+    } else if (c == 'd' && serialLen == 0) {
       page = Page::Digest;
       pageUntil = 0;
       digestRows = 0;
       digestPending = true;
       dirty = true;
+    } else if (serialLen < (int)sizeof serialLine - 1) {
+      serialLine[serialLen++] = c;
     }
   }
   uint32_t now = millis();
+  // The host status line has to notice silence even when no frame arrives.
+  static bool wasLive = false;
+  const bool live = hostEver && now - hostSeenMs < 4000;
+  if (page == Page::Agent && live != wasLive) dirty = true;
+  wasLive = live;
 
   if (page == Page::SelfTest && pageUntil && now > pageUntil) {
     page = Page::Main;
