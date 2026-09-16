@@ -115,10 +115,40 @@ def test_a_binding_written_by_another_process_is_seen_at_once(store):
 
 
 @needs_console
-def test_a_corrupt_store_binds_nothing_rather_than_trusting_it(store):
+def test_a_corrupt_store_refuses_rather_than_reading_as_nothing_bound(store):
+    """The adversarial review's second finding. Reading an unparseable store as "{}" would
+    turn one bad write into "every agent's token is gone" — silently, while serving on."""
+    console.check_agent_token("a", "s3cret")
     store.write_text("{ not json")
+    for given in ("", "s3cret", "anything"):
+        with pytest.raises(console.BindingsUnreadable):
+            console.check_agent_token("a", given)
+    with pytest.raises(console.BindingsUnreadable):
+        console.agent_bindings()
+    # A store whose shape is wrong is corruption too, not an empty store.
+    store.write_text(json.dumps({"a": "not-a-record"}))
+    with pytest.raises(console.BindingsUnreadable):
+        console.check_agent_token("a", "s3cret")
+    # No file at all is the honest starting state: nobody is bound.
+    store.unlink()
+    assert console.agent_bindings() == {}
     assert console.check_agent_token("a", "") == "unbound"
-    assert console.check_agent_token("a", "t") == "bound"
+
+
+@needs_console
+def test_requiring_a_token_refuses_an_unbound_name_instead_of_trusting_it(store, monkeypatch):
+    """The adversarial review's first finding: by default an unbound name is a name
+    anything local can speak for, which inside the isolation container means the agent can
+    act as any name nobody has bound. REFLEX_REQUIRE_AGENT_TOKEN shuts that door."""
+    monkeypatch.setattr(console, "REQUIRE_AGENT_TOKEN", True)
+    assert console.check_agent_token("a", "") == "required"
+    assert console.check_agent_token("a", "   ") == "required"
+    assert console.check_agent_token("a", "s3cret") == "bound"  # first use still binds
+    assert console.check_agent_token("a", "s3cret") == "ok"
+    assert console.check_agent_token("a", "other") == "spoof"
+    # And the default is unchanged: compatibility is what I-3 promises in docs/API.md.
+    monkeypatch.setattr(console, "REQUIRE_AGENT_TOKEN", False)
+    assert console.check_agent_token("b", "") == "unbound"
 
 
 # ---- the live console -----------------------------------------------------------------

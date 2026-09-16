@@ -155,9 +155,18 @@ def operator_token() -> str:
 # SECURITY.md), and the structural answer is docs/ISOLATION.md.
 #
 # Trust on first use, deliberately: a name nobody has bound keeps working without a token,
-# so today's adapters do not break, and `/api/state` marks it `token_bound: false`.
+# so today's adapters do not break, and `/api/state` marks it `token_bound: false`. The
+# cost of that default is exactly stated: **an unbound name is a name anything local can
+# speak for**, which is the adversarial review's first finding. A deployment that wants the
+# door shut sets REFLEX_REQUIRE_AGENT_TOKEN=1, and then every request must carry a token —
+# a name with no token is refused instead of trusted. `docs/ISOLATION.md` turns it on.
+REQUIRE_AGENT_TOKEN = os.environ.get("REFLEX_REQUIRE_AGENT_TOKEN", "") not in ("", "0", "no")
 
 AGENTS_LOCK = threading.Lock()
+
+
+class BindingsUnreadable(RuntimeError):
+    """`agents.json` is there and cannot be read. Not the same as "nobody is bound"."""
 
 
 def _token_sha256(token: str) -> str:
@@ -169,14 +178,23 @@ def _token_sha256(token: str) -> str:
 def agent_bindings() -> dict:
     """`{name: {"token_sha256": …, "bound_at": …}}`, re-read from disk every time: another
     process (`c3s token rotate`) may have dropped a binding since the last request, and a
-    binding that only takes effect after a restart is not a binding."""
+    binding that only takes effect after a restart is not a binding.
+
+    No file means nobody is bound, which is the honest starting state. A file that *is*
+    there and does not parse raises instead: reading it as "nothing is bound" would turn
+    one bad write into "every agent's token is gone" and keep serving, which is the same
+    mistake `Boundary._load` refuses to make for the rules (it exits rather than start with
+    none). A boundary must not reset open, and that includes this one."""
+    if not AGENTS_FILE.exists():
+        return {}
     try:
         data = json.loads(AGENTS_FILE.read_text())
-    except (OSError, ValueError):
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    return {k: v for k, v in data.items() if isinstance(v, dict) and isinstance(v.get("token_sha256"), str)}
+    except (OSError, ValueError) as e:
+        raise BindingsUnreadable(f"{AGENTS_FILE} exists and cannot be read ({e})") from e
+    if not isinstance(data, dict) or not all(
+            isinstance(v, dict) and isinstance(v.get("token_sha256"), str) for v in data.values()):
+        raise BindingsUnreadable(f"{AGENTS_FILE} is not a map of agent name to binding")
+    return data
 
 
 def _write_bindings(data: dict) -> None:
@@ -203,7 +221,11 @@ def check_agent_token(name: str, given: str) -> str:
     `unbound`  no token offered, none on file — allowed, and shown as unbound.
     `bound`    a token offered for a name nobody had bound — bound to it now.
     `ok`       the token matches the one on file.
-    `spoof`    the name is bound and this is not its token (a wrong one, or none).
+    `spoof`    the name is bound and this is not its token (a wrong one, or none), or
+               nothing is bound and this console requires a token from everyone.
+
+    Raises `BindingsUnreadable` if the store is there and unreadable; the caller refuses
+    the request rather than treating every agent as unbound.
     """
     import hmac
 
@@ -213,7 +235,10 @@ def check_agent_token(name: str, given: str) -> str:
         record = data.get(name)
         if record is None:
             if not given:
-                return "unbound"
+                # The default trusts an unbound name (I-3's compatibility clause, and the
+                # state of the world before I-3 existed). REFLEX_REQUIRE_AGENT_TOKEN=1
+                # does not: an agent that cannot say which program it is does not speak.
+                return "required" if REQUIRE_AGENT_TOKEN else "unbound"
             data[name] = {"token_sha256": _token_sha256(given), "bound_at": time.time()}
             _write_bindings(data)
             return "bound"
@@ -726,7 +751,12 @@ class Boundary:
         # I-3. Read before the lock (it is a file), and only ever as a boolean and a time:
         # the hash of an agent's token is not something a page needs, and /api/state has
         # no token of its own. `bound` above is the confirm-binding map and is not this.
-        bindings = agent_bindings()
+        try:
+            bindings, bindings_error = agent_bindings(), None
+        except BindingsUnreadable as e:
+            # Every request is being refused; the page must be able to say why rather than
+            # go blank, so this is reported instead of raised.
+            bindings, bindings_error = {}, str(e)
         with self.lock:
             agents = []
             for name, a in sorted(self.agents.items()):
@@ -773,6 +803,12 @@ class Boundary:
                 },
                 "started_at": STARTED_AT,
                 "default_rules": FLY_DEFAULT.describe(),
+                # I-3, at the console level rather than per agent: whether an unbound name
+                # is trusted here at all, and whether the store could be read. When
+                # `store_error` is set every request is being refused, and a page that
+                # shows agents as "unbound" without saying this would be lying.
+                "agent_tokens": {"required": REQUIRE_AGENT_TOKEN, "bound": len(bindings),
+                                 "store_error": bindings_error},
             }
 
 
@@ -1632,9 +1668,22 @@ class Handler(BaseHTTPRequestHandler):
             # Before anything ticks: a request under a bound name with the wrong token must
             # not spend that agent's confirm, move its cooldown, or count towards its
             # breaker. It is not that agent's request at all.
-            state = check_agent_token(name, self.headers.get("X-Reflex-Agent-Token") or "")
-            if state == "spoof":
+            given = (self.headers.get("X-Reflex-Agent-Token") or "").strip()
+            try:
+                state = check_agent_token(name, given)
+            except BindingsUnreadable as e:
+                # Fail closed and say so. Serving on as if nothing were bound would turn
+                # one bad write into "every agent's token is gone", quietly.
+                print(f"refusing every request: {e}", flush=True)
+                self._json(403, {"error": f"the console cannot read its agent-token store ({e}). It will not "
+                                          "treat every agent as unbound: fix the file, or remove it to start "
+                                          "from nothing bound."})
+                return
+            if state in ("spoof", "required"):
                 asked = payload.get("class")
+                why = (f"{name!r} is not bound to any token and this console requires one "
+                       "(REFLEX_REQUIRE_AGENT_TOKEN)") if state == "required" else \
+                      f"{name!r} is bound to its own agent token and this is not it"
                 TRANSCRIPTS.appendleft({
                     "at": time.time(),
                     "kind": "spoof",
@@ -1643,13 +1692,11 @@ class Handler(BaseHTTPRequestHandler):
                     "reason": str(payload.get("reason", ""))[:160],
                     "granted": False,
                     "tick": None,
-                    "token": "missing" if not (self.headers.get("X-Reflex-Agent-Token") or "").strip() else "wrong",
-                    "why": [f"{name!r} is bound to another token: refused without asking any circuit"],
+                    "token": "missing" if not given else "wrong",
+                    "why": [f"{why}: refused without asking any circuit"],
                 })
-                self._json(403, {"error": f"{name!r} is bound to its own agent token and this is not it. "
-                                          "Send that agent's REFLEX_AGENT_TOKEN in X-Reflex-Agent-Token, or "
-                                          "choose a name of your own; a person can drop the binding with "
-                                          "`c3s token rotate --agent <name>`."})
+                self._json(403, {"error": f"{why}. Send that agent's REFLEX_AGENT_TOKEN in X-Reflex-Agent-Token; "
+                                          "a person can drop a binding with `c3s token rotate --agent <name>`."})
                 return
             try:
                 cls = class_from(payload, TOOL_CLASSES)
