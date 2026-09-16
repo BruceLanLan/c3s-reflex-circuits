@@ -79,6 +79,7 @@ DEFAULT_CLASS = "exec"
 FLY_DEFAULT = Policy(min_gap_ticks=8, commit_ticks=4, forbid_when_blocked=True)
 # Installed rules survive a restart. Without this, restarting the console would quietly
 # turn "no transfers" back into "spend has no circuit" — a boundary that resets open.
+KEEP_AGENTS, KEEP_AGENTS_DAYS = 500, 30
 STATE_FILE = Path(os.environ.get("REFLEX_STATE_FILE", Path.home() / ".c3s-circuit-agent" / "policies.json")).expanduser()
 TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
 CHAIN = None  # set in __main__ when the chain second opinion is on
@@ -214,6 +215,7 @@ class Boundary:
             a = self.agent(name)
             a["armed"]["blocked"] = int(bool(rec.get("blocked")))
             a["ticks"] = int(rec.get("ticks", 0))
+            a["seen"] = float(rec.get("seen", 0))
             for cls, cs in (rec.get("classes") or {}).items():
                 if cls in CLASSES and prints.get(cls) and cs.get("netlist") == prints[cls]:
                     compiled = self.policies[cls]
@@ -250,10 +252,16 @@ class Boundary:
             # (a state is meaningless for any other circuit), and the level bit `blocked`.
             # Events (confirm, irreversible, …) are not kept: they belong to the moment.
             prints = {c: _netlist_print(p) for c, p in self.policies.items()}
+            # Kept: agents active in the last KEEP_AGENTS_DAYS, newest first, at most KEEP_AGENTS —
+            # but a blocked agent is always kept, so forgetting can never unblock anyone.
+            cutoff = time.time() - KEEP_AGENTS_DAYS * 86400
+            recent = sorted(self.agents.items(), key=lambda kv: kv[1].get("seen", 0), reverse=True)
+            keep = [(n, a) for n, a in recent if a["armed"]["blocked"]]
+            keep += [(n, a) for n, a in recent if not a["armed"]["blocked"] and a.get("seen", 0) >= cutoff][:KEEP_AGENTS]
             agents = {
-                name: {"blocked": a["armed"]["blocked"], "ticks": a["ticks"],
+                name: {"blocked": a["armed"]["blocked"], "ticks": a["ticks"], "seen": a.get("seen", 0),
                        "classes": {c: dict(cs, netlist=prints[c]) for c, cs in a["classes"].items() if prints[c]}}
-                for name, a in self.agents.items()
+                for name, a in keep
             }
         body = json.dumps({"format": "c3s.console.policies/1", "saved_at": time.time(), "classes": classes,
                            "agents": agents}, indent=2)
@@ -296,7 +304,7 @@ class Boundary:
     def agent(self, name: str) -> dict:
         return self.agents.setdefault(
             name,
-            {"ticks": 0, "armed": {bit: 0 for bit in MUST_COME_FROM_THE_TOOL_LAYER}, "bound": {},
+            {"ticks": 0, "seen": time.time(), "armed": {bit: 0 for bit in MUST_COME_FROM_THE_TOOL_LAYER}, "bound": {},
              "classes": {c: _fresh_class_state() for c in CLASSES}},
         )
 
@@ -309,6 +317,7 @@ class Boundary:
             raise ValueError(f"not a tool-layer bit: {', '.join(unknown)}")
         with self.lock:
             a = self.agent(name)
+            a["seen"] = time.time()
             for bit, value in bits.items():
                 a["armed"][bit] = int(bool(value))
                 # A person confirms *that* call, not whatever comes next: a confirm bound to
@@ -367,6 +376,7 @@ class Boundary:
         with self.lock:
             a = self.agent(name)
             a["ticks"] += 1
+            a["seen"] = time.time()
             armed = a["armed"]
             # A present device is a heartbeat for every agent: a halt policy with a
             # heartbeat rule stops them all when it is unplugged or goes quiet.
@@ -637,7 +647,28 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("expected a JSON object")
         return payload
 
+    def _local_only(self) -> bool:
+        """Only this machine's own page and its own programs may talk to the console.
+
+        Host must be the console's own name (a page on another site that re-points its DNS at
+        127.0.0.1 sends its own name here). A browser always sends Origin on a POST, so a POST
+        from any other site's page is refused; programs (the adapters, curl) send none. And a
+        POST must say application/json, which a page on another site cannot send without a
+        preflight this server never answers — no plain-form or text/plain request gets in."""
+        host = (self.headers.get("Host") or "").lower()
+        allowed_hosts = {f"127.0.0.1:{PORT}", f"localhost:{PORT}", f"[::1]:{PORT}", f"{HOST}:{PORT}"}
+        if host not in allowed_hosts:
+            self._json(403, {"error": "host not allowed: the console answers only to this machine by its own name"})
+            return False
+        origin = self.headers.get("Origin")
+        if origin is not None and origin.lower() not in {f"http://{h}" for h in allowed_hosts}:
+            self._json(403, {"error": "origin not allowed: another site's page may not use the console"})
+            return False
+        return True
+
     def do_GET(self) -> None:
+        if not self._local_only():
+            return
         if self.path in ("/", "/index.html"):
             self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         elif self.path == "/api/state":
@@ -688,6 +719,11 @@ class Handler(BaseHTTPRequestHandler):
         })
 
     def do_POST(self) -> None:
+        if not self._local_only():
+            return
+        if (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
+            self._json(415, {"error": "content-type must be application/json"})
+            return
         try:
             payload = self._body()
         except Exception as e:
