@@ -78,6 +78,12 @@ Environment:
     REFLEX_CONSOLE    console URL when `console` is not given (default http://127.0.0.1:8765)
     REFLEX_AGENT      agent name when `agent` is not given
     REFLEX_FAIL_OPEN  set to 1 to sign unchecked when the console is unreachable
+    REFLEX_AGENT_TOKEN this wallet's own token (I-3), sent as `X-Reflex-Agent-Token`. The
+                      console binds the agent name to it on the first request and then
+                      refuses that name to anything that cannot send it — so another
+                      program on the machine cannot spend the confirm a person left for
+                      this wallet. Read from the environment only, never from a file.
+                      Unset = unbound, and everything works as before.
 """
 
 from __future__ import annotations
@@ -137,9 +143,17 @@ class BoundaryUnreachable(ConnectionError):
 
 
 def _post(url: str, payload: dict, timeout: float = TIMEOUT) -> dict:
-    """The only network call in this file. Tests replace it to record every body."""
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(),
-                                 headers={"content-type": "application/json"})
+    """The only network call in this file. Tests replace it to record every body.
+
+    The wallet's own token (I-3) rides on every call when REFLEX_AGENT_TOKEN is set — from
+    the environment, never from a file, and read here rather than kept on the object so
+    that rotating it does not mean rebuilding the wallet. The operator's token is not here
+    and must not be: this process is the agent's side of the boundary."""
+    headers = {"content-type": "application/json"}
+    token = os.environ.get("REFLEX_AGENT_TOKEN")
+    if token:
+        headers["X-Reflex-Agent-Token"] = token
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read())
 
