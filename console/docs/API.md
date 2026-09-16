@@ -16,10 +16,10 @@ first: five workstreams read it. Endpoints are on `http://127.0.0.1:8765` by def
 | `POST /api/stop-all`, `POST /api/resume-all` | **a person** | operator token |
 | `GET/POST /api/classes` | read: **loopback** free · over the LAN and to write: **a person** | operator token except from loopback |
 | `POST /api/hooks/claude-code` | **a person**, loopback only | operator token |
-| `GET /api/device/frame`, `POST /api/tool` from a device | a **paired Cardputer** over the LAN | device token, and only as below |
+| `GET /api/device/frame`, `POST /api/tool` from a device | a **paired Cardputer** or a **paired phone** over the LAN | device token, and only as below |
 | `POST /api/device/pair` | a device claiming an open window | **none by design** — see below |
-| `POST /api/device/pair/begin\|confirm`, `POST /api/device/forget` | **a person** | operator token |
-| `GET /api/state`, `GET /api/manifest` | anything local · over the LAN: the operator, or a bound agent's own token (which sees a **narrowed** state — below) | none from loopback |
+| `POST /api/device/pair/begin\|confirm`, `POST /api/device/forget`, `POST /api/device/viewer` | **a person** | operator token |
+| `GET /api/state`, `GET /api/manifest` | anything local · over the LAN: a paired phone's viewer token, the operator, or a bound agent's own token (which sees a **narrowed** state — below) | none from loopback |
 
 **Reading over the network** (2026-09-17, F2). `GET /api/state` answers according to who is
 reading. From loopback and with the operator token it is the whole console. With a bound
@@ -33,11 +33,21 @@ open `tasks` (the person's jobs, which an adapter reads there — I-6) and the c
 names stay. A narrowed reply carries `"view": {"scope": "agent", "agent": "<name>"}`; the full
 one carries no `view`. `GET /api/tasks`, `/api/task/<id>` and `/api/manifest` are unchanged.
 
-**Pairing a phone**: the token travels in the URL **fragment**, never the query string —
-`http://<LAN-IP>:8765/#approvals&token=<operator token>`. A fragment is not sent to the
-server, so it cannot land in the console's log, a proxy's log, or a `Referer`. The page
-reads it once, stores it, and clears it from the address bar. (Superseded the earlier
-`?token=` form after W1 found that the console logs full request lines.)
+**Pairing a phone** (revised 2026-09-17, F1): `c3s pair` asks the running console for a
+**viewer token** — the phone's own, minted by `POST /api/device/viewer` (operator token) into
+`devices.json` with `kind: "phone"`, hash only — and puts *that* in the URL **fragment**, never
+the query string: `http://<LAN-IP>:8765/#approvals&viewer=<viewer token>`. A fragment is not
+sent to the server, so it cannot land in the console's log, a proxy's log, or a `Referer`. The
+page reads it once, stores it, and clears it from the address bar. The page then sends the
+viewer token (`X-Reflex-Device-Token`) on its reads and **never sends the operator token on a
+read**: it used to attach it to the two-second `/api/state` poll, which over the Wi-Fi put the
+person's one secret on the network in cleartext for as long as the page was open. A viewer
+token has a paired Cardputer's rights (confirm a waiting call with its code, block; never
+unblock, heartbeat, rules, stop, resume, tasks) plus `GET /api/state`, `/api/manifest`,
+`/api/tasks`; the page disables the controls it cannot use and says why. A viewer's read is
+**not** a heartbeat — only a device's own frame poll is. `c3s pair --forget <device id>` (or
+`POST /api/device/forget`) revokes a phone. (The `&token=` fragment form is still read by the
+page for a person who types it deliberately; `c3s pair` no longer produces it.)
 
 Operator token: header `X-Reflex-Token` (or `"token"` in the body), compared with
 `hmac.compare_digest`. Generated once into `~/.c3s-circuit-agent/operator-token` (mode 600),
@@ -342,11 +352,16 @@ person four digits, and a mismatch is an alarm, not a retry: the window is cance
 person types the digits the **device** shows (`POST /api/device/pair/confirm`). The console never
 displays those digits.
 
-A device token is **exactly as powerful as the cable and no more**:
+A **phone** is a device too (`POST /api/device/viewer`, operator token → `{"device_id":
+"phone:…", "token": …}` once; record `kind: "phone"`). It has every right in the left column
+below plus `GET /api/state`, `/api/manifest` and `/api/tasks`; a record without `kind` is a
+Cardputer and is refused those. A phone's press is stamped `source: "phone"`.
+
+A Cardputer's device token is **exactly as powerful as the cable and no more**:
 
 | over the network a device may | and may not |
 | --- | --- |
-| `GET /api/device/frame` — the same ~400 B frame the cable carries | read `/api/state` |
+| `GET /api/device/frame` — the same ~400 B frame the cable carries | read `/api/state` (a Cardputer; a phone may) |
 | `confirm` / `confirm_b` for an agent **in `pending[]`**, with that entry's `code` and `for_reason` | write them for any other agent or call |
 | `blocked: 1` — block, for any agent the console knows, **no code needed** | `blocked: 0` — lifting a block happens on the console or over the cable |
 | — | `heartbeat` — the heartbeat *is* the device's polling, which the console computes itself; a beat a network write could forge would not be a dead man's switch |

@@ -283,6 +283,7 @@
 <header><div class="bar">
   <h1><span id="title"></span><small id="subtitle"></small></h1>
   <span><i class="dot" id="svc-dot"></i><span id="svc"></span></span>
+  <span class="mono muted" id="viewer-badge" hidden></span>
   <span><i class="dot" id="chain-dot"></i><span id="chain"></span></span>
   <span><i class="dot" id="models-dot"></i><span id="models"></span></span>
   <span class="spacer"></span>
@@ -566,7 +567,9 @@ const T = {
     "title.overview": "总览", "sub.overview": "", "title.boundaries": "边界", "sub.boundaries": "规则 → 电路 → 逐行核对 → 遍历证明",
     "title.approvals": "待确认", "sub.approvals": "", "title.tasks": "任务", "sub.tasks": "交一件事给它做；每次调用照旧一条一条过电路", "title.activity": "流水", "sub.activity": "每条决策都带电路原话与链上复算",
     "title.agents": "Agents", "sub.agents": "一个名字，四张电路各一份状态", "title.connect": "接入", "sub.connect": "你的模型、你的工具、你的链——边界都在同一张电路上",
-    "svc.ok": "服务已连接", "svc.bad": "服务无响应", "svc.wait": "连接中…",
+    "svc.ok": "服务已连接", "svc.bad": "服务无响应", "svc.wait": "连接中…", "svc.denied": "无权读取：在电脑上跑 `c3s pair` 重新配对这台手机",
+    "tok.viewer.badge": "手机视图（只读 + 确认/封锁）", "tok.viewer.no": "这台手机拿的是查看令牌：能看、能确认屏幕上的调用、能封锁——不能装规则、不能全停/解除、不能解封。这些要在电脑上做。",
+    "tok.viewer.have": "我有操作者令牌", "tok.viewer.switches": "手机只能对屏幕上有匹配码的调用按确认或封锁；这些裸开关是操作者的。",
     "chain.off": "链上复核已关闭", "chain.idle": "链上复核就绪（BSC 只读，未部署）", "chain.ok": "链上复核一致 · 未部署", "chain.pend": "链上复核进行中", "chain.err": "链上节点不可用，仅本地裁决", "chain.dis": "链上复核不一致！",
     "models.n": "{n} 个模型已接入", "models.none": "还没有模型接入",
     "honest.line": "拍不是时间；标志位是工具层的承诺；链上只复算、不部署。",
@@ -678,7 +681,7 @@ const T = {
     "e.chain.ok": "BSC（链 {id}）只读复核一致 · 未部署，无钱包", "e.chain.dis": "BSC（链 {id}）复核不一致：节点算出 grant = {g}", "e.chain.err": "链上复核不可用：{err}（裁决不受影响）",
     "e.tool": "写入 {bits}", "e.policy": "{cls}：{rules}", "e.policy.s": "{nand} NAND + {latch} LATCH · 核对 {rows} 行 · {holds}", "e.policy.none": "{cls}：移除电路，不再设限",
     "l.sending": "已发出，等电路…", "l.neterr": "发不出去：{e}",
-    "tok.prompt": "操作者令牌（安装规则、写 confirm/blocked 需要）。在后台启动日志里，也在 ~/.c3s-circuit-agent/operator-token。只存在这个浏览器里，不会发给服务器。",
+    "tok.prompt": "操作者令牌（安装规则、写 confirm/blocked 需要）。在后台启动日志里，也在 ~/.c3s-circuit-agent/operator-token。只存在这个浏览器里；只随它所守的写操作发出，读取从不带它。",
     // agents
     "ag.title": "接入的 agent", "ag.sub": "每个名字在每张电路上各有一份独立状态；一拍 = 该 agent 的一次请求",
     "ag.none": "还没有任何请求。",
@@ -708,7 +711,9 @@ const T = {
     "title.overview": "Overview", "sub.overview": "", "title.boundaries": "Boundaries", "sub.boundaries": "rules → circuit → every row checked → every rule proven",
     "title.approvals": "Approvals", "sub.approvals": "", "title.tasks": "Tasks", "sub.tasks": "hand it a job; its calls still go through the circuits one at a time", "title.activity": "Activity", "sub.activity": "every decision with the circuit's words and the chain re-check",
     "title.agents": "Agents", "sub.agents": "one name, one state per circuit", "title.connect": "Connect", "sub.connect": "your model, your tools, your chain — the boundary is the same circuit",
-    "svc.ok": "service connected", "svc.bad": "service not responding", "svc.wait": "connecting…",
+    "svc.ok": "service connected", "svc.bad": "service not responding", "svc.wait": "connecting…", "svc.denied": "not allowed to read: re-pair this phone with `c3s pair` on the console",
+    "tok.viewer.badge": "phone view (read + confirm/block)", "tok.viewer.no": "This phone holds a viewer token: it can read, confirm a call shown here, and block — not install rules, stop or resume everything, or unblock. Those happen on the console itself.",
+    "tok.viewer.have": "I have the operator token", "tok.viewer.switches": "A phone presses confirm or block only for a call with a code on this screen; these bare switches are the operator's.",
     "chain.off": "chain check off", "chain.idle": "chain check ready (BSC, read-only, nothing deployed)", "chain.ok": "chain check agrees · nothing deployed", "chain.pend": "chain re-check running", "chain.err": "chain node unavailable, local verdict only", "chain.dis": "chain check DISAGREES",
     "models.n": "{n} model(s) connected", "models.none": "no model connected yet",
     "honest.line": "Ticks are not time; flags are the tool layer's promise; on chain everything is replayed, nothing deployed.",
@@ -815,7 +820,7 @@ const T = {
     "e.chain.ok": "BSC (chain {id}) read-only re-check agrees · nothing deployed, no wallet", "e.chain.dis": "BSC (chain {id}) DISAGREES: node computed grant = {g}", "e.chain.err": "chain check unavailable: {err} (verdict unaffected)",
     "e.tool": "wrote {bits}", "e.policy": "{cls}: {rules}", "e.policy.s": "{nand} NAND + {latch} LATCH · {rows} rows checked · {holds}", "e.policy.none": "{cls}: circuit removed, no longer gated",
     "l.sending": "sent, waiting for the circuit…", "l.neterr": "could not send: {e}",
-    "tok.prompt": "Operator token (needed to install rules and write confirm/blocked). It is in the console's startup log and in ~/.c3s-circuit-agent/operator-token. Kept in this browser only; never sent to the server.",
+    "tok.prompt": "Operator token (needed to install rules and write confirm/blocked). It is in the console's startup log and in ~/.c3s-circuit-agent/operator-token. Kept in this browser only; sent only with the writes it gates, never on a read.",
     "ag.title": "Connected agents", "ag.sub": "one independent state per circuit per name; a tick is one request from that agent",
     "ag.none": "No requests yet.",
     "ag.name": "agent", "ag.ticks": "ticks", "ag.by": "per class ticks/grants", "ag.cool": "cooldown", "ag.latch": "latches", "ag.armed": "armed", "ag.seen": "last seen",
@@ -997,6 +1002,7 @@ function render(s) {
   const open = s.tasks || [];
   $("nav-tasks").textContent = open.length ? String(open.length) : "";
   renderStop(s);  // the stop is on every screen, so its label follows the state everywhere
+  renderViewer();  // and so does what this page's token may do
   if (view === "overview") renderOverview(s, models, pending);
   else if (view === "boundaries") renderBoundaries(s);
   else if (view === "approvals") renderApprovals(s);
@@ -1184,7 +1190,7 @@ function renderApprovals(s) {
       ? `<button class="go tool" type="button" disabled>${t("ap.confirm")}</button><button class="danger" type="button" disabled>${t("ap.block")}</button>`
       : `<input class="notein" type="text" id="${nid}" maxlength="200" placeholder="${esc(t("ap.note"))}">
          <button class="go tool" type="button" data-arm="${esc(bit)}" data-agent="${esc(p.agent)}" data-for="${esc(p.reason || "")}" data-code="${esc(p.code || "")}" data-note="${nid}">${t(bit === "confirm_b" ? "ap.confirm_b" : "ap.confirm")}${p.code ? ` · ${esc(p.code)}` : ""}</button>
-         <button class="danger" type="button" data-arm="blocked" data-agent="${esc(p.agent)}" data-note="${nid}">${t("ap.block")}</button>`;
+         <button class="danger" type="button" data-arm="blocked" data-agent="${esc(p.agent)}" data-code="${esc(p.code || "")}" data-note="${nid}">${t("ap.block")}</button>`;
     return `<div class="pend${wait ? " wait" : ""}"><div style="display:grid;gap:5px;min-width:0">
       ${p.effect ? effectCard(p.effect) : ""}
       <div class="who"><b>${esc(p.agent)}</b>${chipFor(p.class || "exec")}${p.task ? `<span class="mono muted">${t("tk.belongs")} <span class="tid">${esc(p.task)}</span></span>` : ""}<span class="mono muted">tick ${num(p.tick)} · ${clock(p.at)}</span>${wait ? "" : code}</div>
@@ -1223,6 +1229,12 @@ function renderApprovals(s) {
     return `<div class="togl${ok ? "" : " dis"}"><span class="lbl"><b>${esc(bit)}</b><small>${ok ? esc(t("sw." + bit)) : t("sw.unread")}</small></span>${btn}</div>`;
   }).join("");
   $("ap-toggles").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => arm(AP_AGENT, b.dataset.arm, N(b.dataset.v), b)));
+  if (viewerOnly()) {
+    // A phone's token presses only what it can see: a waiting call's confirm, or a block
+    // with that call's code. These bare switches send no code, so they are the operator's.
+    $("ap-toggles").querySelectorAll("button").forEach((b) => { b.disabled = true; b.title = t("tok.viewer.no"); });
+    $("ap-msg").innerHTML = `<span class="muted">${t("tok.viewer.switches")}</span>`;
+  }
 }
 $("ap-agent").addEventListener("change", () => { AP_AGENT = $("ap-agent").value; if (STATE) renderApprovals(STATE); });
 async function arm(agent, bit, v, btn, forReason, code, note) {
@@ -1236,6 +1248,8 @@ async function arm(agent, bit, v, btn, forReason, code, note) {
     if (forReason && (bit === "confirm" || bit === "confirm_b")) {
       body.for_reason = forReason;
       if (code) body.code = code;
+    } else if (code && viewerOnly()) {
+      body.code = code;  // a phone blocks only an agent whose code it can read off this screen
     }
     if (note && String(note).trim()) body.note = String(note).trim().slice(0, 200);
     const d = await post("/api/tool", body, { token: true });  // confirm/blocked/heartbeat need the operator token
@@ -1258,7 +1272,7 @@ async function tkFetchAll() {
   try {
     // The token goes on this read for the same reason /api/state carries it: over the LAN
     // the console closes the ledger, because it is the person's own words about their work.
-    const r = await fetch("/api/tasks", { cache: "no-store", headers: TOKEN ? { "x-reflex-token": TOKEN } : {} });
+    const r = await fetch("/api/tasks", { cache: "no-store", headers: readHeaders() });
     if (!r.ok) throw new Error(r.status);
     TK_ALL = (await r.json()).tasks || [];
     tkRenderClosed();
@@ -1360,12 +1374,17 @@ function stopCount(s) {
 function renderStop(s) {
   const { n, m, stopped } = stopCount(s);
   const label = stopped ? t("ap.stop.all") : m ? t("ap.stop.some", { m: num(m), n: num(n) }) : t("ap.stop");
+  const v = viewerOnly();  // a paired phone may block an agent it can see, not stop or resume everything
   ["stop-all", "stop-all-2", "stop-big"].forEach((id) => {
     const b = $(id);
     if (!b) return;
     b.textContent = label;
-    b.disabled = stopped;  // the stop is already in force: the way back is the resume control
+    b.disabled = stopped || v;  // the stop is already in force: the way back is the resume control
+    b.title = v ? t("tok.viewer.no") : "";
   });
+  ["resume-open", "resume-go"].forEach((id) => { if (v) $(id).disabled = true; });
+  if (v && !$("ap-stop-msg").dataset.viewer) { $("ap-stop-msg").innerHTML = `<span class="muted">${t("tok.viewer.no")}</span>`; $("ap-stop-msg").dataset.viewer = "1"; }
+  if (!v && $("ap-stop-msg").dataset.viewer) { $("ap-stop-msg").innerHTML = ""; delete $("ap-stop-msg").dataset.viewer; }
   const banner = $("ap-stop-banner");
   banner.hidden = !(stopped || m);
   // Under the stop the honest reading is "everything, including agents not seen yet"; a
@@ -1506,31 +1525,66 @@ function showLast(e) {
   LAST = e;
   $("last").innerHTML = e.error ? `<span class="bad">${esc(e.error)}</span>` : entryHtml(e, false).replace(/^<div class="e/, '<div style="padding:0;border:0;background:none" class="e');
 }
-// The operator token gates installing rules and writing the person's bits. It is kept in
-// this browser only (localStorage), never fetched from the server — so an agent that reads
-// the page HTML learns nothing. The person pastes it once from the console's own log.
-let TOKEN = null;
-try { TOKEN = localStorage.getItem("reflex.token"); } catch (e) { /* private window */ }
+// Two tokens, and the page keeps them apart on purpose.
+//
+// The operator token gates installing rules, stopping and resuming, filing tasks and the
+// person's bits. It is kept in this browser only (localStorage), never fetched from the
+// server, and — since 2026-09-17 — sent ONLY with a write it gates, never on a read. It used
+// to ride the two-second /api/state poll, which over the Wi-Fi put the person's one secret on
+// the network in cleartext for as long as the page was open (docs/REDTEAM-2026-09-17.md F1).
+//
+// The viewer token is a paired phone's own (`c3s pair` puts it in the QR). It reads the
+// console and presses confirm/block for a call it can see — the same rights as a Cardputer
+// over Wi-Fi, plus the reads. It cannot install rules, stop, resume or unblock, and the page
+// says so where those controls are instead of failing silently.
+let TOKEN = null, VIEWER = null, READ_DENIED = false;
+try { TOKEN = localStorage.getItem("reflex.token"); VIEWER = localStorage.getItem("reflex.viewer"); } catch (e) { /* private window */ }
 function askToken() {
   const v = window.prompt(t("tok.prompt"));
   if (v) { TOKEN = v.trim(); try { localStorage.setItem("reflex.token", TOKEN); } catch (e) { /* ignore */ } }
   return TOKEN;
 }
+// What a GET carries: the viewer token if this page has one, otherwise nothing. Never the
+// operator token — on this machine a read needs no token, and over the network the phone
+// has its own. A page on the LAN with neither gets 403 and is told to re-pair.
+const readHeaders = () => (VIEWER ? { "x-reflex-device-token": VIEWER } : {});
+const viewerOnly = () => !TOKEN && !!VIEWER;
 async function post(path, body, opts) {
   const headers = { "content-type": "application/json" };
   const needsToken = opts && opts.token;
-  if (needsToken) { if (!TOKEN) askToken(); if (TOKEN) headers["x-reflex-token"] = TOKEN; }
+  let asDevice = false;
+  if (needsToken) {
+    if (TOKEN) headers["x-reflex-token"] = TOKEN;
+    else if (VIEWER && path === "/api/tool") { headers["x-reflex-device-token"] = VIEWER; asDevice = true; }  // the phone's own press
+    else if (VIEWER) return { error: t("tok.viewer.no") };   // rules, stop, resume, tasks: not a phone's to do
+    else if (askToken()) headers["x-reflex-token"] = TOKEN;
+  }
   let r = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
   let d = await r.json();
   // Ask again only when the *token* was the problem. A wrong matching code is also 403,
   // and prompting for the token there would blame the wrong thing and teach the wrong fix.
-  if (r.status === 403 && needsToken && /token/i.test(d.error || "") && askToken()) {
+  if (r.status === 403 && needsToken && !asDevice && /token/i.test(d.error || "") && askToken()) {
     headers["x-reflex-token"] = TOKEN;
     r = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
     d = await r.json();
   }
   if (!r.ok) d.error = d.error || `HTTP ${r.status}`;
   return d;
+}
+// Where an operator-only control sits, say what this page can and cannot do when it holds
+// a viewer token. Disabling silently would read as "broken"; failing on click would read as
+// "the token is wrong". Neither is what happened: the phone was given exactly these rights.
+function renderViewer() {
+  const v = viewerOnly();
+  $("viewer-badge").hidden = !v;
+  $("viewer-badge").textContent = v ? t("tok.viewer.badge") : "";
+  const note = `<span class="muted">${t("tok.viewer.no")}</span> <button class="pre viewer-op" type="button">${t("tok.viewer.have")}</button>`;
+  [["install", "install-msg"], ["tk-go", "tk-msg"]].forEach(([btn, msg]) => {
+    if ($(btn)) $(btn).disabled = v;
+    if (v && $(msg) && !$(msg).dataset.viewer) { $(msg).innerHTML = note; $(msg).dataset.viewer = "1"; }
+    if (!v && $(msg) && $(msg).dataset.viewer) { $(msg).innerHTML = ""; delete $(msg).dataset.viewer; }
+  });
+  document.querySelectorAll(".viewer-op").forEach((b) => { b.onclick = () => { if (askToken()) refresh(); }; });
 }
 $("req").addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -1640,7 +1694,7 @@ $("cn-manifest-go").addEventListener("click", async () => {
   const note = $("cn-manifest-note"), pre = $("cn-manifest"), cls = CN_CLS;
   note.textContent = t("cn.manifest.busy");
   try {
-    const r = await fetch(`/api/manifest?class=${encodeURIComponent(cls)}`, { cache: "no-store", headers: TOKEN ? { "x-reflex-token": TOKEN } : {} });
+    const r = await fetch(`/api/manifest?class=${encodeURIComponent(cls)}`, { cache: "no-store", headers: readHeaders() });
     const d = await r.json();
     if (!r.ok) { note.textContent = d.error || String(r.status); pre.hidden = true; return; }
     pre.textContent = d.manifest_canonical;  // byte for byte what the hash covers; do not reformat
@@ -1752,12 +1806,14 @@ function cnEnter() {
 async function cnFetchMap() {
   CN_BUSY = true;
   try {
-    // The token goes on this read only because the map names paths on the console's own
-    // machine, and the console closes that to the network (a phone that scanned the
-    // pairing link has the token; on the console's machine none is needed).
+    // The map names paths on the console's own machine, so the console closes it to the
+    // network for everyone but the operator — a paired phone's viewer token is refused here
+    // on purpose, and the message says so rather than drawing an empty map.
     const r = await fetch(`/api/classes?agent=${encodeURIComponent($("cn-cc-agent").value.trim() || "claude-code:mine")}`,
-                          { cache: "no-store", headers: TOKEN ? { "x-reflex-token": TOKEN } : {} });
-    CN_MAP = await r.json();
+                          { cache: "no-store", headers: readHeaders() });
+    const d = await r.json();
+    if (!r.ok) { $("cn-tools-msg").textContent = d.error || `HTTP ${r.status}`; CN_BUSY = false; return; }
+    CN_MAP = d;
     CN_EDITS = {};
     cnRenderTools();
     cnRenderPanels();
@@ -1910,9 +1966,11 @@ $("cn-probe").addEventListener("click", async () => {
 // ---------- live ----------
 async function refresh() {
   try {
-    // Over the LAN the state needs the operator token (the phone that scanned the QR has it);
-    // on this machine the header is ignored.
-    const r = await fetch("/api/state", { cache: "no-store", headers: TOKEN ? { "x-reflex-token": TOKEN } : {} });
+    // Over the LAN the state needs a token: the paired phone's own (never the operator's —
+    // a read is not what that token is for, and it must not ride the Wi-Fi every two
+    // seconds). On this machine no header is needed and none is sent.
+    const r = await fetch("/api/state", { cache: "no-store", headers: readHeaders() });
+    READ_DENIED = r.status === 403;
     if (!r.ok) throw new Error(r.status);
     render(await r.json());
     lastOk = Date.now();
@@ -1922,19 +1980,26 @@ async function refresh() {
 function liveTick() {
   const now = Date.now();
   const alive = now - lastOk < 6000, settled = lastOk || now - OPENED > 6000;
-  $("svc-dot").className = `dot ${settled ? (alive ? "ok" : "bad") : ""}`;
-  $("svc").textContent = t(settled ? (alive ? "svc.ok" : "svc.bad") : "svc.wait");
+  $("svc-dot").className = `dot ${READ_DENIED ? "bad" : settled ? (alive ? "ok" : "bad") : ""}`;
+  $("svc").textContent = READ_DENIED ? t("svc.denied") : t(settled ? (alive ? "svc.ok" : "svc.bad") : "svc.wait");
   $("clock").textContent = new Date(now).toLocaleTimeString(locale(), { hour12: false });
 }
 
-// A pairing link carries the operator token in the fragment (`#approvals&token=…`). The
-// fragment never leaves the browser, so it is in no server log; it is kept here and then
-// taken off the address bar, so a screenshot or a forwarded link does not carry it on.
+// A pairing link carries this phone's own viewer token in the fragment (`#approvals&viewer=…`;
+// `c3s pair`). The fragment never leaves the browser, so it is in no server log; it is kept
+// here and then taken off the address bar, so a screenshot or a forwarded link does not carry
+// it on. The older `&token=` form (the operator token) is still read, for a person who
+// deliberately types it, but `c3s pair` no longer produces it.
 (function takeTokenFromFragment() {
-  const m = /^#?([a-z]*)&token=([A-Za-z0-9_\-]+)$/.exec(location.hash || "");
+  const m = /^#?([a-z]*)&(token|viewer)=([A-Za-z0-9_\-]+)$/.exec(location.hash || "");
   if (!m) return;
-  TOKEN = m[2];
-  try { localStorage.setItem("reflex.token", TOKEN); } catch (e) { /* private window: this visit only */ }
+  if (m[2] === "viewer") {
+    VIEWER = m[3];
+    try { localStorage.setItem("reflex.viewer", VIEWER); } catch (e) { /* private window: this visit only */ }
+  } else {
+    TOKEN = m[3];
+    try { localStorage.setItem("reflex.token", TOKEN); } catch (e) { /* private window: this visit only */ }
+  }
   history.replaceState(null, "", "#" + (m[1] || "approvals"));
 })();
 setLang(lang);

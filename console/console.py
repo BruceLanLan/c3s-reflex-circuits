@@ -69,7 +69,8 @@ from c3s.policy import AGENT_WRITABLE, MUST_COME_FROM_THE_TOOL_LAYER, Policy  # 
 # console keeps a line per hook: `/api/device/*` below, a device token on `/api/tool`, and
 # the device's presence as a heartbeat source in __main__. A device token is never an
 # operator token: where one is present, the device's rules apply and nothing falls through.
-from cardputer_relay import device_get, device_post, device_tool, install_device_presence  # noqa: E402
+from cardputer_relay import device_auth, device_get, device_post, device_tool, install_device_presence  # noqa: E402
+import cardputer_relay as _devices  # noqa: E402  (the phone's viewer token lives in the same store; see viewer_issue)
 
 # Of the tool layer's bits, only `blocked` is a level that stays where it was put. The
 # rest are events, each consumed by the one tick it applies to: a confirm (either key)
@@ -393,6 +394,56 @@ def token_rotate(agent: str) -> dict:
         _write_bindings(data)
     return {"agent": agent, "rotated": True, "was_bound_at": record.get("bound_at"),
             "next": "start the agent with a new REFLEX_AGENT_TOKEN; its first request binds the name again"}
+
+
+# ---- the phone's own token (F1, 2026-09-17) ------------------------------------------------
+#
+# The page used to attach the operator token to its two-second /api/state poll, so with
+# --lan on the person's one secret crossed the Wi-Fi in cleartext for as long as the page
+# was open, and a passive listener who captured it owned the console. The pairing delivery
+# was clean (fragment, never sent to a server); the retransmission was the hole.
+#
+# A paired phone now holds a token of its own, kept in the same store as a paired Cardputer
+# (devices.json, hash only) and accepted by the same device path: it may read what is
+# waiting, approve a waiting call whose code matches, and block — and additionally read the
+# state and the manifest, which a Cardputer never asks for. It may not install rules, stop,
+# resume, unblock, or hold the heartbeat. Its record carries `kind: "phone"`; a record without
+# it is a Cardputer and keeps the narrower rights. The operator token now crosses the network
+# only on a write a person makes from a phone they have deliberately given it to.
+VIEWER_KIND = "phone"
+
+
+def viewer_issue(name: str = "phone") -> dict:
+    """Mint a phone's token: one record in devices.json, `kind: "phone"`, hash only. Called
+    by the console for `POST /api/device/viewer` (operator token) — the CLI asks the running
+    console rather than writing the store itself, so there is one writer to that file. The
+    token is returned once, to go into the pairing QR's fragment, and is kept nowhere."""
+    name = str(name or "phone")[:40].strip() or "phone"
+    token = secrets.token_urlsafe(24)
+    with _devices.DEVICES_LOCK:
+        data = _devices._read_devices()
+        while True:
+            device_id = f"phone:{secrets.token_hex(3)}"
+            if device_id not in data["devices"]:
+                break
+        data["devices"][device_id] = {"name": name, "kind": VIEWER_KIND, "token_sha256": _devices._sha256(token),
+                                      "paired_at": time.time()}
+        _devices._write_devices(data)
+    print(f"phone: issued a viewer token to {device_id} ({name!r}). It reads the console and presses confirm/block "
+          f"for calls it can see; it cannot install rules, stop, resume or unblock.", flush=True)
+    return {"device_id": device_id, "token": token, "kind": VIEWER_KIND,
+            "next": "put the token in the pairing link's fragment (c3s pair does); `python -m cardputer_relay forget "
+                    f"{device_id}` revokes it"}
+
+
+def viewer_auth(token: str) -> str | None:
+    """Which paired *phone* this token belongs to, or None. A Cardputer's token is a device
+    token too, but it is not a viewer: the frame is all it reads."""
+    device_id = device_auth(token or "")
+    if device_id is None:
+        return None
+    record = _devices._read_devices()["devices"].get(device_id) or {}
+    return device_id if record.get("kind") == VIEWER_KIND else None
 
 
 TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
@@ -1869,13 +1920,15 @@ def class_map(handler: "Handler | None" = None, agent: str = "claude-code:mine")
 def api_classes_get(h: "Handler") -> None:
     from urllib.parse import parse_qs, urlsplit
 
-    # Open on this machine, and closed from the network — the same line `/api/state` draws,
-    # because this answer names absolute paths on the console's machine (where the adapters
-    # are, where the user's settings.json is). The phone that scanned the pairing QR has
-    # the operator token and still gets it.
-    if h.client_address and h.client_address[0] not in ("127.0.0.1", "::1") and not h._has_token({}):
-        h._json(403, {"error": "reading the tool map over the network needs the operator token "
-                               "(X-Reflex-Token — the pairing link carries it); on this machine it needs none"})
+    # Open on this machine, and closed from the network to everyone but the operator — a
+    # step stricter than `/api/state`, because this answer names absolute paths on the
+    # console's machine (where the adapters are, where the user's settings.json is). A
+    # paired phone's viewer token does not open it; the page says so instead of drawing an
+    # empty map. One locality rule for the whole handler: `_from_loopback`.
+    if not h._from_loopback() and not h._has_token({}):
+        h._json(403, {"error": "reading the tool map over the network needs the operator token (X-Reflex-Token); "
+                               "a phone's viewer token does not open it, because it names paths on this machine. "
+                               "On this machine it needs none"})
         return
     agent = (parse_qs(urlsplit(h.path).query).get("agent") or ["claude-code:mine"])[0][:40] or "claude-code:mine"
     h._json(200, class_map(h, agent))
@@ -2115,16 +2168,22 @@ class Handler(BaseHTTPRequestHandler):
 
         `("local", None)`      a connection from loopback — this machine's own page and programs;
         `("operator", None)`   the operator token, wherever it came from;
+        `("viewer", id)`       a paired phone's own token (F1) — the person's page on the Wi-Fi;
         `("agent", name)`      a bound agent's own token (I-3) — that agent's adapter;
         `(None, None)`         nobody the console can name.
 
         Asked in that order, so a request that carries two credentials is read as the more
         powerful one. The reply a reader gets depends on which of these they are: the
-        first two see the whole console, an agent sees its own rows (F2, 2026-09-17)."""
+        first three see the whole console, an agent sees its own rows (F2, 2026-09-17).
+        A viewer's read is not a heartbeat: the Cardputer's presence is its polling of its
+        own frame, and a phone tab left open in a pocket must not hold a dead-man's halt open."""
         if self._from_loopback():
             return "local", None
         if self._has_token({}):
             return "operator", None
+        phone = viewer_auth(self.headers.get("X-Reflex-Device-Token") or "")
+        if phone:
+            return "viewer", phone
         owner = bound_token_owner(self._agent_token())
         if owner:
             return "agent", owner
@@ -2140,9 +2199,9 @@ class Handler(BaseHTTPRequestHandler):
             return True
         if self._reader_identity()[0] is not None:
             return True
-        self._json(403, {"error": "reading the console over the network needs a token: the operator token "
-                                  "(X-Reflex-Token — the pairing link carries it) or a bound agent's own "
-                                  "token. On this machine it needs none."})
+        self._json(403, {"error": "reading the console over the network needs a token: a paired phone's own "
+                                  "(X-Reflex-Device-Token — the pairing link from `c3s pair` carries it), the "
+                                  "operator's (X-Reflex-Token), or a bound agent's own. On this machine it needs none."})
         return False
 
     def do_GET(self) -> None:
@@ -2262,10 +2321,31 @@ class Handler(BaseHTTPRequestHandler):
             # person reads what their agent did, and an agent that could file or close its
             # own would be writing that account itself. Neither grants anything.
             return api_task(self, payload)
+        elif self.path == "/api/device/viewer":
+            # F1: mint a phone's own token. A person's act, like opening a pairing window, so
+            # the operator token — and the only place that token is needed to pair a phone.
+            if not self._has_token(payload):
+                self._json(403, {"error": "issuing a phone's viewer token is the operator's: send the token (see the console's log)"})
+                return
+            self._json(200, viewer_issue(payload.get("name", "phone")))
         elif self.path.startswith("/api/device/"):  # W11: pairing; nothing here writes a bit
             device_post(self, payload, BOUNDARY)
         elif self.path == "/api/tool":
             if self.headers.get("X-Reflex-Device-Token"):  # W11: a key press that came over Wi-Fi
+                # A phone's press goes down the device path, which stamps `cardputer-wifi`.
+                # If it was a phone, say so before the entry is serialized — the person
+                # reading Activity should not think a Cardputer they do not own pressed the
+                # key. The dict handed to _json is the transcript's own, so both agree.
+                phone = viewer_auth(self.headers.get("X-Reflex-Device-Token") or "")
+                if phone:
+                    reply = self._json
+
+                    def stamped(code: int, obj: dict) -> None:
+                        if code == 200 and obj.get("device") == phone:
+                            obj["source"] = "phone"
+                        reply(code, obj)
+
+                    self._json = stamped  # type: ignore[method-assign]
                 device_tool(self, payload, BOUNDARY)
                 return
             # `source` says which channel the write came from (a chat button, the page), so

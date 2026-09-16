@@ -142,25 +142,33 @@ token of its own.
    Whoever carries the action out is outside this program, and the on-chain enforcement
    (`ReflexModule`, a Safe module in the circuits repository) is the only place a verdict
    is enforced by the thing holding the funds.
-10. **With `--lan` on, treat the operator token as exposed to that network.** Not once, at
-    pairing — *continuously*. Over the LAN `GET /api/state` requires the token, and the
-    page polls it every two seconds, so the token rides the Wi-Fi in cleartext for as long
-    as the page is open; there is no TLS (see 8). A passive listener that captures it owns
-    the console: rules, `confirm`, `blocked`, stop and resume. The phone also keeps it in
-    `localStorage` with no expiry. The *pairing link* is clean — the token is in the URL
-    fragment, which is never sent to a server, and the page strips it from the address bar
-    — so `c3s pair --no-token` keeps it out of the QR but does **not** stop the
-    retransmission. Today's remedies are to leave `--lan` off (the default is loopback
-    only), use it only on a network you trust, and `c3s token rotate` after a phone
-    session. The fix is a separate read-scoped token for the phone, so the operator token
-    never travels at all; it is not built yet. Found 2026-09-17, F1.
-11. **A bound agent's token reads the whole console over the LAN**, including every other
-    agent's pending `reason`, the transcript and their armed bits — `reader`'s token read
-    back `treasury-bot`'s `[exec] wire 50000 USDC to 0xBEEF`. `docs/ISOLATION.md` argues
-    that a contained agent cannot spend a confirm left for another because it cannot know
-    the exact `reason` that confirm is bound to; over the LAN, with its own token, it can
-    read it. The narrow fix (an agent identity sees only its own rows) is not in yet.
-    Found 2026-09-17, F2.
+10. **With `--lan` on, the paired phone's viewer token is exposed to that network,
+    continuously.** The operator token no longer is: since 2026-09-17 the page sends it only
+    with a write it gates and never on a read, and `c3s pair` puts a **viewer token** — the
+    phone's own, kept in `devices.json` as a hash like a Cardputer's — in the QR instead.
+    That token rides the Wi-Fi in cleartext on every two-second poll (there is no TLS, see
+    8), so a passive listener who captures it can read the whole console, confirm a waiting
+    call whose two-digit code they can also read, and block an agent. They cannot install
+    rules, stop or resume everything, unblock, or hold the heartbeat — those refuse a device
+    token, and the phone's press is recorded as `source: "phone"`. The phone keeps the viewer
+    token in `localStorage` with no expiry; `c3s pair --forget <device id>` revokes it (the
+    id is printed at pairing). What remains is that a person who types the operator token
+    into a phone has put it on that phone: it then crosses the network on each rule install,
+    stop or resume from there — rarely, and only when they act — and lives in that browser
+    until cleared. Leave `--lan` off unless a phone is wanted; pair only on a network you
+    would let read your console. Found 2026-09-17, F1; narrowed the same day.
+11. **A bound agent's token reads its own rows over the LAN, and the rules.** It used to
+    read the whole console — `reader`'s token read back `treasury-bot`'s pending
+    `[exec] wire 50000 USDC to 0xBEEF`, the exact `reason` a confirm binds to, which
+    `docs/ISOLATION.md` relies on a contained agent not having. Since 2026-09-17 an agent
+    identity over the network gets its own `agents` entry, its own `pending` items, and the
+    transcript entries about it or about the rules; other agents' calls, notes and armed
+    bits are not in the reply (`view: {scope: "agent"}` marks it). What it can still learn:
+    the installed rules of every class and what was checked about them, the open tasks (the
+    person's jobs, by design — I-6), the count of bound names, and that a stop was pressed.
+    And the same-uid limit (2) is untouched: on the console's own machine an agent reads
+    `/api/state` whole from loopback, token or no token. Found 2026-09-17, F2; narrowed the
+    same day.
 
 ## The recommendation
 

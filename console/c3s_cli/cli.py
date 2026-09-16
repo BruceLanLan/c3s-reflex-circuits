@@ -4,7 +4,7 @@
     c3s up --lan      the same, reachable from a phone on the same Wi-Fi (see the warning)
     c3s up --service  install the launchd agent as well, so a reboot or a kill brings it back
     c3s status        is it running, what is waiting for a person, where is the log
-    c3s pair          print the pairing QR again
+    c3s pair          print the pairing QR: the phone gets its own viewer token, never the operator's
     c3s token         show the operator token; `c3s token rotate` replaces it
     c3s token bind --agent NAME   bind an agent name to its token from this machine (I-3);
                       `c3s token list` shows what is bound, `rotate --agent NAME` drops one
@@ -113,17 +113,21 @@ def _bound_host() -> str | None:
     return _recalled().get("host")
 
 
-def _pairing_url(port: int, token: str | None, ip: str | None = None) -> str | None:
-    """The URL the QR carries: the token rides in the **fragment**, never the query string.
+def _pairing_url(port: int, viewer_token: str | None, ip: str | None = None) -> str | None:
+    """The URL the QR carries: the phone's own **viewer** token rides in the **fragment**,
+    never the query string — and never the operator token.
 
     A fragment is not sent to the server (docs/API.md, "Pairing a phone"), so the token
     cannot appear in the console's log — which prints whole request lines — nor in a
-    proxy's log or a `Referer`. The page reads it once, stores it and clears the bar.
+    proxy's log or a `Referer`. The page reads it once, stores it and clears the bar. That
+    covers the delivery. What the phone then does with it is the other half: the page sends
+    the viewer token on its reads, and the operator token — if the person ever types it
+    into the phone — only on a write it gates (docs/REDTEAM-2026-09-17.md F1).
     """
     ip = ip or next(iter(paths.lan_ipv4()), None)
     if not ip:
         return None
-    fragment = f"#approvals&token={token}" if token else "#approvals"
+    fragment = f"#approvals&viewer={viewer_token}" if viewer_token else "#approvals"
     return f"http://{ip}:{port}/{fragment}"
 
 
@@ -132,15 +136,34 @@ def _print_qr(url: str, invert: bool) -> None:
     say(f"  {url}")
 
 
-def _pairing_caveats(port: int, with_token: bool) -> None:
-    """Say what the phone will actually get.
+def _issue_viewer_token(port: int, token: str) -> tuple[str | None, str]:
+    """Ask the running console for a phone's own token (`POST /api/device/viewer`, operator
+    token). The console writes devices.json, not this process — one writer to that file —
+    and hands the token back once; it is kept nowhere but the QR and the phone."""
+    try:
+        status, body = client._call("POST", "/api/device/viewer", port, body={"name": "phone"}, token=token)
+    except client.ConsoleDown as e:
+        return None, str(e)
+    if status != 200:
+        return None, f"the console answered {status}: {body.get('error', body)}"
+    return body.get("token"), body.get("device_id", "")
 
-    The page takes the token out of the fragment, keeps it in that browser and removes it
-    from the address bar (docs/INSTALL.md §8). It still crossed the local network once.
+
+def _pairing_caveats(device_id: str | None) -> None:
+    """Say what the phone will actually get, truthfully.
+
+    The viewer token is the phone's own, and it IS on this Wi-Fi continuously: the page sends
+    it on every poll, in cleartext (no TLS). What that buys a listener is bounded — read the
+    console, confirm a call whose code they can also read, block — and never rules, stop,
+    resume or unblock. The operator token no longer travels on a read at all.
     """
-    if with_token:
-        say("  The phone keeps the token in its browser; it crossed this Wi-Fi once. "
-            "`c3s token rotate` replaces it; `c3s pair --no-token` keeps it off the network.")
+    say("  The phone gets a viewer token of its own, kept in that browser. It rides this Wi-Fi in cleartext")
+    say("  on every poll, so someone listening could read the console, confirm a call they can also see the")
+    say("  code of, or block an agent — and could not install rules, stop or resume everything, or unblock.")
+    say("  The operator token is not in this link and the page never sends it on a read.")
+    if device_id:
+        say(f"  To revoke this phone: `c3s pair --forget {device_id}` (it is device {device_id}).")
+    say("  `c3s pair --no-token` leaves every token out; the phone then reads nothing until a person types one.")
 
 
 def _open_page(port: int) -> None:
@@ -225,13 +248,16 @@ def cmd_up(args) -> int:
     say(f"  kept in {paths.TOKEN_FILE} (mode 600). The page asks for it once.")
     say()
     if host == "0.0.0.0":
-        url = _pairing_url(port, token)
+        viewer, device_id = (_issue_viewer_token(port, token) if token else (None, "no operator token yet"))
+        url = _pairing_url(port, viewer)
         if url:
-            say("pair a phone on the same Wi-Fi — scan this, and the page keeps the token:")
+            say("pair a phone on the same Wi-Fi — scan this, and the page keeps the phone's own viewer token:")
             _print_qr(url, args.invert_qr)
-            say("  the token is in that URL. Only scan it on a network you trust; "
-                "`c3s token rotate` replaces it.")
-            _pairing_caveats(port, with_token=True)
+            if viewer:
+                _pairing_caveats(device_id)
+            else:
+                say(f"  (no viewer token could be issued — {device_id}; the link carries none, and the phone "
+                    "will not be able to read the console until `c3s pair` is run again)")
         else:
             say("no LAN address found, so there is nothing to pair with yet.")
     else:
@@ -516,14 +542,36 @@ def cmd_token(args) -> int:
 
 
 def cmd_pair(args) -> int:
+    """Print the pairing QR. Each run issues the phone that scans it a viewer token of its
+    own, through the running console; the operator token is never in the link."""
     token = client.operator_token()
+    if getattr(args, "forget", None):
+        if not token:
+            return bad(f"no operator token in {paths.TOKEN_FILE}: start the console first.")
+        try:
+            status, body = client._call("POST", "/api/device/forget", args.port, body={"device_id": args.forget}, token=token)
+        except client.ConsoleDown as e:
+            return bad(f"{e}: nothing was changed.")
+        if status != 200 or not body.get("forgotten"):
+            return bad(f"not forgotten: {body.get('error') or body.get('why') or body}")
+        say(f"forgot {args.forget}: its token no longer reads or presses anything. The phone keeps a useless string "
+            "until someone clears that browser's storage.")
+        return 0
     ips = paths.lan_ipv4()
     if not ips:
         return bad("this machine has no LAN address, so there is nothing to pair with.")
     ip = args.ip or ips[0]
-    url = _pairing_url(args.port, None if args.no_token else token, ip)
-    assert url
     bound = _bound_host()
+    viewer, device_id = None, None
+    if not args.no_token:
+        if not token:
+            return bad(f"no operator token in {paths.TOKEN_FILE}: start the console first, or use --no-token.")
+        viewer, device_id = _issue_viewer_token(args.port, token)
+        if not viewer:
+            return bad(f"could not issue the phone a viewer token ({device_id}). Is the console up? "
+                       "`c3s pair --no-token` prints a link with no token in it.")
+    url = _pairing_url(args.port, viewer, ip)
+    assert url
     say(f"scan this on a phone on the same Wi-Fi ({ip}):")
     say()
     _print_qr(url, args.invert_qr)
@@ -531,11 +579,13 @@ def cmd_pair(args) -> int:
     if bound and bound != "0.0.0.0":
         say(f"the console is bound to {bound}, so the phone cannot reach it: restart it with "
             "`c3s down && c3s up --lan`.")
-    if not args.no_token:
-        say("the token is in that URL: it crosses your network once and the page removes it from "
-            "the address bar. On a network you do not trust, use `c3s pair --no-token` and type "
-            "the token by hand, or `c3s token rotate` afterwards.")
-        _pairing_caveats(args.port, with_token=True)
+    if viewer:
+        say("the phone's own viewer token is in that URL's fragment (never sent to a server; the page removes it "
+            "from the address bar).")
+        _pairing_caveats(device_id)
+    else:
+        say("no token is in that URL. The phone will be told it may not read; a person can type the operator "
+            "token into the page, which then sends it only on the writes it gates.")
     if len(ips) > 1:
         say(f"other addresses of this machine: {', '.join(ips[1:])} (`c3s pair --ip <one>`)")
     return 0
@@ -988,9 +1038,10 @@ def build_parser() -> argparse.ArgumentParser:
                             "taken as an argument, so it cannot land in the shell's history")
     token.set_defaults(func=cmd_token)
 
-    pair = subs.add_parser("pair", help="print the pairing QR again")
+    pair = subs.add_parser("pair", help="print the pairing QR: the phone that scans it gets a viewer token of its own")
     pair.add_argument("--ip", help="which of this machine's addresses to put in the URL")
-    pair.add_argument("--no-token", action="store_true", help="leave the token out of the URL")
+    pair.add_argument("--no-token", action="store_true", help="leave every token out of the URL")
+    pair.add_argument("--forget", metavar="DEVICE_ID", help="revoke a paired phone's (or Cardputer's) token instead")
     pair.add_argument("--invert-qr", action="store_true", help="QR for a light terminal background")
     pair.set_defaults(func=cmd_pair)
 
