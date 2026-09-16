@@ -13,19 +13,34 @@ hook says nothing and Claude Code's own permission flow applies unchanged — th
 boundary only ever narrows what may run, never widens it. If the circuit refuses, the
 call is denied and the reason is the rule's own words.
 
-`blocked` and `confirm` are not touched here on purpose. They belong to a layer the
-agent cannot write: a person arms them from the console page or POST /api/tool. A
-refusal for want of confirmation says so, and the person, not the model, resolves it.
+This hook is also the tool layer for one bit: `irreversible`. Before asking, it looks
+at the call Claude Code is about to make — the tool name and arguments the framework
+supplies, not anything the model says about itself — and if the call matches a pattern
+for an action that cannot be undone (`rm`, `git push`, `git reset --hard`, `sudo`, a
+Write outside the working directory, ...) it arms `irreversible` on the console first.
+Under `confirm_per_irreversible` the circuit then refuses unless a person has left an
+unspent confirm. That classification is the tool layer's promise, exactly the kind
+docs/AGENT.md means: the circuit proves "irreversible and no confirm ⇒ no grant", and
+this file is what decides which calls are irreversible. The pattern list is a
+heuristic; a destructive command it does not recognise is this layer's miss, not the
+circuit's, and a person who wants a stricter list writes one (REFLEX_IRREVERSIBLE_FILE).
+
+`blocked`, `confirm` and `confirm_b` are never touched here. They belong to a person: the
+console page or POST /api/tool. A refusal for want of confirmation says so, and the
+person, not the model, resolves it. `failed` is armed by the companion PostToolUse hook.
 
 Environment:
-    REFLEX_CONSOLE   console URL (default http://127.0.0.1:8765)
-    REFLEX_AGENT     agent name (default claude-code:<session id prefix>)
-    REFLEX_FAIL_OPEN set to 1 to let tools run when the console is unreachable.
-                     Off by default: a boundary that fails open is not one.
+    REFLEX_CONSOLE            console URL (default http://127.0.0.1:8765)
+    REFLEX_AGENT              agent name (default claude-code:<session id prefix>)
+    REFLEX_FAIL_OPEN          set to 1 to let tools run when the console is unreachable.
+                              Off by default: a boundary that fails open is not one.
+    REFLEX_IRREVERSIBLE_FILE  one fnmatch glob per line, `#` comments; replaces the
+                              built-in list unless a line reads `!default`, which keeps it
 """
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import sys
@@ -33,6 +48,61 @@ import urllib.error
 import urllib.request
 
 CONSOLE = os.environ.get("REFLEX_CONSOLE", "http://127.0.0.1:8765").rstrip("/")
+
+# Matched case-insensitively against the raw Bash command and against the describe()
+# line. Globs, so `*` crosses spaces. Kept short on purpose: this is the floor, not the
+# ceiling, and a deployment adds its own.
+DEFAULT_IRREVERSIBLE = (
+    "rm *", "* rm *", "*rm -r*", "*rm -f*",
+    "git push*", "* git push*", "git reset --hard*", "* git reset --hard*",
+    "git clean*", "* git clean*", "git branch -D*", "git checkout -- *",
+    "*--force*", "*--hard*",
+    "sudo *", "* sudo *",
+    "curl *| *sh*", "wget *| *sh*",
+    "chmod -R *", "chown -R *",
+    "*drop table*", "*drop database*", "*truncate *", "*delete from *",
+    "mkfs*", "dd if=*", "*> /dev/*",
+)
+
+
+def irreversible_patterns() -> tuple[str, ...]:
+    path = os.environ.get("REFLEX_IRREVERSIBLE_FILE")
+    if not path:
+        return DEFAULT_IRREVERSIBLE
+    own, keep_default = [], False
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for raw in fh:
+                line = raw.split("#", 1)[0].strip()
+                if line == "!default":
+                    keep_default = True
+                elif line:
+                    own.append(line)
+    except OSError:
+        return DEFAULT_IRREVERSIBLE  # an unreadable list must not silently mean "nothing is irreversible"
+    return (DEFAULT_IRREVERSIBLE if keep_default else ()) + tuple(own)
+
+
+def is_irreversible(tool: str, args: dict, cwd: str) -> bool:
+    """Whether the call Claude Code is about to make cannot be undone, by pattern."""
+    if tool in ("Write", "Edit", "NotebookEdit", "MultiEdit"):
+        path = os.path.realpath(str(args.get("file_path", "")))
+        root = os.path.realpath(cwd) if cwd else ""
+        return bool(root) and not (path == root or path.startswith(root + os.sep))
+    if tool == "Bash":
+        texts = [str(args.get("command", "")).lower(), describe(tool, args).lower()]
+        pats = irreversible_patterns()
+        return any(fnmatch.fnmatchcase(t, p.lower()) for t in texts for p in pats)
+    return False
+
+
+def arm(agent: str, **bits: int) -> None:
+    """Write tool-layer bits. Only ever called with `irreversible` from this file."""
+    body = json.dumps({"agent": agent, **bits}).encode()
+    req = urllib.request.Request(f"{CONSOLE}/api/tool", data=body,
+                                 headers={"content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        resp.read()
 
 
 def deny(reason: str) -> None:
@@ -62,12 +132,15 @@ def main() -> None:
     if not isinstance(args, dict):
         args = {}
     agent = os.environ.get("REFLEX_AGENT") or f"claude-code:{str(event.get('session_id', ''))[:8]}"
-    reason = f"{tool}: {describe(tool, args)}"[:160]
+    irreversible = is_irreversible(tool, args, str(event.get("cwd", "")))
+    reason = f"{tool}{' [irreversible]' if irreversible else ''}: {describe(tool, args)}"[:160]
 
     body = json.dumps({"agent": agent, "intent": 1, "reason": reason}).encode()
     req = urllib.request.Request(f"{CONSOLE}/api/request", data=body,
                                  headers={"content-type": "application/json"})
     try:
+        if irreversible:
+            arm(agent, irreversible=1)  # the bit describes the next tick, and that tick consumes it
         with urllib.request.urlopen(req, timeout=15) as resp:
             verdict = json.loads(resp.read())
     except (urllib.error.URLError, OSError, ValueError) as e:
@@ -78,11 +151,17 @@ def main() -> None:
 
     if verdict.get("granted"):
         sys.exit(0)  # no decision of our own: the normal permission flow applies
-    why = "; ".join(verdict.get("why") or []) or "the circuit did not grant"
+    why_list = verdict.get("why") or []
+    why = "; ".join(why_list) or "the circuit did not grant"
     hint = ""
-    if any(w.startswith("no confirmation") for w in verdict.get("why") or []):
+    if any(w.startswith("no confirmation") for w in why_list):
         hint = " A person can arm a confirmation from the console page; the model cannot."
-    if any(w.startswith("blocked") for w in verdict.get("why") or []):
+    if any(w.startswith("irreversible") for w in why_list):
+        hint = (" This call looks irreversible and needs a fresh confirm from a person; the"
+                " model cannot supply one. Do not retry until it has been given.")
+    if any(w.startswith("breaker") for w in why_list):
+        hint = " Too many consecutive failures; a person must reset the breaker. Stop and report."
+    if any(w.startswith("blocked") or w.startswith("halted") for w in why_list):
         hint = " The tool layer has blocked this agent; only it can lift that."
     deny(f"refused by the boundary at tick {verdict.get('tick')}: {why}.{hint}")
 
