@@ -13,6 +13,9 @@ first: five workstreams read it. Endpoints are on `http://127.0.0.1:8765` by def
 | `POST /api/policy`, `POST /api/task` | **a person** | operator token |
 | `POST /api/stop-all`, `POST /api/resume-all` | **a person** | operator token |
 | `GET/POST /api/classes` | read: anything local · write: **a person** | operator token to write |
+| `GET /api/device/frame`, `POST /api/tool` from a device | a **paired Cardputer** over the LAN | device token, and only as below |
+| `POST /api/device/pair` | a device claiming an open window | **none by design** — see below |
+| `POST /api/device/pair/begin\|confirm`, `POST /api/device/forget` | **a person** | operator token |
 | `GET /api/state`, `GET /api/manifest` | anything local | none |
 
 **Pairing a phone**: the token travels in the URL **fragment**, never the query string —
@@ -177,6 +180,33 @@ files the adapters already parse; the adapters are short-lived processes and pic
 on their next call. The class decides **which circuit answers**; `irreversible` decides
 **whether a person must confirm**. Both are the tool layer's promise, not something the circuit
 proves.
+
+## The Cardputer over Wi-Fi · device tokens
+
+Header `X-Reflex-Device-Token`. `~/.c3s-circuit-agent/devices.json` (mode 600) keeps only the
+sha256. Pairing: a person opens a window (`POST /api/device/pair/begin`), the device claims it
+(`POST /api/device/pair`, unauthenticated **on purpose** — whoever claims it must then show the
+person four digits, and a mismatch is an alarm, not a retry: the window is cancelled), the
+person types the digits the **device** shows (`POST /api/device/pair/confirm`). The console never
+displays those digits.
+
+A device token is **exactly as powerful as the cable and no more**:
+
+| over the network a device may | and may not |
+| --- | --- |
+| `GET /api/device/frame` — the same ~400 B frame the cable carries | read `/api/state` |
+| `confirm` / `confirm_b` for an agent **in `pending[]`**, with that entry's `code` and `for_reason` | write them for any other agent or call |
+| `blocked: 1` — block, for any agent the console knows, **no code needed** | `blocked: 0` — lifting a block happens on the console or over the cable |
+| — | `heartbeat` — the heartbeat *is* the device's polling, which the console computes itself; a beat a network write could forge would not be a dead man's switch |
+| — | `irreversible`, `failed`, `/api/policy`, `/api/task`, `/api/stop-all` |
+
+Why blocking needs no code (coordinator's call, 2026-09-16): an emergency stop must never be
+gated on reading a digit off a screen, and blocking is the fail-safe direction — it only ever
+makes the boundary stricter. Lifting is the direction that needs a person at the console.
+
+Why a device endpoint instead of polling `/api/state`: the frame is the cable's own 400 bytes
+(state is tens of kilobytes), the device needs no JSON parser (the same `onHostLine` parser
+reads it), and **a token-carrying poll is the heartbeat** — none of which `/api/state` can give.
 
 ## Errors
 
