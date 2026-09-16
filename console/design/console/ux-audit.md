@@ -27,6 +27,10 @@
    「三步」卡片（标记 + 13 个键），按状态勾掉已完成的步骤。
 6. **手机导航只有图标**：7 个 36×44 的图标，非开发者认不出。→ 图标下加短标签（CSS 已改），
    中文导航键改为纯中文（copy.md），否则 `Overview · 总览` 只能省略成 `Overvie…`。
+7. **「全部停下」在默认安装上停不住没规则的那几类** [验证]：没有共享停机电路时，stop-all 之后
+   `message` 类（未装规则）的请求照样 `granted: true`（`blocked: 1` 在输入里，但没有电路读它）。
+   页面上「已封锁 n 个 agent：它们的下一次请求都会被拒」此刻是假话。→ 文案改准（copy.md
+   `ov.none` / `ov.halt.off` / `ap.stop.done`）；产品上建议默认装共享停机——那是 console 作者的活（F11）。
 
 已验证 / 待怀疑分开标注：**[验证]** = 截图或量测；**[怀疑]** = 我的判断，没有用户测过。
 
@@ -52,6 +56,9 @@
   `.code` 20px（手机 24px）；`.pend .why + .note` 升到 `--text` 13px，`.why li` 降到 `--dim`；
   `--faint` 从 `#5E646C` 提到 `#858C95`（4.55:1）。复测：手机上确认按钮 y=648，两位数
   y=465，中间只有原话与解释（`final-approvals-phone-zh-viewport.png`）。
+  深色调色板离开画板的令牌有两个：`--faint`（上面的理由）和 `--dim`（`#979CA3` → `#A2A7AE`，
+  5.6 → 6.4:1，因为它现在承担原话与备注两层次要文字）；半透明叠色 `--dim-rgb` 仍用画板值
+  `151,156,163`，只影响徽章底色。其余颜色与画板一致。
 - 文案（copy.md）：`ap.confirm` → 「确认这一条 · 75」，`ap.pending` → 「等你点头」，
   `ap.code` → 「核对码」，`ap.code.hint` 只在列表顶部说一次（新键 `ap.hint.once`）。
 - 标记 diff（列表顶部说一次，卡片里不再重复）：
@@ -312,6 +319,32 @@
   `opt-approvals-desk-zh.png`、`opt-boundaries-desk-zh.png`、`opt-connect-desk-zh-light.png`。
 - 页面没有主题切换按钮；[怀疑] 不必加，跟系统走即可。
 
+## F11 · 「全部停下」停不住没规则的类（默认安装就是这个状态）
+
+**人做什么**：出事了，按「全部停下」，以为一切都停了。
+
+**哪里出问题**  [验证，8776 实测]
+- 移除 `halt` 与 `message` 两张电路（默认安装本来就没有这两张），`POST /api/stop-all` 成功
+  （`stopped: true, count: 5`），随后 `tg:12345` 发一条 `message` 类请求 →
+  `{"granted": true, "class_installed": false, "why": [], "inputs": {"blocked": 1, …}}`。
+  blocked 位写进去了，但没有任何电路读它。装回 `halt` 后同一请求 →
+  `granted: false, why: ["halted (shared halt circuit): blocked is high; …"]`。
+- 页面此刻显示 `ap.stop.done`「已封锁 5 个 agent：它们的下一次请求都会被拒」、横幅
+  `ap.stopped.banner`「…下一次请求都会被拒」。对无规则的类，这两句是假的。总览里唯一说出
+  这个缺口的是灰字 `ov.halt.off`「没有共享停机电路：blocked 只是电平，放下就恢复」——
+  这句话说的是电平语义，不是「停不住」。
+
+**改什么**
+- 文案（copy.md）：`ov.none` 明说「全部停下也拦不住它」；`ov.halt.off` 明说停下的范围并建议装
+  共享停机；`ap.stop.done` 把范围说成「装了规则的每一类」。
+- 页面（JS，小）：`renderStop()` 里若 `!isLive(policyOf(HALT))` 且存在未装规则的类，在停下卡
+  横幅下加一行 `.note.bad`：「{classes} 没有规则也没有共享停机：这次停下管不到它们。」
+  新键 `ap.stop.gap`（zh 同上；en "{classes} have no rules and there is no shared halt: this
+  stop does not reach them."）。
+- 产品（console.py，非本人文件，最重要的一条）：**默认安装共享停机电路**（`sticky_block` +
+  `forbid_when_blocked`，心跳可不开），或让 stop-all 在没有 halt 电路时把所有未装规则的类当成
+  整类拒绝直到恢复。一个「全部停下」按钮存在的前提是它真的全部停下。
+
 ## F10 · 小项（都已验证，改动小）
 
 - **Connect 里第二个 `<style>`**（`.picks .pick .cnrow #cn-tools .srcpat`）已并入
@@ -336,14 +369,17 @@
 - **不改 `ap.resume.word`**（用户要打的字「解除 / RESUME」）：改它改的是手势。
 - **不动 `ruleWordsZh()` 里的中文**：它是 JS，不是 `t()` 键；虽有「拍」字，留给下一轮。
 - **不加主题切换按钮**：跟系统走。
+- **不出设计画板 / Artifact**：把 `optimized.css` 注入活页面截出来的图比手画的稿更真——它就是
+  落地后的样子，带真实数据。画板留给需要用户在几种方向里挑的时候；这一轮方向没变，只是修。
 
 ## 需要落地的标记 / JS 改动一览（按价值排）
 
 | # | 改动 | 类型 | 对应 |
 | --- | --- | --- | --- |
 | 1 | 整块 `<style>` 换成 `optimized.css`；删 Connect 内嵌 `<style>` | 替换 | 全部 |
-| 2 | `copy.md` 里的键值（中英同步）；新键 `first.*` `ap.hint.once` `ap.stop.hold` `ap.stop.hint` `ac.more` `ap.halt.stale` `ev.proof` `ev.proof.sub` | 字典 | F1–F7 |
+| 2 | `copy.md` 里的键值（中英同步）；新键 `first.*` `ap.hint.once` `ac.more` `ap.halt.stale` `ev.proof` `ev.proof.sub` `ap.stop.gap`。**`ap.stop.sub` / `ap.stop.hold` / `ap.stop.hint` 三键要和第 3 行一起落**，否则文案在描述一个还不存在的手势 | 字典 | F1–F7 F11 |
 | 3 | 停下按住触发（JS 约 20 行） | JS | F4 |
+| 3b | 停下卡在没有共享停机且有类未装规则时加一行范围提示 | JS ~5 行 + 键 `ap.stop.gap` | F11 |
 | 4 | `itemNote()` 规则顺序优先 + 共享停机优先 | JS 2 行 | F2 F6 |
 | 5 | 待确认列表顶部 `.hint-once`，卡片内去掉重复提示 | 标记 + JS 1 行 | F1 |
 | 6 | 总览 `#ov-first` 三步卡 + 渲染逻辑 | 标记 + JS ~10 行 | F7 |
@@ -351,6 +387,7 @@
 | 8 | 流水连续重复折叠 | JS ~15 行 | F5 |
 | 9 | 开关卡 `agentless` 类 | JS 1 行 | F7 |
 | — | 后台：共享停机的 `pending[]` 条目给 `bit`/`code`；`why` 区分停机输出与人写的 blocked | console.py（非本人） | F6 |
+| — | 后台：默认装共享停机电路，让「全部停下」名副其实 | console.py（非本人） | F11 |
 
 ## 截图索引（请用户看这几张）
 
