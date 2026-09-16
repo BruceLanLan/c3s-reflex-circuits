@@ -13,6 +13,12 @@ first: five workstreams read it. Endpoints are on `http://127.0.0.1:8765` by def
 | `POST /api/policy`, `POST /api/task` | **a person** | operator token |
 | `GET /api/state`, `GET /api/manifest` | anything local | none |
 
+**Pairing a phone**: the token travels in the URL **fragment**, never the query string —
+`http://<LAN-IP>:8765/#approvals&token=<operator token>`. A fragment is not sent to the
+server, so it cannot land in the console's log, a proxy's log, or a `Referer`. The page
+reads it once, stores it, and clears it from the address bar. (Superseded the earlier
+`?token=` form after W1 found that the console logs full request lines.)
+
 Operator token: header `X-Reflex-Token` (or `"token"` in the body), compared with
 `hmac.compare_digest`. Generated once into `~/.c3s-circuit-agent/operator-token` (mode 600),
 printed at startup, overridable with `REFLEX_OPERATOR_TOKEN`. Every request must also pass
