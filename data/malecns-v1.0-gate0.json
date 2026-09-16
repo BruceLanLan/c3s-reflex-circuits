@@ -1,0 +1,230 @@
+{
+ "format": "c3s.gate0/1",
+ "license": "CC-BY (MaleCNS dataset); this file is a derived aggregate",
+ "preregistered_in": "scripts/run_gate0.py docstring",
+ "q1_inhibitory_input_to_the_giant_fibers": {
+  "assumption": "acetylcholine excitatory; GABA and glutamate inhibitory; anything else unknown",
+  "giant_fibers": [
+   {
+    "body_id": 10001,
+    "by_neurotransmitter": {
+     "acetylcholine": 10113,
+     "dopamine": 1,
+     "gaba": 5037,
+     "glutamate": 826,
+     "histamine": 1,
+     "unclear": 2604
+    },
+    "excitatory_synapses": 10113,
+    "inhibitory_share": 0.3155,
+    "inhibitory_synapses": 5863,
+    "input_synapses": 18582
+   },
+   {
+    "body_id": 10010,
+    "by_neurotransmitter": {
+     "acetylcholine": 13371,
+     "dopamine": 2,
+     "gaba": 6155,
+     "glutamate": 1102,
+     "histamine": 354,
+     "octopamine": 1,
+     "unclear": 3911
+    },
+    "excitatory_synapses": 13371,
+    "inhibitory_share": 0.2915,
+    "inhibitory_synapses": 7257,
+    "input_synapses": 24896
+   }
+  ],
+  "inhibitory_share": 0.3018,
+  "thresholds": {
+   "immaterial_max_share": 0.05,
+   "material_min_share": 0.2
+  },
+  "verdict": "material"
+ },
+ "q2_two_hop_between_vpns_and_giant_fibers": {
+  "min_synapses_per_hop": 5,
+  "note": "descriptive: candidates for the non-LC4 channel, not a claim about any of them",
+  "types": [
+   {
+    "cells": 2,
+    "synapses_from_LC4_LPLC2": 28,
+    "synapses_onto_giant_fibers": 1416,
+    "type": "DNp70"
+   },
+   {
+    "cells": 6,
+    "synapses_from_LC4_LPLC2": 1452,
+    "synapses_onto_giant_fibers": 1215,
+    "type": "SAD064"
+   },
+   {
+    "cells": 5,
+    "synapses_from_LC4_LPLC2": 5201,
+    "synapses_onto_giant_fibers": 1134,
+    "type": "PVLP122"
+   },
+   {
+    "cells": 2,
+    "synapses_from_LC4_LPLC2": 2127,
+    "synapses_onto_giant_fibers": 711,
+    "type": "PVLP010"
+   },
+   {
+    "cells": 4,
+    "synapses_from_LC4_LPLC2": 7648,
+    "synapses_onto_giant_fibers": 591,
+    "type": "PVLP151"
+   },
+   {
+    "cells": 6,
+    "synapses_from_LC4_LPLC2": 295,
+    "synapses_onto_giant_fibers": 545,
+    "type": "PVLP123"
+   },
+   {
+    "cells": 2,
+    "synapses_from_LC4_LPLC2": 306,
+    "synapses_onto_giant_fibers": 494,
+    "type": "DNpe042"
+   },
+   {
+    "cells": 2,
+    "synapses_from_LC4_LPLC2": 474,
+    "synapses_onto_giant_fibers": 471,
+    "type": "GNG300"
+   },
+   {
+    "cells": 4,
+    "synapses_from_LC4_LPLC2": 2369,
+    "synapses_onto_giant_fibers": 354,
+    "type": "AVLP452"
+   },
+   {
+    "cells": 2,
+    "synapses_from_LC4_LPLC2": 2373,
+    "synapses_onto_giant_fibers": 349,
+    "type": "LHAD1g1"
+   },
+   {
+    "cells": 2,
+    "synapses_from_LC4_LPLC2": 25,
+    "synapses_onto_giant_fibers": 318,
+    "type": "CB2664"
+   },
+   {
+    "cells": 2,
+    "synapses_from_LC4_LPLC2": 5231,
+    "synapses_onto_giant_fibers": 283,
+    "type": "DNp103"
+   },
+   {
+    "cells": 2,
+    "synapses_from_LC4_LPLC2": 697,
+    "synapses_onto_giant_fibers": 259,
+    "type": "AVLP396"
+   },
+   {
+    "cells": 4,
+    "synapses_from_LC4_LPLC2": 2096,
+    "synapses_onto_giant_fibers": 189,
+    "type": "CB3513"
+   },
+   {
+    "cells": 2,
+    "synapses_from_LC4_LPLC2": 26,
+    "synapses_onto_giant_fibers": 188,
+    "type": "SAD049"
+   }
+  ]
+ },
+ "q3_parallel_pathway_grouping": {
+  "candidates": [
+   {
+    "cells": 2,
+    "from_LC4_LPLC2": 4214,
+    "input_synapses": 18296,
+    "share_from_LC4_LPLC2": 0.2303,
+    "top_input_types": {
+     "CB1280": 444,
+     "CB1638": 396,
+     "CB2664": 601,
+     "LC4": 4209,
+     "SAD064": 570,
+     "unannotated": 2456
+    },
+    "type": "DNp02",
+    "verdict": "weak"
+   },
+   {
+    "cells": 2,
+    "from_LC4_LPLC2": 14995,
+    "input_synapses": 21930,
+    "share_from_LC4_LPLC2": 0.6838,
+    "top_input_types": {
+     "CB4176": 366,
+     "LC4": 11597,
+     "LPLC2": 3398,
+     "MeVP53": 645,
+     "PVLP046": 614,
+     "unannotated": 1035
+    },
+    "type": "DNp04",
+    "verdict": "supported"
+   },
+   {
+    "cells": 2,
+    "from_LC4_LPLC2": 2871,
+    "input_synapses": 43607,
+    "share_from_LC4_LPLC2": 0.0658,
+    "top_input_types": {
+     "LC4": 1152,
+     "LPLC1": 2773,
+     "LPLC2": 1719,
+     "PVLP122": 1018,
+     "PVLP123": 1528,
+     "unannotated": 2865
+    },
+    "type": "DNp06",
+    "verdict": "poor member"
+   },
+   {
+    "cells": 2,
+    "from_LC4_LPLC2": 3737,
+    "input_synapses": 24198,
+    "share_from_LC4_LPLC2": 0.1544,
+    "top_input_types": {
+     "LC4": 3666,
+     "LC9": 958,
+     "LPLC1": 1041,
+     "SAD064": 576,
+     "Tm4": 1480,
+     "unannotated": 2878
+    },
+    "type": "DNp11",
+    "verdict": "weak"
+   }
+  ],
+  "thresholds": {
+   "poor_max_share": 0.1,
+   "supported_min_share": 0.25
+  }
+ },
+ "release": "male-cns:v1.0",
+ "source_files": {
+  "annotations": {
+   "name": "body-annotations-male-cns-v1.0-minconf-0.5.feather",
+   "sha256": "2177e246113e4cfbf1e7772ec37c6da1955ff22e8063d0b1f833101f99a9a3b2"
+  },
+  "neurotransmitters": {
+   "name": "body-neurotransmitters-male-cns-v1.0.feather",
+   "sha256": "95c9289220663abeb3409f3ad9e5a7f8a53f8093f5139d15502cd08da8879621"
+  },
+  "weights": {
+   "name": "connectome-weights-male-cns-v1.0-minconf-0.5.feather",
+   "sha256": "e35da783d1c686b2b58b3b87cd6a403ae43bfcfba8bff28e08ef752c1a56afc1"
+  }
+ }
+}

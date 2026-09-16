@@ -49,7 +49,10 @@ pathway crosses when `V_P ≥ parallel_threshold`. The two eyes are OR-ed.
 two excitatory (non-LC4 angular size, LC4 angular velocity) and **two inhibitory**
 ones ([ModelDB 230400](https://modeldb.science/230400)); Ache et al. 2019 report
 inhibitory input to the giant fibers producing tonic hyperpolarisation. The teacher
-above has excitatory drive only. That is a deliberate simplification, and the
+above has excitatory drive only, and the release says that is a real omission:
+**30.2 % of the giant fibers' input synapses come from GABA or glutamate cells**
+(`scripts/run_gate0.py`, with the reading registered before the query ran). That is a
+deliberate simplification, and the
 circuits in this repository are verified against *this* teacher, not against the
 published model — a distinction the evidence ladder depends on. It is also one
 plausible reason the identifiability analysis finds a third of the decision table

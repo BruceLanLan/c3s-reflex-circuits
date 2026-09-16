@@ -101,6 +101,41 @@ The release's consensus neurotransmitter *prediction* is acetylcholine for all
 from EM image features, not measurements; the teacher treats all four inputs as
 excitatory.
 
+## Zero-parameter queries (Gate 0)
+
+`scripts/run_gate0.py` asks the release three questions whose answers depend on no
+parameter of the model — each is a count or a share — with the readings registered in
+its docstring before it ran (commit `efdaf6c`). Results:
+`data/malecns-v1.0-gate0.json`.
+
+**How much of the giant fibers' input is inhibitory?** **30.2 %** of their input
+synapses come from cells whose consensus neurotransmitter is GABA or glutamate,
+counting glutamate as inhibitory — an assumption, not a measurement, since GluCl is
+the common fast glutamate receptor in the fly. The registered reading calls anything
+at or above 20 % material: the teacher's all-excitatory simplification is missing
+about a third of the drive ([LIMITATIONS](LIMITATIONS.md#known-simplifications-in-the-teacher)).
+
+**What sits between the visual projection neurons and the giant fibers?** Cell types
+on two-hop paths LC4/LPLC2 → X → giant fiber, both hops carrying at least 5 synapses,
+ranked by what X puts onto the fibers:
+
+| Type | Cells | Synapses onto the giant fibers |
+| --- | ---: | ---: |
+| `DNp70` | 2 | 1,416 |
+| `SAD064` | 6 | 1,215 |
+| `PVLP122` | 5 | 1,134 |
+| `PVLP010` | 2 | 711 |
+| `PVLP151` | 4 | 591 |
+
+These are candidates for the non-LC4 size channel that von Reyn et al. 2017 left
+unidentified — a list worth looking at, not a claim about any of them.
+
+**Is the "parallel pathway" grouping supported?** Of each candidate's input synapses,
+LC4 and LPLC2 supply **68.4 % of `DNp04`**, 23.0 % of `DNp02`, 15.4 % of `DNp11` and
+**6.6 % of `DNp06`**. Only `DNp04` clears the registered bar of 25 %, and `DNp06`
+falls below the 10 % that marks a poor member. The grouping this teacher assumes is
+not uniform in the data.
+
 ## What this layer does not provide
 
 * **Synaptic strength.** Synapse counts are used as a proxy for weight. The
