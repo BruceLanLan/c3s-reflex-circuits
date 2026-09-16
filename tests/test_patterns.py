@@ -126,14 +126,16 @@ def test_the_validator_catches_what_it_is_meant_to():
 # -- the registry -------------------------------------------------------------
 
 
-def test_the_registry_holds_the_five_seeds():
-    assert [p.stem for p in RECORDS] == [
+def test_the_registry_still_holds_the_five_seeds():
+    """A sixth record is welcome and needs no bookkeeping — the canon has no index — but
+    the five seeds must not quietly leave."""
+    assert {
         "p001-smallest-long-mode",
         "p002-one-ulp-past-the-overlap",
         "p003-twice-to-full-raise",
         "p004-takeoff-on-the-first-tick",
         "p005-raises-but-never-takes-off",
-    ]
+    } <= {p.stem for p in RECORDS}
 
 
 @pytest.mark.parametrize("path", RECORDS, ids=lambda p: p.stem)

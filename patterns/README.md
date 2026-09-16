@@ -115,13 +115,16 @@ All five were found on 2026-09-16 by the c3s-reflex maintainers, under core dige
 
 Two things the seeds taught us, both open to being overturned by the next record:
 
-- **Four of the five sit at or just past 31 degrees.** That is the first degree outside
-  the modelled 30-degree binocular overlap, where only the right eye sees. In MaleCNS
-  v1.0 the right giant fiber receives fewer LC4 and LPLC2 synapses than the left, so
-  the right eye alone is the weakest drive the model has — and the weakest drive is
-  where the interesting boundaries are: it is slow enough to spend ticks raising wings
-  instead of taking off at once. The mirror azimuth, seen by the stronger left eye,
-  behaves differently in `p001`, `p003` and `p005`.
+- **Four of the five sit at 31 degrees, or one ulp past the 30-degree edge.** Just
+  outside the modelled binocular overlap only the right eye sees. In MaleCNS v1.0 the
+  right giant fiber receives fewer LC4 and LPLC2 synapses than the left, so the right
+  eye alone is the weakest drive the model has — and the weakest drive is where the
+  interesting boundaries are: it is slow enough to spend ticks raising wings instead of
+  taking off at once. Every one of the three records at +31° behaves differently at
+  −31°, where the stronger left eye is alone: `p001` takes the fast escape instead of
+  the slow one (tick 13 rather than 15), `p003` reaches the saturated raise counter once
+  instead of twice and escapes 21 ticks earlier (tick 249), and `p005` escapes at all
+  (long mode, tick 324).
 - **Seven of the twelve reachable states never appear in any record.**
   `c3s.reach.reachable_states` finds 12 of the 64 states reachable from reset: 0, 1, 2,
   3, 4, 8, 16, 24, 32, 40, 48, 56. An episode stops at its first takeoff, so it can only
