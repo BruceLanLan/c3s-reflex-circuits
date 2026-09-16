@@ -60,6 +60,16 @@ def write_plist(console: Path, repo: Path, host: str, port: int, python: str | N
     return paths.PLIST
 
 
+def plist_env() -> dict:
+    """What the installed plist says the console is started with — the authoritative record
+    of host and port for a launchd-started console, which outlives any note this CLI kept."""
+    try:
+        with paths.PLIST.open("rb") as fh:
+            return dict(plistlib.load(fh).get("EnvironmentVariables") or {})
+    except (OSError, ValueError):
+        return {}
+
+
 def _launchctl(*args: str) -> tuple[int, str]:
     done = subprocess.run(["launchctl", *args], capture_output=True, text=True)
     return done.returncode, (done.stdout + done.stderr).strip()

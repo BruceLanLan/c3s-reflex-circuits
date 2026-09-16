@@ -99,6 +99,17 @@ def _pending(state: dict) -> tuple[int | None, str]:
     return None, "— (this console has no pending[] yet: I-2 in docs/API.md)"
 
 
+def _bound_host() -> str | None:
+    """What address the console is listening on: the plist for a launchd service, the note
+    from the last `c3s up` otherwise. It decides whether a phone can reach it at all, so
+    neither is guessed — None means nobody here started this console."""
+    if service.loaded():
+        host = service.plist_env().get("CONSOLE_HOST")
+        if host:
+            return host
+    return _recalled().get("host")
+
+
 def _pairing_url(port: int, token: str | None, ip: str | None = None) -> str | None:
     ip = ip or next(iter(paths.lan_ipv4()), None)
     if not ip:
@@ -149,6 +160,17 @@ def cmd_up(args) -> int:
             say(f"a console is already answering on http://127.0.0.1:{port} (pid {running}"
                 f"{', console.py' if ours else ', not console.py'}).")
             say("  leave it as it is, `c3s down` to stop it, or `c3s up --port <other>` beside it.")
+            if args.service:
+                # Never silently skip --service: how the console starts is exactly what the
+                # person asked to change, and rewriting the plist under a running console
+                # would leave the two disagreeing until something restarted it.
+                if service.loaded():
+                    say("  --service: the launchd agent is already loaded. To change how it starts "
+                        "(port, --lan, --cardputer): `c3s down --service`, then `c3s up --service …`.")
+                else:
+                    say("  --service was NOT installed: this console runs outside launchd. "
+                        "`c3s down` first, then `c3s up --service`.")
+                return 1
             return cmd_status(args) if ours else 1
         return bad(f"port {port} is taken by pid {running} ({_command_of(running) or 'unknown'}) and it is not "
                    f"answering /api/state: stop it, or use --port <other>.")
@@ -234,9 +256,13 @@ def cmd_status(args) -> int:
     count, pending_text = _pending(state)
     agents = state.get("agents", [])
     blocked = [a["agent"] for a in agents if (a.get("armed") or {}).get("blocked")]
+    under_launchd = service.loaded()
     say(f"answering      yes, {up_for / 60:.0f} min (pid {pid or '?'}, "
-        f"{'launchd' if service.loaded() else 'plain process'})")
-    say(f"bound to       {known.get('host', '(unknown: not started by this c3s)')}")
+        f"{'launchd' if under_launchd else 'plain process'})")
+    # The plist is the record for a service; a note from the last `c3s up` for a plain
+    # process. Either beats guessing, because "bound to" is what decides whether a phone
+    # can reach it at all.
+    say(f"bound to       {_bound_host() or '(unknown: this console was not started by c3s)'}")
     say(f"agents         {len(agents)}" + (f" — blocked: {', '.join(blocked)}" if blocked else ""))
     say(f"waiting for a person  {pending_text}")
     circuits = [f"{c}:{'deny' if p.get('deny_all') else str(p['circuit']['nand']) + '+' + str(p['circuit']['latch'])}"
@@ -376,7 +402,7 @@ def cmd_pair(args) -> int:
     ip = args.ip or ips[0]
     url = _pairing_url(args.port, None if args.no_token else token, ip)
     assert url
-    bound = _recalled().get("host")
+    bound = _bound_host()
     say(f"scan this on a phone on the same Wi-Fi ({ip}):")
     say()
     _print_qr(url, args.invert_qr)
