@@ -4,7 +4,7 @@
 
 C3S Circuit Agent 在你自己的模型和它能做的动作之间，放一颗编译出来、穷举核对过的规则电路（见 [docs/AGENT.md](docs/AGENT.md)）。它的第一颗电路是果蝇巨纤维逃逸反射，沿用研究名：也就是下文受连接组约束的电路综合，从 MaleCNS v1.0 一路做到 173 个 NAND 门、全部 8,388,608 行逐行核过的网表。果蝇电路是这套方法的来源；干活的模型是你自己的。
 
-[English](README.md) · [在线演示](https://brucelanlan.github.io/c3s-reflex-circuits/demo/) · [C3S Circuit Agent](https://brucelanlan.github.io/c3s-reflex-circuits/sim/) · [Release v0.2.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0)
+[English](README.md) · [在线演示](https://brucelanlan.github.io/c3s-reflex-circuits/demo/) · [C3S Circuit Agent](https://brucelanlan.github.io/c3s-reflex-circuits/sim/) · [Release v0.2.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0) · [更新了什么](CHANGELOG.md)
 
 这个仓库只问一个很窄的问题：**如果一个行为是由实测的神经连线塑造的，最少需要多小的一台确定机器才能复现它？这台机器有多少部分可以被证明，而不是被信任？**
 
@@ -19,6 +19,25 @@ MaleCNS v1.0 连接组 ─► 显式教师模型 ─► 16 位决策表
 ```
 
 本页是面向开发者的中文指引：怎么跑起来、代码在哪、想改某样东西该动哪里。方法细节与全部数字以英文文档为准，下文会直接链过去。
+
+## 跑起来 —— agent 后台就在这个仓库里
+
+两半，一个克隆。上面那些电路是**证明**；**`console/`** 是你真正要跑的东西：你写下 agent 绝对不能做什么，
+规则编译成上面这样的一颗电路，你自己的模型通过适配器接进来，它每一次工具调用在发生之前就被放行或拒绝。
+钥匙在人手上 —— 页面上、桌上那台 Cardputer 上、或者聊天里。
+
+```sh
+git clone https://github.com/BruceLanLan/c3s-reflex-circuits
+cd c3s-reflex-circuits/console && sh install.sh     # 页面开在 127.0.0.1:8765
+c3s demo                                            # 一个假的邮箱、日历、文件夹
+```
+
+从 **[console/README.zh-CN.md](console/README.zh-CN.md)** 开始，或者直接看那份同时写给使用者和开发者的
+**[console/docs/GUIDE.md](console/docs/GUIDE.md)**。它**不做**什么在
+[console/SECURITY.md](console/SECURITY.md)；三轮对抗评审打出来的结果在
+[console/docs/REDTEAM-2026-09-17.md](console/docs/REDTEAM-2026-09-17.md)。
+
+**它不持有钱包、不持有私钥**，不签名、不广播。**放行是一个判决，不是一次执行。**
 
 ## 在线演示
 
@@ -123,6 +142,7 @@ python scripts/check_properties.py --controls    # 时序性质两套方法，�
 | `data/` | 连接组聚合数据（源数据 CC-BY） | 想核对生物学来源 |
 | `docs/` | 英文详细文档；`docs/demo/` 是网页演示 | 想看方法与局限 |
 | `tests/` | pytest 测试 | 改完代码先跑 |
+| `console/` | **产品本身**：边界后台、页面、把模型接进来的适配器、Cardputer 与聊天中继、`c3s` 命令，以及它自己的 README、指南、接口和安全说明 | 想真的用起来 |
 
 ## 核心概念
 

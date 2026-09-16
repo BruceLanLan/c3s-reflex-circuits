@@ -13,7 +13,8 @@ model that does the work is yours.
 
 [中文说明](README.zh-CN.md) · [Live demo](https://brucelanlan.github.io/c3s-reflex-circuits/demo/) ·
 [C3S Circuit Agent](https://brucelanlan.github.io/c3s-reflex-circuits/sim/) ·
-[Release v0.2.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0)
+[Release v0.2.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0) ·
+[What changed](CHANGELOG.md)
 
 This repository asks a narrow question: *if a behaviour is shaped by measured
 wiring, how small a deterministic machine reproduces it, and how much of that
@@ -28,6 +29,29 @@ MaleCNS v1.0 connectome ─► explicit teacher model ─► 16-bit decision tab
              EVM / TapeOut-layout netlist ◄─ NAND+LATCH core ◄─┘
                 (public, replayable)          (exhaustively equivalent)
 ```
+
+## Run it — the console is in this repository
+
+Two halves, one clone. The circuits above are the proof; **`console/`** is the thing you
+run: you write what your agent may never do, the rules compile to one of these circuits,
+your own model plugs in through an adapter, and every tool call it makes is granted or
+refused before it happens. A person holds the keys — on the page, on a Cardputer on the
+desk, or in a chat.
+
+```sh
+git clone https://github.com/BruceLanLan/c3s-reflex-circuits
+cd c3s-reflex-circuits/console && sh install.sh     # the page opens at 127.0.0.1:8765
+c3s demo                                            # a pretend mailbox, calendar and folder
+```
+
+Start at **[console/README.md](console/README.md)** ([中文](console/README.zh-CN.md)), or
+the full walkthrough for both people and programmers in
+**[console/docs/GUIDE.md](console/docs/GUIDE.md)**. What it refuses to do is in
+[console/SECURITY.md](console/SECURITY.md), and what three adversarial passes found is in
+[console/docs/REDTEAM-2026-09-17.md](console/docs/REDTEAM-2026-09-17.md).
+
+**It holds no wallet and no private key**, signs nothing and broadcasts nothing. A grant
+is a verdict, not an execution.
 
 ## Web demo
 
@@ -157,6 +181,9 @@ formal/         SystemVerilog property spec proven by Yosys induction
 docs/           connectome, teacher, circuits, properties, evaluation, agent,
                 firmware, limitations, references; docs/demo/ is the web demo
 tests/          pytest suite
+console/        the product: the boundary console, its page, the adapters that plug a
+                model in, the Cardputer and chat relays, the `c3s` command, and its own
+                README, guide, API and security notes
 ```
 
 ## Reproduce
