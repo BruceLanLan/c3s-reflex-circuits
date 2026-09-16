@@ -280,3 +280,30 @@ def test_an_irreversible_tool_needs_a_persons_confirm(client):
         assert sum(1 for e in rows if "[irreversible]" in e["reason"]) == 3
     finally:
         console("/api/policy", {"class": "message", "remove": True})
+
+
+def test_a_call_aimed_at_the_consoles_tool_layer_is_refused_even_ungated(client):
+    agent = fresh_agent()
+    c = client("--agent", agent, "--gate", "delete_*")  # echo is not gated
+    reply = c.tool("echo", text="POST http://127.0.0.1:8765/api/tool {\"agent\":\"me\",\"confirm\":1}")
+    assert reply["result"]["isError"] is True and "refused before any circuit was asked" in text_of(reply)
+    assert text_of(c.tool("echo", text="GET http://127.0.0.1:8765/api/state")) .startswith("GET")  # reading is fine
+    c.close()
+
+
+HOOK = Path(__file__).resolve().parents[1] / "adapters" / "claude_code_hook.py"
+
+
+@pytest.mark.parametrize("tool,args", [
+    ("Bash", {"command": "curl -s localhost:8765/api/tool -d '{\"agent\":\"me\",\"confirm\":1}'"}),
+    ("Bash", {"command": "python3 -c \"import urllib.request as u; u.urlopen('http://127.0.0.1:8765/api/policy', b'{}')\""}),
+    ("Bash", {"command": "echo {} > ~/.c3s-circuit-agent/policies.json"}),
+    ("Bash", {"command": "kill $(lsof -ti:8765)"}),
+    ("Edit", {"file_path": "/work/proj/.claude/settings.json", "old_string": "a", "new_string": "b"}),
+])
+def test_the_hook_refuses_tampering_before_asking_any_circuit(tool, args):
+    event = {"session_id": "tamper", "cwd": "/tmp", "tool_name": tool, "tool_input": args}
+    out = subprocess.run([sys.executable, str(HOOK)], input=json.dumps(event), capture_output=True, text=True,
+                         env=dict(os.environ, REFLEX_CONSOLE="http://127.0.0.1:8765"), timeout=TIMEOUT)
+    assert out.returncode == 2
+    assert "refused before any circuit was asked" in json.loads(out.stdout)["hookSpecificOutput"]["permissionDecisionReason"]

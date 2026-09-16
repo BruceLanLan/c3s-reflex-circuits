@@ -130,6 +130,53 @@ def describe(tool: str, args: dict) -> str:
     return ", ".join(f"{k}={v}" for k, v in list(args.items())[:3] if isinstance(v, (str, int, float)))
 
 
+# ---- the guard protects itself ------------------------------------------------------
+#
+# An agent with a shell on the same machine could otherwise write its own tool-layer bits
+# (`curl localhost:8765/api/tool -d '{"confirm":1}'`), replace the installed rules, edit
+# the file that keeps them, or rewrite the hook configuration that routes it here. Those
+# calls are refused outright, before any circuit is asked, whatever the rules say. This is
+# a pattern check on the call — the agent can still find a way this list does not name
+# (another port forward, an encoded URL, a second user's shell). The structural answer is
+# to run the agent where it cannot reach the console or these files at all: another OS
+# user, a container, a sandbox without network to localhost.
+
+def _console_markers() -> list[str]:
+    from urllib.parse import urlsplit
+
+    u = urlsplit(CONSOLE)
+    port = u.port or (443 if u.scheme == "https" else 80)
+    hosts = {u.hostname or "127.0.0.1", "127.0.0.1", "localhost", "0.0.0.0", "[::1]", "::1"}
+    return sorted({f"{h}:{port}" for h in hosts})
+
+
+GUARDED_PATHS = (".c3s-circuit-agent", "reflex-console", "cardputer_relay", "claude_code_hook", "claude_code_post_hook",
+                 "mcp_proxy", "reflex_classes", ".claude/settings", "claude/settings.json", "REFLEX_")
+GUARDED_API = ("/api/tool", "/api/policy")
+
+
+def reaches_the_guard(tool: str, args: dict) -> str | None:
+    """Why this call would tamper with the boundary itself, or None."""
+    text = json.dumps(args, ensure_ascii=False)
+    lower = text.lower()
+    if any(m in lower for m in _console_markers()) and any(a in lower for a in GUARDED_API):
+        return "it writes to the boundary console's tool-layer or rules endpoint"
+    if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+        path = str(args.get("file_path", ""))
+        if any(g in path for g in GUARDED_PATHS):
+            return f"it edits the boundary's own files or hook configuration ({path})"
+    if tool == "Bash":
+        cmd = str(args.get("command", ""))
+        if any(a in cmd for a in GUARDED_API) and ("curl" in cmd or "wget" in cmd or "http" in cmd or "python" in cmd):
+            return "it calls the boundary console's tool-layer or rules endpoint"
+        writes = (">", "tee ", "sed -i", "mv ", "rm ", "cp ", "chmod ", "truncate", "python", "perl -i", "kill ")
+        if any(g in cmd for g in GUARDED_PATHS) and any(w in cmd for w in writes):
+            return "it would modify or stop the boundary's own files, process or hook configuration"
+        if ("kill" in cmd or "pkill" in cmd) and ("console.py" in cmd or ":8765" in cmd or "lsof" in cmd):
+            return "it would stop the boundary console"
+    return None
+
+
 def main() -> None:
     try:
         event = json.load(sys.stdin)
@@ -140,6 +187,10 @@ def main() -> None:
     if not isinstance(args, dict):
         args = {}
     agent = os.environ.get("REFLEX_AGENT") or f"claude-code:{str(event.get('session_id', ''))[:8]}"
+    tamper = reaches_the_guard(tool, args)
+    if tamper:
+        deny(f"refused before any circuit was asked: {tamper}. The boundary's tool layer belongs to a person; "
+             "an agent may not write its own confirm, change its rules, or stop its guard.")
     irreversible = is_irreversible(tool, args, str(event.get("cwd", "")))
     # Which circuit answers: one per class of tool (spend / message / exec / files),
     # decided from the tool's name — framework data, not the model's — and sent along.
