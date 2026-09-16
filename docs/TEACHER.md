@@ -45,6 +45,19 @@ across the midline):
 The giant-fiber pathway *crosses* when `V_GF ≥ gf_threshold`; the parallel
 pathway crosses when `V_P ≥ parallel_threshold`. The two eyes are OR-ed.
 
+**This is not the published GF model.** von Reyn et al. 2017 sum *four* components:
+two excitatory (non-LC4 angular size, LC4 angular velocity) and **two inhibitory**
+ones ([ModelDB 230400](https://modeldb.science/230400)); Ache et al. 2019 report
+inhibitory input to the giant fibers producing tonic hyperpolarisation. The teacher
+above has excitatory drive only. That is a deliberate simplification, and the
+circuits in this repository are verified against *this* teacher, not against the
+published model — a distinction the evidence ladder depends on. It is also one
+plausible reason the identifiability analysis finds a third of the decision table
+decided by the free parameters rather than by the data
+([EVALUATION](EVALUATION.md#parameter-identifiability)). Adding inhibition would
+change the teacher, the table and every circuit downstream of them, so it belongs
+in a new version with its own pre-registration rather than an edit here.
+
 Motor selection, per tick, for a standing fly outside its refractory period:
 
 * GF crosses and the wings are **not yet** raised → **short-mode takeoff**

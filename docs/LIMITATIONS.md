@@ -18,10 +18,10 @@
 
 | Simplification | Why it matters |
 | --- | --- |
-| Synapse count used as weight; all inputs excitatory | Real synaptic efficacy varies per connection and is not in the connectome |
+| Synapse count used as weight; all inputs excitatory | Real synaptic efficacy varies per connection and is not in the connectome. It also **departs from the model this teacher follows**: von Reyn et al. 2017 sum two excitatory *and two inhibitory* components ([ModelDB 230400](https://modeldb.science/230400)), and Ache et al. 2019 report inhibitory input to the giant fibers producing tonic hyperpolarisation. The circuits are verified against this teacher, not against the published model ([TEACHER](TEACHER.md#model)) |
 | Instantaneous drive, no membrane or synaptic dynamics | The GF's actual response has time course; timing-sensitive decisions are the most affected |
 | LC4 and LPLC2 treated as independent channels | MaleCNS shows 2,902 LPLC2→LC4 synapses (1,180 edges) that the model ignores |
-| `DNp02`/`DNp04`/`DNp06`/`DNp11` as the "parallel pathway" | A modelling hypothesis; the dataset does not label these as the parallel escape circuit |
+| `DNp02`/`DNp04`/`DNp06`/`DNp11` as the "parallel pathway" | A modelling hypothesis; the dataset does not label these as the parallel escape circuit, and the published function of `DNp02` and `DNp11` is takeoff *direction* rather than the long-mode sequence — the circuits behind von Reyn et al. 2014's long mode are still unidentified, so this grouping is unsupported rather than merely unconfirmed |
 | Size tuning (μ = 60°, σ = 30°), speed scale, binocular overlap, tick length, refractory period | Chosen, not measured |
 | Three free parameters calibrated by grid search | 89 of 1,105 points satisfy the constraints; see the controls for how much the wiring restricts this |
 | One animal, one release | Left and right giant fibers already differ by 34 % in input synapses |
