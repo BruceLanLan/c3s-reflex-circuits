@@ -270,3 +270,42 @@ def test_the_bnbagent_snippet_is_read_from_the_adapters_own_docstring():
     assert "BoundaryWalletProvider(EVMWalletProvider(...)" in snippet
     assert snippet.splitlines()[0] == "from bnbagent.wallets import EVMWalletProvider"
     assert "import" in (ROOT / "adapters" / "bnbagent_boundary.py").read_text()[:400]
+
+
+# -- the desk tools W4's recorded run found on the wrong side --------------------------
+
+@pytest.mark.parametrize("tool,cls,irreversible", [
+    # A calendar write is a call other people receive, so it belongs with messages and
+    # cannot be taken back once the invitation has gone out. These four landed in `exec`
+    # and reversible until 2026-09-17, which meant a policy of "messages need a person"
+    # did not cover moving someone else's meeting.
+    ("create_event", "message", True),
+    ("update_event", "message", True),
+    ("cancel_event", "message", True),
+    ("respond_to_event", "message", True),
+    # Overwriting a file destroys what was there. `write_file` was `files` but reversible.
+    ("write_file", "files", True),
+    ("overwrite_config", "files", True),
+    # Unchanged, and here so a later widening cannot quietly move them:
+    ("send_email", "message", True),
+    ("trash_email", "files", True),
+    ("read_file", "exec", False),
+    ("list_inbox", "exec", False),
+    ("get_status", "exec", False),
+])
+def test_the_built_in_rules_put_ordinary_desk_tools_where_a_person_would(tool, cls, irreversible):
+    from reflex_classes import classify, is_irreversible_tool
+
+    assert classify(tool) == cls, tool
+    assert is_irreversible_tool(tool) is irreversible, tool
+
+
+def test_claude_codes_own_write_is_still_judged_by_path_not_by_name():
+    """`write_file*` and not `write_*`, deliberately: the hook decides `Write` from where
+    the path points (inside the workspace it is reversible, outside it is not). A name
+    rule that swallowed `Write` would ask a person to approve every file a coding agent
+    touches, and a boundary nobody can live with gets turned off."""
+    from reflex_classes import classify, is_irreversible_tool
+
+    assert classify("Write") == "files"
+    assert is_irreversible_tool("Write") is False

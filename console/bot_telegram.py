@@ -55,7 +55,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cardputer_relay import pending_items  # noqa: E402  (same "waiting for a person" rule as the page and the device)
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
-CONSOLE = os.environ.get("CONSOLE_URL", "http://127.0.0.1:8765").rstrip("/")
+# `CONSOLE_URL` is what a deployment sets, and it wins. `REFLEX_CONSOLE` and
+# `CONSOLE_PORT` are what everything else here reads, so they are honoured too: without
+# that, a test run pointed at its own console still talked to whatever owned 8765, got a
+# 403 from a console it had no token for, and blamed the code under test.
+CONSOLE = (os.environ.get("CONSOLE_URL") or os.environ.get("REFLEX_CONSOLE")
+           or f"http://127.0.0.1:{os.environ.get('CONSOLE_PORT', '8765')}").rstrip("/")
 TOOL_LAYER_CHATS = {c.strip() for c in os.environ.get("TOOL_LAYER_CHATS", "").split(",") if c.strip()}
 # The operator token gates installing rules and writing the person's bits. The bot is a
 # person's tool, so it reads the token the console wrote; a person's chat then holds the keys.

@@ -37,6 +37,24 @@ def console(path: str, payload=None) -> dict:
         return json.loads(resp.read())
 
 
+@pytest.fixture
+def message_class_removed():
+    """Take the `message` circuit away for one test, and put back exactly what was there.
+
+    `c3s demo` installs all four classes, so on a console anyone has demoed with, a test
+    that needs an ungated class has to make one rather than hope for one.
+    """
+    before = (console("/api/state").get("policies") or {}).get("message")
+    console("/api/policy", {"class": "message", "remove": True})
+    yield
+    if before is None:
+        console("/api/policy", {"class": "message", "remove": True})
+    elif before.get("deny_all"):
+        console("/api/policy", {"class": "message", "deny_all": True})
+    else:
+        console("/api/policy", dict(before["settings"], **{"class": "message"}))
+
+
 @pytest.fixture(scope="module", autouse=True)
 def test_policy():
     """`echo` lands in `exec` and `delete_everything` in `files` (built-in class rules),
@@ -193,9 +211,13 @@ def test_fixed_class_overrides_the_rules(client):
     assert mine["by_class"]["files"]["ticks"] == 2 and mine["by_class"]["exec"]["ticks"] == 0
 
 
-def test_uninstalled_class_is_not_gated(client):
-    """`message` has no circuit in this test setup, so a call classed there is granted
-    and the decision says the class is not installed."""
+def test_uninstalled_class_is_not_gated(client, message_class_removed):
+    """A class with no circuit is not gated: the call is granted and the decision says so.
+
+    The fixture is the point. This used to assume `message` happened to have no circuit,
+    which was true of a fresh console and false of anyone's console the moment they ran
+    `c3s demo` — it installs all four classes. A test that depends on the developer not
+    having used the product is a test that fails for the wrong reason."""
     agent = fresh_agent()
     c = client("--agent", agent, "--class", "message")
     for _ in range(3):
