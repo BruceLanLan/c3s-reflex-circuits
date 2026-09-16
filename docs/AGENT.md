@@ -29,6 +29,8 @@ circuit itself commands a takeoff.
 * `contracts/src/ReflexModule.sol` — a compiled policy as a Safe module: the agent acts
   through a human-owned Safe only on ticks the circuit grants, and writes none of the
   bits it reads. [ONCHAIN-SELF-DEPLOY.md](ONCHAIN-SELF-DEPLOY.md) is the self-deploy flow.
+* `scripts/boundary_manifest.py` / `scripts/validate_boundary.py` — a compiled policy as
+  an ERC-8004 boundary manifest anyone can re-check and score; see [ERC8004.md](ERC8004.md).
 
 ## Rules you write, compiled and proven
 
