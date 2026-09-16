@@ -178,41 +178,15 @@ python -m c3s_cli.qr_verify     # 需要 pip install qrcode；c3s 本身永远�
 `c3s up` 自己计时：从命令发出到 `GET /api/state` 回 200 的秒数会打在第二行。本机（M 系列
 Mac、规则已存在）实测 **1.0 秒**，第一次要编译并逐行核对电路，慢一点。
 
-## 8. 还差一处页面改动（协调者在集成那一轮做）
+## 8. 页面读取配对令牌（已落地，2026-09-16 收尾）
 
-配对 URL 现在是 `http://<IP>:<端口>/#approvals&token=<令牌>`（`docs/API.md` 的 "Pairing a
-phone"，`0bf4847` 取代了早先的 `?token=`）。这个 URL **今天就能打开**——路径是 `/`，
-`#approvals` 也已经能路由。还差的只有一件事：**页面要从 fragment 里把令牌读出来、存下来、
-并立刻从地址栏移除**。`static/index.html` 现在同时有三个 agent 在改，所以我不动它，只把 diff
-写在这里；它归协调者在波次 3 的集成那一轮落地。落地之前 `c3s pair` 会把这件事打在二维码下面。
+配对 URL 是 `http://<IP>:<端口>/#approvals&token=<令牌>`（`docs/API.md` 的 "Pairing a
+phone"）。页面打开时从 fragment 里取出令牌、存进这台浏览器的 localStorage、并立刻把它从地址栏
+移除（截图、历史记录、转发的链接里都不再有它）；之后页面读 `/api/state` 时带上它，这正是
+局域网上的手机需要的。令牌仍然在本地网络上走过一次，补救是 `c3s token rotate`。
 
-位置：`let TOKEN = null; try { TOKEN = localStorage.getItem(...) }` 那两行之后（在文件末尾那句
-`show(location.hash.slice(1) || "overview")` 之前，所以清掉 hash 里的令牌之后视图仍然对）：
-
-```js
- let TOKEN = null;
- try { TOKEN = localStorage.getItem("reflex.token"); } catch (e) { /* private window */ }
-+// Pairing (`c3s pair`, the QR): the fragment is `#approvals&token=…`. The token rides in
-+// the fragment, which is never sent to the server (docs/API.md, "Pairing a phone"), so it
-+// cannot reach the console's log — which prints whole request lines — nor a proxy's log or
-+// a Referer. Keep it in this browser and take it out of the address bar at once, so it is
-+// not in the history, in a screenshot, or in a link the person shares. It still crossed
-+// the local network once, which docs/INSTALL.md says plainly; rotation is the remedy.
-+(() => {
-+  const parts = location.hash.replace(/^#/, "").split("&");
-+  const view = parts.shift() || "";
-+  let handed = null;
-+  try { handed = new URLSearchParams(parts.join("&")).get("token"); } catch (e) { /* ignore */ }
-+  if (!handed) return;
-+  TOKEN = handed.trim();
-+  try { localStorage.setItem("reflex.token", TOKEN); } catch (e) { /* private window */ }
-+  history.replaceState(null, "", location.pathname + (view ? "#" + view : ""));
-+})();
-```
-
-在它落地之前，扫码的手机会到审批页，然后像往常一样被问一次令牌（粘贴 `c3s token` 打印的那
-一串）；或者用 **`c3s pair --no-token`**：二维码里只有 `http://<IP>:<端口>/#approvals`，
-令牌根本不上网络。
+不想让令牌上网络：**`c3s pair --no-token`**，二维码里只有 `http://<IP>:<端口>/#approvals`，
+扫码的手机到审批页后被问一次令牌（粘贴 `c3s token` 打印的那一串）。
 
 ## 9. 菜单栏
 
