@@ -141,6 +141,106 @@ def test_loopback_keeps_the_whole_view(lan, boundary, monkeypatch):
     assert status == 200 and "view" not in body and WIRE in json.dumps(body)
 
 
+# -- F1: the phone has a token of its own, and the operator token stays off the reads --------
+
+
+def paired_cardputer() -> str:
+    """A Cardputer paired the W11 way: window, claim, four digits. Its token is a device
+    token with no `kind`, so it is not a viewer."""
+    cr.device_pair_begin()
+    claim = cr.device_pair_claim("cardputer-1", "desk")
+    assert cr.device_pair_confirm(claim["code"])["paired"]
+    return claim["token"]
+
+
+def test_a_viewer_token_is_a_device_record_of_kind_phone_with_only_its_hash_on_disk(lan):
+    issued = console.viewer_issue("my phone")
+    assert issued["device_id"].startswith("phone:") and issued["kind"] == "phone"
+    assert console.viewer_auth(issued["token"]) == issued["device_id"]
+    assert cr.device_auth(issued["token"]) == issued["device_id"]  # the same store, the same device path
+    on_disk = cr.DEVICES_FILE.read_text()
+    assert issued["token"] not in on_disk and issued["device_id"] in on_disk and '"kind": "phone"' in on_disk
+
+
+def test_issuing_a_viewer_token_is_the_operators_act(lan):
+    status, body = post(lan, "/api/device/viewer", {"name": "phone"})
+    assert status == 403 and "operator" in body["error"]
+    status, body = post(lan, "/api/device/viewer", {"name": "phone"}, {"X-Reflex-Token": OPERATOR})
+    assert status == 200 and body["token"] and console.viewer_auth(body["token"]) == body["device_id"]
+
+
+def test_a_phones_token_reads_the_whole_state_over_the_lan_and_a_cardputers_does_not(lan, boundary):
+    two_agents(boundary)
+    phone = console.viewer_issue()["token"]
+    status, body = get(lan, "/api/state", {"X-Reflex-Device-Token": phone})
+    assert status == 200 and "view" not in body                          # the person's own phone: the full view
+    assert {a["agent"] for a in body["agents"]} == {"reader", "treasury-bot"}
+    assert get(lan, "/api/manifest?class=exec", {"X-Reflex-Device-Token": phone})[0] == 200
+    assert get(lan, "/api/tasks", {"X-Reflex-Device-Token": phone})[0] == 200
+    cardputer = paired_cardputer()
+    assert get(lan, "/api/state", {"X-Reflex-Device-Token": cardputer})[0] == 403   # the frame is all it reads
+    assert get(lan, "/api/classes", {"X-Reflex-Device-Token": phone})[0] == 403     # names local paths: operator only
+
+
+def test_a_phones_read_is_not_a_heartbeat(lan, boundary):
+    """A phone tab left open in a pocket must not hold a dead-man's halt open. Only a
+    device polling its own frame is present."""
+    phone = console.viewer_issue()["token"]
+    assert get(lan, "/api/state", {"X-Reflex-Device-Token": phone})[0] == 200
+    assert cr.device_present() is False
+
+
+def test_a_phone_confirms_what_it_can_see_and_blocks_but_nothing_the_operator_does(lan, boundary):
+    two_agents(boundary)
+    phone = console.viewer_issue()["token"]
+    hdr = {"X-Reflex-Device-Token": phone}
+    # not the operator's acts
+    assert post(lan, "/api/policy", {"class": "spend", "deny_all": True}, hdr)[0] == 403
+    assert post(lan, "/api/stop-all", {}, hdr)[0] == 403
+    assert post(lan, "/api/resume-all", {}, hdr)[0] == 403
+    assert post(lan, "/api/task", {"text": "a job"}, hdr)[0] == 403
+    assert post(lan, "/api/tool", {"agent": "treasury-bot", "blocked": 0}, hdr)[0] == 403    # never unblock
+    assert post(lan, "/api/tool", {"agent": "treasury-bot", "heartbeat": 1}, hdr)[0] == 403  # never the heartbeat
+    # the device's acts: confirm the waiting call, with its code, and block
+    it = next(p for p in get(lan, "/api/state", hdr)[1]["pending"] if p["agent"] == "treasury-bot")
+    status, body = post(lan, "/api/tool", {"agent": "treasury-bot", "confirm": 1, "for_reason": WIRE, "code": it["code"]}, hdr)
+    assert status == 200 and body["armed"]["confirm"] == 1
+    assert console.TRANSCRIPTS[0]["source"] == "phone"  # not "cardputer-wifi": nobody's Cardputer pressed this
+    status, body = post(lan, "/api/tool", {"agent": "treasury-bot", "blocked": 1, "code": it["code"]}, hdr)
+    assert status == 200 and body["armed"]["blocked"] == 1
+    assert boundary.status()["operator_stop"]["on"] is False  # a block, not the stop button
+
+
+def test_a_forgotten_phone_reads_nothing(lan, boundary):
+    issued = console.viewer_issue()
+    hdr = {"X-Reflex-Device-Token": issued["token"]}
+    assert get(lan, "/api/state", hdr)[0] == 200
+    assert post(lan, "/api/device/forget", {"device_id": issued["device_id"]}, {"X-Reflex-Token": OPERATOR})[1]["forgotten"]
+    assert get(lan, "/api/state", hdr)[0] == 403
+
+
+def test_the_page_never_sends_the_operator_token_on_a_read():
+    """The hole itself (F1): the page attached `x-reflex-token` to its two-second poll. Every
+    GET the page makes is found here and checked; the operator token may ride only a POST."""
+    import re
+
+    html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+    calls = []
+    for m in re.finditer(r"\bfetch\(", html):  # each call, from its open paren to the matching close
+        depth, i = 0, m.end() - 1
+        while i < len(html):
+            depth += (html[i] == "(") - (html[i] == ")")
+            i += 1
+            if depth == 0:
+                break
+        calls.append(html[m.start():i])
+    gets = [c for c in calls if '"POST"' not in c]
+    assert len(gets) >= 4, gets  # /api/state, /api/tasks, /api/manifest, /api/classes
+    offenders = [g for g in gets if "x-reflex-token" in g or "TOKEN" in g]
+    assert not offenders, offenders
+    assert "readHeaders()" in "".join(gets)
+
+
 def test_a_narrowed_view_is_not_a_write_credential(lan, boundary):
     """Narrowing the read changed nothing about writes: the agent token still writes no
     person's bit, and its own request path is unchanged."""
