@@ -14,6 +14,16 @@ python console.py                                 # http://127.0.0.1:8765
 REFLEX_CARDPUTER=1 python console.py              # the same, with a Cardputer on USB as the confirm key
 ```
 
+On first run the console prints an **operator token** (also kept in
+`~/.c3s-circuit-agent/operator-token`, mode 600). It is the person's key: installing
+rules and writing the person's bits (`confirm`, `confirm_b`, `blocked`, `heartbeat`)
+require it, over HTTP. The page asks for it once and keeps it in that browser only; the
+Telegram bot reads the file; the model's adapters never receive it, so an agent that
+reaches the console cannot write its own confirm — unless it can read that file, which
+is why an agent that must be bounded should run where it cannot (another OS user, a
+container). `POST /api/request` and the adapters' own bits (`irreversible`, `failed`)
+need no token.
+
 1. **Boundaries** — pick a template per class of tool: *no transfers* (spend, refused
    outright), *no deletes without a person* (files), *messages need a person* (message),
    *stop after failures* (exec), *halt + heartbeat* (shared). Compile and install; the
