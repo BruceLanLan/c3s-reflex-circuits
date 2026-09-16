@@ -4,266 +4,418 @@
 <title>C3S Circuit Agent · boundary console</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { --bg: #15181C; --nav: #111417; --panel: #1C2025; --panel2: #202529; --line: #2B3037; --text: #ECE7DC; --dim: #979CA3;
-          --faint: #5E646C; --ok: #46C878; --bad: #E36A52; --amber: #F2A541; --blue: #6FA8DC; --agent: #6FA8DC; --tool: #F2A541;
-          --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  * { box-sizing: border-box; }
-  [hidden] { display: none !important; }  /* a display: rule of ours must not outvote hidden */
-  html { color-scheme: dark; }
-  body { margin: 0; background: var(--bg); color: var(--dim); font: 14px/1.5 system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif; overflow-x: hidden; }
-  a { color: var(--blue); text-decoration: none; }
-  code, .mono { font-family: var(--mono); font-size: 12.5px; }
-  .num { font-family: var(--mono); color: var(--text); font-variant-numeric: tabular-nums; }
-  .muted { color: var(--faint); } .ok { color: var(--ok); } .bad { color: var(--bad); } .amber { color: var(--amber); }
-  .c-agent { color: var(--agent); } .c-tool { color: var(--tool); }
-  button { font: inherit; cursor: pointer; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  input, select, textarea { background: #14171a; border: 1px solid var(--line); color: var(--text); padding: 6px 8px; font: inherit; font-size: 13px; border-radius: 6px; min-width: 0; }
-  input[type=number] { font-family: var(--mono); }
-  textarea { width: 100%; resize: vertical; line-height: 1.5; }
-  input:focus, select:focus, textarea:focus { outline: 1px solid var(--amber); border-color: var(--amber); }
+/* C3S Circuit Agent · console — optimized stylesheet (UX pass, 2026-09-16)
+ *
+ * Drop-in replacement for the whole <style> block of static/index.html, including the second
+ * <style> that lives inside <section data-view="connect"> (remove that one when this lands).
+ * Every selector the page's JavaScript sets or reads is kept: .on .wait .warn .dis .halt .tool
+ * .ok .bad .amber .dim .no .err .spoof .policy .stat .cnt:empty .msg:empty .drill:empty
+ * .rules[data-off] .kind.* .rev.* .stopdock .stopbanner .stopbtn:disabled .pick.on .togl.dis
+ * .verdict-row.* .e.* .chain.* .c-agent .c-tool .t1 .num .mono .muted .link .pre .go .danger.
+ * New selectors (need markup, listed in ux-audit.md): .first .first-step .proof .stopbtn.holding
+ * .e.more .pend .eff .code-top .hint-once .agentless.
+ *
+ * Theme: DARK-FIRST. :root is the approved dark canvas; light is offered under
+ * prefers-color-scheme: light unless data-theme="dark", and data-theme="light" forces it.
+ * (Swap the two palette blocks to make light the default — nothing else changes.)
+ * Alpha overlays use rgba(var(--x-rgb), a) so both palettes share one component sheet.
+ */
 
-  /* shell */
-  .shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100vh; }
-  nav { background: var(--nav); border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; padding: 16px 12px; position: sticky; top: 0; height: 100vh; }
-  .brand { padding: 4px 12px 14px; }
-  .brand b { display: block; color: var(--text); font-weight: 600; font-size: 15px; letter-spacing: .01em; }
-  .brand small { display: block; font-family: var(--mono); color: var(--faint); font-size: 11.5px; margin-top: 2px; }
-  .nav-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 8px; color: var(--dim); font-size: 13px; background: none; border: 0; text-align: left; width: 100%; }
-  .nav-item:hover { color: var(--text); }
-  .nav-item.on { background: var(--line); color: var(--text); }
-  .nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-  .nav-item .cnt { margin-left: auto; font-family: var(--mono); font-size: 11px; background: rgba(242,165,65,.14); color: var(--amber); border-radius: 4px; padding: 0 6px; }
-  .nav-item .cnt:empty { display: none; }
-  .nav-foot { margin-top: auto; padding: 0 12px; font-family: var(--mono); color: var(--faint); font-size: 11px; line-height: 1.6; }
-  .page { min-width: 0; display: flex; flex-direction: column; }
-  header { position: sticky; top: 0; z-index: 2; background: var(--nav); border-bottom: 1px solid var(--line); }
-  .bar { min-height: 48px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 8px 24px; font-size: 12.5px; }
-  .bar h1 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
-  .bar h1 small { color: var(--faint); font-weight: 400; margin-left: 6px; font-size: 12.5px; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); margin-right: 6px; }
-  .dot.ok { background: var(--ok); box-shadow: 0 0 6px rgba(70,200,120,.5); } .dot.bad { background: var(--bad); } .dot.amber { background: var(--amber); }
-  .spacer { flex: 1; }
-  .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-  .lang button { background: none; border: 0; color: var(--dim); padding: 3px 9px; font-size: 12px; }
-  .lang button.on { background: var(--line); color: var(--text); }
-  main { padding: 24px; display: grid; gap: 16px; align-content: start; }
-  section[data-view] { display: none; }
-  section[data-view].on { display: grid; gap: 16px; }
-  .foot { font-size: 11.5px; color: var(--faint); }
-
-  /* cards */
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-  .card.warn { border-color: rgba(242,165,65,.45); }
-  .h2 { margin: 0; font-size: 12px; letter-spacing: .04em; color: var(--dim); font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
-  .h2 .sub { font-weight: 400; color: var(--faint); font-size: 12px; letter-spacing: 0; }
-  .h2 .right { margin-left: auto; }
-  .grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
-  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-  .split { display: grid; grid-template-columns: 5fr 6fr; gap: 16px; }
-  .split.b { grid-template-columns: 3fr 2fr; }
-  .split.a { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
-  @media (max-width: 1000px) { .split, .split.b, .split.a, .grid3, .grid2 { grid-template-columns: 1fr; } }
-  .stat .k { font-size: 11px; color: var(--faint); letter-spacing: .04em; }
-  .stat .v { font-family: var(--mono); font-size: 22px; color: var(--text); line-height: 1.2; }
-  .stat .v small { font-size: 13px; color: var(--dim); font-family: inherit; }
-  .stat .d { font-size: 12.5px; color: var(--dim); overflow-wrap: anywhere; }
-  .mini { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-  .mini .nm { display: flex; gap: 8px; align-items: baseline; } .mini .nm b { color: var(--text); font-weight: 600; } .mini .nm span { color: var(--faint); font-size: 12px; }
-  .mini .rl { font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
-  .mini .ct { font-family: var(--mono); color: var(--text); margin-top: auto; font-size: 12.5px; }
-  .mini .st { font-size: 12px; }
-  .mini button { align-self: flex-start; }
-  .chip { font-family: var(--mono); font-size: 11px; padding: 1px 7px; border-radius: 4px; background: rgba(151,156,163,.14); color: var(--dim); white-space: nowrap; }
-  .chip.spend { color: var(--amber); } .chip.halt { color: var(--bad); }
-  .badge { display: inline-block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; padding: 1px 6px; border-radius: 4px; border: 1px solid transparent; white-space: nowrap; vertical-align: 1px; }
-  .badge.cost { color: var(--agent); border-color: rgba(111,168,220,.45); background: rgba(111,168,220,.08); }
-  .badge.boundary { color: var(--tool); border-color: rgba(242,165,65,.45); background: rgba(242,165,65,.08); }
-  .badge.count { color: var(--tool); border-color: rgba(242,165,65,.45); background: rgba(242,165,65,.08); }
-  .pre { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 6px; padding: 4px 9px; font-size: 12px; }
-  .pre:hover { color: var(--text); border-color: var(--faint); }
-  .pre.tool { border-color: rgba(242,165,65,.5); color: var(--tool); }
-  .pre.on { background: var(--line); color: var(--text); }
-  .go { border: 0; border-radius: 8px; padding: 7px 16px; font-weight: 600; color: #121417; background: var(--text); }
-  .go.tool { background: var(--tool); } .go.agent { background: var(--agent); }
-  .danger { border-radius: 8px; padding: 6px 14px; font-weight: 500; color: var(--bad); border: 1px solid rgba(227,106,82,.5); background: none; }
-  .link { background: none; border: 0; color: var(--faint); font-size: 12px; padding: 0; text-decoration: underline dotted; }
-  .tabs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .tab { padding: 6px 12px; border-radius: 6px; font-size: 13px; color: var(--dim); font-family: var(--mono); background: none; border: 0; }
-  .tab.on { background: var(--line); color: var(--text); } .tab.halt { color: var(--amber); }
-  .msg { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel2); border: 1px solid var(--line); overflow-wrap: anywhere; }
-  .msg:empty { display: none; }
-  .note { font-size: 12px; color: var(--faint); overflow-wrap: anywhere; }
-  .note b, .lead b { color: var(--text); font-weight: 500; }
-  .lead { font-size: 12.5px; color: var(--dim); margin: 0; }
-
-  /* rule editor */
-  .rules { display: grid; gap: 7px; }
-  .rule { display: grid; grid-template-columns: 72px 1fr; gap: 6px 12px; align-items: start; padding: 7px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; }
-  .rule input[type=number] { width: 100%; text-align: center; padding: 5px 6px; }
-  .rule .tog { display: flex; justify-content: center; padding-top: 4px; }
-  .rule .tog input { width: 16px; height: 16px; margin: 0; accent-color: var(--tool); }
-  .rule .name { color: var(--text); font-size: 13px; font-weight: 500; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
-  .rule .name code { color: var(--faint); font-size: 11.5px; }
-  .rule .hint { font-size: 12px; color: var(--faint); line-height: 1.4; }
-  .rule .hint code { font-size: 11.5px; }
-  .rule .hint.cost code { color: var(--agent); } .rule .hint.boundary code { color: var(--tool); }
-  .rules[data-off] .rule { opacity: .4; }
-  .denyall { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid rgba(227,106,82,.45); border-radius: 8px; font-size: 13px; color: var(--text); }
-  .denyall input { width: 16px; height: 16px; margin: 0; accent-color: var(--bad); }
-  .denyall small { color: var(--faint); font-size: 12px; }
-  .actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
-  .domain { font-size: 12px; color: var(--faint); } .domain.warn { color: var(--amber); }
-
-  /* evidence */
-  .words { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
-  .words li { display: grid; grid-template-columns: 14px 1fr; gap: 6px; font-size: 13px; color: var(--text); }
-  .words li::before { content: "·"; color: var(--faint); }
-  .words li .en { display: block; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
-  .inputs { font-size: 12px; color: var(--faint); overflow-wrap: anywhere; }
-  .inputs code { color: var(--dim); }
-  .sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: -1px; margin: 0 4px 0 6px; }
-  .verdict-row { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); border-left-width: 3px; }
-  .verdict-row.ok { border-left-color: var(--ok); } .verdict-row.bad { border-left-color: var(--bad); } .verdict-row.dim { border-left-color: var(--faint); }
-  .verdict-row .mark { font-family: var(--mono); font-weight: 700; font-size: 15px; line-height: 1.3; }
-  .verdict-row.ok .mark { color: var(--ok); } .verdict-row.bad .mark { color: var(--bad); } .verdict-row.dim .mark { color: var(--faint); }
-  .verdict-row .head { color: var(--text); font-weight: 500; font-size: 13px; }
-  .verdict-row .body { font-size: 12.5px; color: var(--dim); margin-top: 2px; }
-  .verdict-row .body b { color: var(--text); font-weight: 500; font-family: var(--mono); font-size: 12px; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 8px; }
-  .tile { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
-  .tile .k { font-size: 11px; color: var(--faint); letter-spacing: .04em; }
-  .tile .v { font-family: var(--mono); font-size: 17px; color: var(--text); line-height: 1.3; margin-top: 2px; white-space: nowrap; }
-  .tile .v small { font-size: 11.5px; color: var(--dim); margin-left: 3px; }
-  details { font-size: 12px; color: var(--faint); } summary { cursor: pointer; }
-  pre { margin: 0; padding: 10px 12px; background: var(--nav); border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
-  pre .c { color: var(--faint); } pre .t { color: var(--tool); }
-
-  /* approvals */
-  .pend { background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--tool); border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
-  .pend.wait { border-left-color: var(--faint); }
-  .pend .who { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; } .pend .who b { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
-  .pend .call { font-family: var(--mono); color: var(--text); font-size: 12.5px; overflow-wrap: anywhere; }
-  .pend .btns { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
-  .pend .btns button { white-space: nowrap; min-height: 44px; }
-  .pend .btns .notein { width: 100%; min-height: 44px; }
-  @media (max-width: 700px) { .pend { grid-template-columns: 1fr; } .pend .btns { min-width: 0; } }
-
-  /* the effect a person approves on (I-1): what the call would do, before the tool's words */
-  .eff { display: grid; gap: 5px; padding: 9px 11px; border-radius: 8px; background: rgba(242,165,65,.06); border: 1px solid rgba(242,165,65,.3); }
-  .eff .top { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
-  .eff .sum { color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
-  .eff .meta { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
-  .eff .meta b { color: var(--text); font-weight: 600; }
-  .eff .kv { grid-template-columns: minmax(0, 90px) minmax(0, 1fr); border-top-color: rgba(242,165,65,.2); }
-  .kind { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--nav); color: var(--dim); white-space: nowrap; }
-  .kind.pay, .kind.delete { color: var(--bad); border-color: rgba(227,106,82,.5); }
-  .kind.send, .kind.write, .kind.move { color: var(--tool); border-color: rgba(242,165,65,.5); }
-  .kind.read { color: var(--ok); border-color: rgba(70,200,120,.4); }
-  .kind.exec { color: var(--agent); border-color: rgba(111,168,220,.5); }
-  .rev { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
-  .rev.no { color: var(--bad); background: rgba(227,106,82,.14); }
-  .rev.yes { color: var(--ok); background: rgba(70,200,120,.12); }
-  .rev.unk { color: var(--faint); background: rgba(151,156,163,.12); }
-  .code { font-family: var(--mono); font-size: 19px; letter-spacing: .12em; color: var(--tool); background: rgba(242,165,65,.12); border: 1px solid rgba(242,165,65,.45); border-radius: 7px; padding: 0 9px; }
-  .codeline { display: inline-flex; gap: 7px; align-items: center; font-size: 12px; color: var(--faint); }
-
-  /* the big red button, and the deliberate way back */
-  .stopbtn { border: 0; border-radius: 10px; background: var(--bad); color: #190E0B; font-weight: 700; font-size: 15px; min-height: 44px; padding: 9px 18px; }
-  .stopbtn:disabled { background: rgba(227,106,82,.18); color: var(--bad); border: 1px solid rgba(227,106,82,.5); opacity: 1; cursor: default; }
-  .bar .stopbtn { min-height: 32px; padding: 4px 14px; font-size: 13px; }
-  .stopbanner { border: 1px solid rgba(227,106,82,.5); background: rgba(227,106,82,.1); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--text); }
-  .drill { font-size: 12.5px; color: var(--dim); background: var(--panel2); border: 1px dashed var(--faint); border-radius: 8px; padding: 9px 11px; overflow-wrap: anywhere; }
-  .drill:empty { display: none; }
-  .resume { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
-  .resume .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .resume input { flex: 1 1 150px; min-height: 44px; font-size: 16px; }
-  .resume button { min-height: 44px; }
-  .stopdock { display: none; }
-  .why { margin: 3px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
-  .why li { font-family: var(--mono); font-size: 12px; color: var(--text); display: grid; grid-template-columns: 12px 1fr; gap: 4px; overflow-wrap: anywhere; }
-  .why li::before { content: "↳"; color: var(--faint); }
-  .togl { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; }
-  .togl.dis { opacity: .4; border-style: dashed; }
-  .togl .lbl b { color: var(--text); font-weight: 500; font-family: var(--mono); font-size: 12.5px; display: block; }
-  .togl .lbl small { color: var(--faint); font-size: 11.5px; }
-  .togl button { white-space: nowrap; }
-  .handled { display: grid; gap: 6px; }
-
-  /* a filed job (I-6): the person's words, then what the circuits did with them */
-  .task { background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--agent); border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
-  .task .top { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
-  .task .said { color: var(--text); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
-  .task .spent { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
-  .task .spent .g { color: var(--ok); } .task .spent .r { color: var(--bad); }
-  .task .btns { display: flex; flex-direction: column; gap: 8px; min-width: 140px; }
-  .task .btns button { white-space: nowrap; min-height: 44px; }
-  .tid { font-family: var(--mono); font-size: 11.5px; color: var(--agent); background: rgba(111,168,220,.12); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
-  @media (max-width: 700px) { .task { grid-template-columns: 1fr; } .task .btns { min-width: 0; } }
-
-  /* log */
-  .log { display: grid; gap: 6px; }
-  .e { display: grid; grid-template-columns: 62px 1fr; gap: 10px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-left-width: 3px; border-radius: 6px; font-size: 13px; min-width: 0; }
-  .e.ok { border-left-color: var(--ok); } .e.no { border-left-color: var(--faint); } .e.tool { border-left-color: var(--tool); } .e.policy { border-left-color: var(--agent); } .e.err { border-left-color: var(--bad); }
-  .e.spoof { border-left-color: var(--bad); border-left-style: double; } .e.spoof .verdict { background: rgba(227,106,82,.14); color: var(--bad); }
-  .e.task-e { border-left-color: var(--agent); border-left-style: dashed; } .e.task-e .verdict { background: rgba(111,168,220,.14); color: var(--agent); }
-  .e .t { font-family: var(--mono); font-size: 12px; color: var(--faint); padding-top: 2px; }
-  .e .h { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-width: 0; }
-  .e .h .agent { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
-  .e .h .bits { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; } .e .h .bits .t1 { color: var(--tool); }
-  .e .h .chain { margin-left: auto; font-family: var(--mono); font-size: 12px; white-space: nowrap; }
-  .e .verdict { font-family: var(--mono); font-size: 11.5px; font-weight: 700; letter-spacing: .06em; padding: 1px 7px; border-radius: 4px; }
-  .e.ok .verdict { background: rgba(70,200,120,.14); color: var(--ok); } .e.no .verdict { background: rgba(151,156,163,.14); color: var(--dim); }
-  .e.tool .verdict { background: rgba(242,165,65,.14); color: var(--tool); } .e.policy .verdict { background: rgba(111,168,220,.14); color: var(--agent); } .e.err .verdict { background: rgba(227,106,82,.14); color: var(--bad); }
-  .e .d { color: var(--dim); margin-top: 2px; font-size: 12.5px; overflow-wrap: anywhere; } .e .d b { color: var(--text); font-weight: 500; }
-  .e .reason { color: var(--faint); font-style: italic; overflow-wrap: anywhere; }
-  @media (max-width: 480px) { .e { grid-template-columns: 1fr; gap: 2px; } }
-  .tester { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; }
-  .tester input[type=text] { width: 180px; max-width: 100%; }
-  .tester label { display: flex; gap: 6px; align-items: center; }
-  .tester label input[type=checkbox] { accent-color: var(--agent); }
-
-  /* tables */
-  .wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; color: var(--faint); font-weight: 500; padding: 4px 10px 6px 0; border-bottom: 1px solid var(--line); white-space: nowrap; font-size: 12px; }
-  td { padding: 6px 10px 6px 0; color: var(--text); vertical-align: top; }
-  td.name { overflow-wrap: anywhere; max-width: 22ch; } td.num { white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
-  tr + tr td { border-top: 1px solid #23282e; }
-  .kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; font-size: 12.5px; padding: 6px 0; border-top: 1px solid #23282e; }
-  .kv b { color: var(--text); font-weight: 500; } .kv .free { color: var(--ok); } .kv .gate { color: var(--tool); }
-  .step { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 12.5px; }
-  .step .n { font-family: var(--mono); color: var(--faint); } .step b { color: var(--text); font-weight: 500; }
-
-  @media (max-width: 900px) {
-    .shell { grid-template-columns: 1fr; }
-    nav { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px; padding: 10px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
-    .brand { padding: 0 8px 0 4px; width: 100%; } .brand small { display: none; }
-    .nav-item { width: auto; height: 32px; padding: 0 10px; } .nav-item span.lab { display: none; }
-    .nav-foot { display: none; }
-    main, .bar { padding-left: 16px; padding-right: 16px; }
+/* ---------- tokens ---------- */
+:root {
+  color-scheme: dark;
+  --bg: #15181C; --nav: #111417; --panel: #1C2025; --panel2: #202529; --field: #14171A;
+  --line: #2B3037; --line2: #23282E;
+  --text: #ECE7DC; --dim: #A2A7AE; --faint: #858C95;          /* faint raised from #5E646C (2.6:1) to 4.5:1 on --panel2 */
+  --ok: #46C878; --bad: #E36A52; --amber: #F2A541; --blue: #6FA8DC;
+  --agent: var(--blue); --tool: var(--amber);
+  --ok-rgb: 70,200,120; --bad-rgb: 227,106,82; --tool-rgb: 242,165,65; --agent-rgb: 111,168,220; --dim-rgb: 151,156,163;
+  --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #E36A52; --text-fill: #ECE7DC;
+  --on-fill: #121417; --on-text: #121417; --on-bad: #190E0B;   /* --on-text: the words on a --text-fill button; --on-fill: on the amber/blue ones */
+  --focus: var(--amber);
+  --shadow: 0 1px 0 rgba(0,0,0,.25);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #F3F1EB; --nav: #EBE8E0; --panel: #FFFFFF; --panel2: #F7F5EF; --field: #FFFFFF;
+    --line: #DAD6CC; --line2: #E6E2D9;
+    --text: #1B1F24; --dim: #4B525B; --faint: #6B727B;
+    --ok: #1F8A48; --bad: #B8412B; --amber: #9A5E0E; --blue: #2C6BA3;
+    --ok-rgb: 31,138,72; --bad-rgb: 184,65,43; --tool-rgb: 200,125,30; --agent-rgb: 44,107,163; --dim-rgb: 75,82,91;
+    --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #D9553B; --text-fill: #1B1F24;
+    --on-fill: #121417; --on-text: #F3F1EB; --on-bad: #FFF6F3;
+    --focus: #C8761A;
+    --shadow: 0 1px 2px rgba(20,20,20,.06);
   }
-  /* a real phone: 390x844 (iOS Safari) and 360x800 (Android Chrome). Every tap target is
-     at least 44 px, text inputs are 16 px so Safari does not zoom (a zoom would also
-     change scrollWidth), and the stop button sits where a thumb already is — the bottom
-     of the screen — instead of in a top bar nobody can reach one-handed. */
-  @media (max-width: 600px) {
-    .bar .stopbtn { display: none; }
-    .stopdock { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--nav);
-                border-top: 1px solid var(--line); padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
-    .stopdock .stopbtn { width: 100%; min-height: 50px; font-size: 16px; }
-    main { padding-bottom: 86px; }
-    .pend .btns button, .pend .btns .notein { width: 100%; font-size: 16px; }
-    .pend .btns { flex-direction: column; }
-    input, select { font-size: 16px; min-height: 44px; }
-    /* every target a thumb has to hit on this screen, not only the big ones */
-    .nav-item, .pre, .link, .danger, .go, .tab { min-height: 44px; }
-    .lang button { min-height: 44px; padding: 0 14px; }
-    .togl { padding: 8px 10px; }
-    .tester input[type=text] { width: 100%; }
-    .code { font-size: 22px; }
-  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F3F1EB; --nav: #EBE8E0; --panel: #FFFFFF; --panel2: #F7F5EF; --field: #FFFFFF;
+  --line: #DAD6CC; --line2: #E6E2D9;
+  --text: #1B1F24; --dim: #4B525B; --faint: #6B727B;
+  --ok: #1F8A48; --bad: #B8412B; --amber: #9A5E0E; --blue: #2C6BA3;
+  --ok-rgb: 31,138,72; --bad-rgb: 184,65,43; --tool-rgb: 200,125,30; --agent-rgb: 44,107,163; --dim-rgb: 75,82,91;
+  --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #D9553B; --text-fill: #1B1F24;
+  --on-fill: #121417; --on-text: #F3F1EB; --on-bad: #FFF6F3;
+  --focus: #C8761A;
+  --shadow: 0 1px 2px rgba(20,20,20,.06);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #15181C; --nav: #111417; --panel: #1C2025; --panel2: #202529; --field: #14171A;
+  --line: #2B3037; --line2: #23282E;
+  --text: #ECE7DC; --dim: #A2A7AE; --faint: #858C95;
+  --ok: #46C878; --bad: #E36A52; --amber: #F2A541; --blue: #6FA8DC;
+  --ok-rgb: 70,200,120; --bad-rgb: 227,106,82; --tool-rgb: 242,165,65; --agent-rgb: 111,168,220; --dim-rgb: 151,156,163;
+  --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #E36A52; --text-fill: #ECE7DC;
+  --on-fill: #121417; --on-text: #121417; --on-bad: #190E0B;
+  --focus: var(--amber);
+  --shadow: 0 1px 0 rgba(0,0,0,.25);
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }  /* a display: rule of ours must not outvote hidden */
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--dim); font: 14px/1.5 var(--sans); overflow-x: hidden; }
+a { color: var(--blue); text-decoration: none; }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+.num { font-family: var(--mono); color: var(--text); font-variant-numeric: tabular-nums; }
+.muted { color: var(--faint); } .ok { color: var(--ok); } .bad { color: var(--bad); } .amber { color: var(--amber); }
+.c-agent { color: var(--agent); } .c-tool { color: var(--tool); }
+button { font: inherit; cursor: pointer; color: inherit; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+input, select, textarea { background: var(--field); border: 1px solid var(--line); color: var(--text); padding: 6px 8px; font: inherit; font-size: 13px; border-radius: 6px; min-width: 0; }
+input[type=number] { font-family: var(--mono); }
+textarea { width: 100%; resize: vertical; line-height: 1.5; }   /* the Tasks form's one free-text field */
+input:focus, select:focus, textarea:focus, button:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+::placeholder { color: var(--faint); }
+
+/* ---------- shell ---------- */
+.shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100vh; }
+nav { background: var(--nav); border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; padding: 16px 12px; position: sticky; top: 0; height: 100vh; }
+.brand { padding: 4px 12px 14px; }
+.brand b { display: block; color: var(--text); font-weight: 600; font-size: 15px; letter-spacing: .01em; }
+.brand small { display: block; font-family: var(--mono); color: var(--faint); font-size: 11.5px; margin-top: 2px; }
+.nav-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 8px; color: var(--dim); font-size: 13px; background: none; border: 0; text-align: left; width: 100%; }
+.nav-item:hover { color: var(--text); }
+.nav-item.on { background: var(--line); color: var(--text); }
+.nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.nav-item .cnt { margin-left: auto; font-family: var(--mono); font-size: 11px; background: rgba(var(--tool-rgb), .16); color: var(--tool); border-radius: 4px; padding: 0 6px; min-width: 18px; text-align: center; }
+.nav-item .cnt:empty { display: none; }
+.nav-foot { margin-top: auto; padding: 0 12px; font-family: var(--mono); color: var(--faint); font-size: 11px; line-height: 1.6; white-space: pre-line; }
+.page { min-width: 0; display: flex; flex-direction: column; }
+header { position: sticky; top: 0; z-index: 2; background: var(--nav); border-bottom: 1px solid var(--line); }
+.bar { min-height: 48px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 8px 24px; font-size: 12.5px; }
+.bar h1 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.bar h1 small { color: var(--faint); font-weight: 400; margin-left: 6px; font-size: 12.5px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); margin-right: 6px; }
+.dot.ok { background: var(--ok); box-shadow: 0 0 6px rgba(var(--ok-rgb), .5); } .dot.bad { background: var(--bad); } .dot.amber { background: var(--amber); }
+.spacer { flex: 1; }
+.lang { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.lang button { background: none; border: 0; color: var(--dim); padding: 3px 9px; font-size: 12px; }
+.lang button.on { background: var(--line); color: var(--text); }
+main { padding: 24px; display: grid; gap: 16px; align-content: start; }
+section[data-view] { display: none; }
+section[data-view].on { display: grid; gap: 16px; }
+.foot { font-size: 11.5px; color: var(--faint); }
+
+/* ---------- cards ---------- */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow); }
+.card.warn { border-color: rgba(var(--tool-rgb), .5); }
+.h2 { margin: 0; font-size: 12px; letter-spacing: .04em; color: var(--dim); font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.h2 .sub { font-weight: 400; color: var(--faint); font-size: 12px; letter-spacing: 0; }
+.h2 .right { margin-left: auto; }
+.grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.split { display: grid; grid-template-columns: 5fr 6fr; gap: 16px; }
+.split.b { grid-template-columns: 3fr 2fr; }
+.split.a { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+@media (max-width: 1000px) { .split, .split.b, .split.a, .grid3, .grid2 { grid-template-columns: 1fr; } }
+.stat .k { font-size: 11px; color: var(--faint); letter-spacing: .04em; }
+.stat .v { font-family: var(--mono); font-size: 22px; color: var(--text); line-height: 1.2; }
+.stat .v small { font-size: 13px; color: var(--dim); font-family: inherit; }
+.stat .d { font-size: 12.5px; color: var(--dim); overflow-wrap: anywhere; }
+.mini { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mini .nm { display: flex; gap: 8px; align-items: baseline; } .mini .nm b { color: var(--text); font-weight: 600; } .mini .nm span { color: var(--faint); font-size: 12px; }
+.mini .rl { font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+/* the proof line is the thing nobody else can claim: it reads as a sentence, not as a spec */
+.mini .ct { font-family: var(--mono); color: var(--text); margin-top: auto; font-size: 12px; }
+.mini .st { font-size: 13px; font-weight: 500; }
+.mini button { align-self: flex-start; }
+.chip { font-family: var(--mono); font-size: 11px; padding: 1px 7px; border-radius: 4px; background: rgba(var(--dim-rgb), .16); color: var(--dim); white-space: nowrap; }
+.chip.spend { color: var(--amber); } .chip.halt { color: var(--bad); }
+.badge { display: inline-block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; padding: 1px 6px; border-radius: 4px; border: 1px solid transparent; white-space: nowrap; vertical-align: 1px; }
+.badge.cost { color: var(--agent); border-color: rgba(var(--agent-rgb), .45); background: rgba(var(--agent-rgb), .08); }
+.badge.boundary, .badge.count { color: var(--tool); border-color: rgba(var(--tool-rgb), .45); background: rgba(var(--tool-rgb), .08); }
+.pre { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 6px; padding: 4px 9px; font-size: 12px; }
+.pre:hover { color: var(--text); border-color: var(--faint); }
+.pre.tool { border-color: rgba(var(--tool-rgb), .5); color: var(--tool); }
+.pre.on { background: var(--line); color: var(--text); }
+.go { border: 0; border-radius: 8px; padding: 7px 16px; font-weight: 600; color: var(--on-text); background: var(--text-fill); }
+.go.tool { background: var(--tool-fill); color: var(--on-fill); } .go.agent { background: var(--agent-fill); color: var(--on-fill); }
+.danger { border-radius: 8px; padding: 6px 14px; font-weight: 500; color: var(--bad); border: 1px solid rgba(var(--bad-rgb), .5); background: none; }
+.link { background: none; border: 0; color: var(--faint); font-size: 12px; padding: 0; text-decoration: underline dotted; }
+.link:hover { color: var(--text); }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tab { padding: 6px 12px; border-radius: 6px; font-size: 13px; color: var(--dim); font-family: var(--mono); background: none; border: 0; }
+.tab.on { background: var(--line); color: var(--text); } .tab.halt { color: var(--amber); }
+.msg { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel2); border: 1px solid var(--line); overflow-wrap: anywhere; }
+.msg:empty { display: none; }
+.note { font-size: 12px; color: var(--faint); overflow-wrap: anywhere; }
+.note b, .lead b { color: var(--text); font-weight: 500; }
+.lead { font-size: 13px; color: var(--dim); margin: 0; }
+
+/* ---------- first run (new markup: #ov-first, see audit F7) ---------- */
+.first { display: grid; gap: 10px; border-color: rgba(var(--tool-rgb), .4); }
+.first .h2 { color: var(--text); font-size: 14px; letter-spacing: 0; }
+.first p { margin: 0; font-size: 13px; color: var(--dim); }
+.first-step { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 11px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.first-step .n { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--faint); color: var(--faint); font-family: var(--mono); font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+.first-step.done .n { border-color: var(--ok); color: var(--ok); }
+.first-step.done .n::before { content: "✓"; } .first-step.done .n span { display: none; }
+.first-step.done { opacity: .75; }
+.first-step b { color: var(--text); font-weight: 600; display: block; }
+.first-step small { color: var(--dim); font-size: 12px; display: block; }
+.first-step .go, .first-step .pre { min-height: 36px; white-space: nowrap; }
+
+/* ---------- rule editor ---------- */
+.rules { display: grid; gap: 7px; }
+.rule { display: grid; grid-template-columns: 72px 1fr; gap: 6px 12px; align-items: start; padding: 7px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; }
+.rule input[type=number] { width: 100%; text-align: center; padding: 5px 6px; }
+.rule .tog { display: flex; justify-content: center; padding-top: 4px; }
+.rule .tog input { width: 16px; height: 16px; margin: 0; accent-color: var(--tool-fill); }
+.rule .name { color: var(--text); font-size: 13px; font-weight: 500; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.rule .name code { color: var(--faint); font-size: 11.5px; }
+.rule .hint { font-size: 12px; color: var(--dim); line-height: 1.4; }
+.rule .hint code { font-size: 11.5px; }
+.rule .hint.cost code { color: var(--agent); } .rule .hint.boundary code { color: var(--tool); }
+.rules[data-off] .rule { opacity: .4; }
+.denyall { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid rgba(var(--bad-rgb), .45); border-radius: 8px; font-size: 13px; color: var(--text); }
+.denyall input { width: 16px; height: 16px; margin: 0; accent-color: var(--bad-fill); }
+.denyall small { color: var(--dim); font-size: 12px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.domain { font-size: 12px; color: var(--faint); } .domain.warn { color: var(--amber); }
+
+/* ---------- evidence ---------- */
+.words { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.words li { display: grid; grid-template-columns: 14px 1fr; gap: 6px; font-size: 13px; color: var(--text); }
+.words li::before { content: "·"; color: var(--faint); }
+.words li .en { display: block; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
+.inputs { font-size: 12px; color: var(--faint); overflow-wrap: anywhere; }
+.inputs code { color: var(--dim); }
+.sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: -1px; margin: 0 4px 0 6px; }
+.verdict-row { display: grid; grid-template-columns: 24px 1fr; gap: 8px; padding: 10px 12px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); border-left-width: 3px; }
+.verdict-row.ok { border-left-color: var(--ok); } .verdict-row.bad { border-left-color: var(--bad); } .verdict-row.dim { border-left-color: var(--faint); }
+.verdict-row .mark { font-family: var(--mono); font-weight: 700; font-size: 17px; line-height: 1.2; }
+.verdict-row.ok .mark { color: var(--ok); } .verdict-row.bad .mark { color: var(--bad); } .verdict-row.dim .mark { color: var(--faint); }
+.verdict-row .head { color: var(--text); font-weight: 600; font-size: 14px; }
+.verdict-row .body { font-size: 12.5px; color: var(--dim); margin-top: 3px; }
+.verdict-row .body b { color: var(--text); font-weight: 600; font-family: var(--mono); font-size: 12.5px; }
+/* one sentence of proof, set like a verdict (new markup: .proof, see audit F3) */
+.proof { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start; padding: 10px 12px; border-radius: 8px; background: rgba(var(--ok-rgb), .08); border: 1px solid rgba(var(--ok-rgb), .35); color: var(--text); font-size: 14px; line-height: 1.45; }
+.proof.bad { background: rgba(var(--bad-rgb), .08); border-color: rgba(var(--bad-rgb), .4); }
+.proof .mark { font-family: var(--mono); font-weight: 700; font-size: 17px; color: var(--ok); } .proof.bad .mark { color: var(--bad); }
+.proof b { font-family: var(--mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.proof small { display: block; color: var(--dim); font-size: 12px; margin-top: 2px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 8px; }
+.tile { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.tile .k { font-size: 11px; color: var(--faint); letter-spacing: .04em; }
+.tile .v { font-family: var(--mono); font-size: 15px; color: var(--text); line-height: 1.3; margin-top: 2px; white-space: nowrap; }
+.tile .v small { font-size: 11.5px; color: var(--dim); margin-left: 3px; }
+details { font-size: 12px; color: var(--faint); } summary { cursor: pointer; } summary:hover { color: var(--text); }
+pre { margin: 0; padding: 10px 12px; background: var(--nav); border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+pre .c { color: var(--faint); } pre .t { color: var(--tool); }
+
+/* ---------- approvals ---------- */
+/* Column order (CSS only, audit F1): what waits comes first; the stop card drops below it and
+   returns to the top only while a block is in force (its banner is visible). */
+section[data-view="approvals"] .split.a > div > .card:nth-child(1) { order: 2; }
+section[data-view="approvals"] .split.a > div > .card:nth-child(2) { order: 1; }
+section[data-view="approvals"] .split.a > div > .card:nth-child(3) { order: 3; }
+section[data-view="approvals"] .split.a > div > .card:has(.stopbanner:not([hidden])) { order: 0; }
+.pend { background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--tool); border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.pend.wait { border-left-color: var(--faint); }
+.pend .who { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; } .pend .who b { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+.pend .who .codeline { margin-left: auto; }             /* the digits sit at the right edge, where the eye lands after the button */
+.pend .call { font-family: var(--mono); color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
+.pend .btns { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
+.pend .btns button { white-space: nowrap; min-height: 44px; }
+.pend .btns .notein { width: 100%; min-height: 40px; order: 3; font-size: 13px; }   /* the note is an afterthought, not a field to fill in before pressing */
+.pend .btns .go { order: 1; font-size: 15px; } .pend .btns .danger { order: 2; }
+/* refusal hierarchy (audit F2): the person's sentence first, the circuit's words as the quote beneath */
+.pend .why + .note { color: var(--text); font-size: 13px; }
+.pend .note + .note { color: var(--faint); font-size: 11.5px; }
+.pend .why li { color: var(--dim); font-size: 12px; }
+@media (max-width: 700px) { .pend { grid-template-columns: 1fr; } .pend .btns { min-width: 0; } }
+
+/* the effect a person approves on (I-1): what the call would do, before the tool's words */
+.eff { display: grid; gap: 5px; padding: 9px 11px; border-radius: 8px; background: rgba(var(--tool-rgb), .07); border: 1px solid rgba(var(--tool-rgb), .3); }
+.eff .top { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.eff .sum { color: var(--text); font-size: 16px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.eff .meta { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+.eff .meta b { color: var(--text); font-weight: 600; }
+.eff .kv { grid-template-columns: minmax(0, 90px) minmax(0, 1fr); border-top-color: rgba(var(--tool-rgb), .2); }
+.eff .code-top { margin-left: auto; }                    /* optional markup: the code inside .eff .top */
+.kind { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--nav); color: var(--dim); white-space: nowrap; }
+.kind.pay, .kind.delete { color: var(--bad); border-color: rgba(var(--bad-rgb), .5); }
+.kind.send, .kind.write, .kind.move { color: var(--tool); border-color: rgba(var(--tool-rgb), .5); }
+.kind.read { color: var(--ok); border-color: rgba(var(--ok-rgb), .4); }
+.kind.exec { color: var(--agent); border-color: rgba(var(--agent-rgb), .5); }
+.rev { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.rev.no { color: var(--bad); background: rgba(var(--bad-rgb), .14); }
+.rev.yes { color: var(--ok); background: rgba(var(--ok-rgb), .12); }
+.rev.unk { color: var(--faint); background: rgba(var(--dim-rgb), .12); }
+.code { font-family: var(--mono); font-size: 20px; letter-spacing: .14em; color: var(--tool); background: rgba(var(--tool-rgb), .12); border: 1px solid rgba(var(--tool-rgb), .45); border-radius: 7px; padding: 0 9px; line-height: 1.6; font-variant-numeric: tabular-nums; }
+.codeline { display: inline-flex; gap: 7px; align-items: center; font-size: 12px; color: var(--faint); }
+.hint-once { font-size: 12px; color: var(--faint); }    /* the matching-code hint said once above the list, not on every card */
+
+/* the big red button, and the deliberate way back */
+.stopbtn { border: 0; border-radius: 10px; background: var(--bad-fill); color: var(--on-bad); font-weight: 700; font-size: 15px; min-height: 44px; padding: 9px 18px; position: relative; overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.stopbtn:disabled { background: rgba(var(--bad-rgb), .18); color: var(--bad); border: 1px solid rgba(var(--bad-rgb), .5); opacity: 1; cursor: default; }
+/* hold-to-stop (JS diff in audit F4): the fill rises over ~600 ms; a lifted finger cancels it */
+.stopbtn.holding::before { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.28); transform-origin: left; animation: stop-hold .6s linear forwards; }
+@keyframes stop-hold { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.stopbtn.armed { box-shadow: 0 0 0 3px rgba(var(--bad-rgb), .35); }
+.bar .stopbtn { min-height: 34px; padding: 4px 16px; font-size: 13px; margin: 0 12px 0 8px; }   /* isolation from the clock and the language toggle */
+.stopbanner { border: 1px solid rgba(var(--bad-rgb), .5); background: rgba(var(--bad-rgb), .1); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--text); }
+.drill { font-size: 12.5px; color: var(--dim); background: var(--panel2); border: 1px dashed var(--faint); border-radius: 8px; padding: 9px 11px; overflow-wrap: anywhere; }
+.drill:empty { display: none; }
+.resume { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.resume .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.resume input { flex: 1 1 150px; min-height: 44px; font-size: 16px; }
+.resume button { min-height: 44px; }
+.stopdock { display: none; }
+.stopdock .note { text-align: center; font-size: 11px; margin-top: 4px; }   /* "hold for half a second": the dock says it, the desktop button's title does */
+.why { margin: 3px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.why li { font-family: var(--mono); font-size: 12px; color: var(--text); display: grid; grid-template-columns: 12px 1fr; gap: 4px; overflow-wrap: anywhere; }
+.why li::before { content: "↳"; color: var(--faint); }
+.togl { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; }
+.togl.dis { opacity: .45; border-style: dashed; }
+.togl .lbl b { color: var(--text); font-weight: 500; font-family: var(--mono); font-size: 12.5px; display: block; }
+.togl .lbl small { color: var(--faint); font-size: 11.5px; }
+.togl button { white-space: nowrap; }
+.handled { display: grid; gap: 6px; }
+#ap-toggles { display: grid; gap: 8px; }   /* was an inline style; it lives here so .agentless can turn it off */
+/* with no agent there is nothing to switch: the panel says so and hides the raw bits (new markup: .agentless on the card) */
+.agentless #ap-toggles, .agentless #ap-agent { display: none; }
+
+/* ---------- log ---------- */
+.log { display: grid; gap: 6px; }
+.e { display: grid; grid-template-columns: 62px 1fr; gap: 10px; padding: 7px 10px; background: var(--panel2); border: 1px solid var(--line); border-left-width: 3px; border-radius: 6px; font-size: 13px; min-width: 0; }
+.e.ok { border-left-color: var(--ok); } .e.no { border-left-color: var(--faint); } .e.tool { border-left-color: var(--tool); } .e.policy { border-left-color: var(--agent); } .e.err { border-left-color: var(--bad); }
+.e.spoof { border-left-color: var(--bad); border-left-style: double; } .e.spoof .verdict { background: rgba(var(--bad-rgb), .14); color: var(--bad); }
+.e .t { font-family: var(--mono); font-size: 12px; color: var(--faint); padding-top: 2px; }
+.e .h { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-width: 0; }
+.e .h .agent { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+.e .h .bits { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; } .e .h .bits .t1 { color: var(--tool); }
+.e .h .chain { margin-left: auto; font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.e .verdict { font-family: var(--mono); font-size: 11.5px; font-weight: 700; letter-spacing: .06em; padding: 1px 7px; border-radius: 4px; }
+.e.ok .verdict { background: rgba(var(--ok-rgb), .14); color: var(--ok); } .e.no .verdict { background: rgba(var(--dim-rgb), .16); color: var(--dim); }
+.e.tool .verdict { background: rgba(var(--tool-rgb), .14); color: var(--tool); } .e.policy .verdict { background: rgba(var(--agent-rgb), .14); color: var(--agent); } .e.err .verdict { background: rgba(var(--bad-rgb), .14); color: var(--bad); }
+.e .d { color: var(--dim); margin-top: 2px; font-size: 12.5px; overflow-wrap: anywhere; } .e .d b { color: var(--text); font-weight: 500; }
+.e .reason { color: var(--faint); font-style: italic; overflow-wrap: anywhere; }
+/* a run of identical refusals folds into one row (JS diff in audit F5) */
+.e.more { border-left-style: dotted; } .e.more .d { color: var(--faint); }
+.e.more .cnt { font-family: var(--mono); color: var(--text); background: rgba(var(--dim-rgb), .16); border-radius: 4px; padding: 0 6px; }
+@media (max-width: 480px) { .e { grid-template-columns: 1fr; gap: 2px; } }
+.tester { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; }
+.tester input[type=text] { width: 180px; max-width: 100%; }
+.tester label { display: flex; gap: 6px; align-items: center; }
+.tester label input[type=checkbox] { accent-color: var(--agent-fill); }
+
+/* ---------- tables ---------- */
+.wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: var(--faint); font-weight: 500; padding: 4px 10px 6px 0; border-bottom: 1px solid var(--line); white-space: nowrap; font-size: 12px; }
+td { padding: 6px 10px 6px 0; color: var(--text); vertical-align: top; }
+td.name { overflow-wrap: anywhere; max-width: 22ch; } td.num { white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
+tr + tr td { border-top: 1px solid var(--line2); }
+.kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; font-size: 12.5px; padding: 6px 0; border-top: 1px solid var(--line2); }
+.kv b { color: var(--text); font-weight: 500; } .kv .free { color: var(--ok); } .kv .gate { color: var(--tool); }
+.step { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 12.5px; }
+.step .n { font-family: var(--mono); color: var(--faint); } .step b { color: var(--text); font-weight: 500; }
+
+/* ---------- connect (was the second <style> inside the section) ---------- */
+.picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.pick { display: grid; gap: 3px; text-align: left; padding: 11px 13px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel2); color: var(--dim); min-height: 44px; }
+.pick:hover { border-color: var(--faint); color: var(--text); }
+.pick.on { border-color: var(--tool); background: rgba(var(--tool-rgb), .08); }
+.pick b { color: var(--text); font-weight: 600; font-size: 13.5px; }
+.pick small { font-size: 12px; color: var(--faint); line-height: 1.4; }
+.pick.on small { color: var(--dim); }
+.cnrow { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 12.5px; }
+.cnrow label { display: flex; gap: 6px; align-items: center; color: var(--faint); }
+.cnrow input[type=text] { width: 190px; max-width: 100%; }
+#cn-tools td { vertical-align: middle; }
+#cn-tools select { padding: 3px 6px; }
+#cn-tools input[type=checkbox] { width: 17px; height: 17px; margin: 0; accent-color: var(--tool-fill); }
+#cn-tools .src { font-size: 11.5px; }
+#cn-tools .locked { color: var(--faint); font-size: 11.5px; }
+.srcpat { font-family: var(--mono); font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
+
+/* ---------- tasks (the view in flight tonight; tokenised copy of its owner's rules) ---------- */
+.task { background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--agent); border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.task .top { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.task .said { color: var(--text); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.task .spent { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+.task .spent .g { color: var(--ok); } .task .spent .r { color: var(--bad); }
+.task .btns { display: flex; flex-direction: column; gap: 8px; min-width: 140px; }
+.task .btns button { white-space: nowrap; min-height: 44px; }
+.tid { font-family: var(--mono); font-size: 11.5px; color: var(--agent); background: rgba(var(--agent-rgb), .12); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+.e.task-e { border-left-color: var(--agent); border-left-style: dashed; } .e.task-e .verdict { background: rgba(var(--agent-rgb), .14); color: var(--agent); }
+@media (max-width: 700px) { .task { grid-template-columns: 1fr; } .task .btns { min-width: 0; } }
+
+/* ---------- narrow: tablet ---------- */
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  nav { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px; padding: 8px 8px 6px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .brand { padding: 0 8px 4px 6px; width: 100%; } .brand small { display: none; }
+  /* every tab keeps its name: icon above a short label (nav.* in zh become Chinese-only, see copy.md) */
+  .nav-item { width: auto; flex: 1 1 0; min-width: 48px; height: auto; min-height: 48px; flex-direction: column; justify-content: center; gap: 3px; padding: 5px 2px; }
+  .nav-item span.lab { display: block; font-size: 10.5px; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-item .cnt { position: absolute; margin: 0; transform: translate(14px, -22px); }
+  .nav-item { position: relative; }
+  .nav-foot { display: none; }
+  main, .bar { padding-left: 16px; padding-right: 16px; }
+}
+/* ---------- narrow: a real phone (390x844 iOS Safari, 360x800 Android Chrome) ----------
+   Every tap target is at least 44 px, text inputs are 16 px so Safari does not zoom, and the
+   stop button sits where a thumb already is — the bottom of the screen. */
+@media (max-width: 600px) {
+  header { position: sticky; }
+  .bar { gap: 4px 12px; padding: 6px 112px 6px 16px; position: relative; }   /* right gutter is the toggle's lane */
+  .bar h1 { flex: 1 1 100%; }                    /* the title on its own line, the three dots share the next */
+  .bar .lang { position: absolute; top: 8px; right: 16px; }   /* the toggle rides the title row instead of taking a third */
+  .lang button { min-height: 34px; padding: 0 12px; }
+  .bar h1 small { display: block; margin: 0; font-size: 11.5px; }
+  .bar > span:not(.lang):not(.spacer) { font-size: 11.5px; }
+  #clock { display: none; }                      /* the phone has a clock */
+  .bar .stopbtn { display: none; }
+  .stopdock { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--nav);
+              border-top: 1px solid var(--line); padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
+  .stopdock .stopbtn { width: 100%; min-height: 50px; font-size: 16px; }
+  main { padding-bottom: 108px; }                /* the dock: 8 + 50 + hint 20 + 8, plus room to breathe */
+  .cnrow input[type=text] { width: 100%; }
+  /* the dock is the stop on a phone; the card keeps the banner, the drill and the way back */
+  section[data-view="approvals"] .card.warn > .actions > .stopbtn { display: none; }
+  .pend .btns button, .pend .btns .notein { width: 100%; font-size: 16px; }
+  .pend .btns { flex-direction: column; }
+  .pend .btns .notein { font-size: 16px; }
+  input, select, textarea { font-size: 16px; } input, select { min-height: 44px; }
+  .nav-item, .pre, .link, .danger, .go, .tab { min-height: 44px; }
+  .togl { padding: 8px 10px; }
+  .tester input[type=text] { width: 100%; }
+  .code { font-size: 24px; }
+  .eff .sum { font-size: 17px; }
+  .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }   /* four zeros in one column is a wall; two by two reads as a dashboard */
+  .stat { padding: 10px 12px; } .stat .v { font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .stopbtn.holding::before { animation-duration: .01s; } }
 </style>
 
 <div class="shell">
@@ -295,6 +447,14 @@
 <main>
 <!-- ===== Overview ===== -->
 <section data-view="overview">
+  <!-- First run: the three steps, with the ones already done ticked; gone once all three are. -->
+  <div class="card first" id="ov-first" hidden>
+    <div class="h2" data-i18n="first.title"></div>
+    <p data-i18n="first.lead"></p>
+    <div class="first-step" data-step="rules"><span class="n"><span>1</span></span><div><b data-i18n="first.s1"></b><small data-i18n="first.s1.d"></small></div><button class="go tool" type="button" data-go="boundaries" data-i18n="first.go1"></button></div>
+    <div class="first-step" data-step="connect"><span class="n"><span>2</span></span><div><b data-i18n="first.s2"></b><small data-i18n="first.s2.d"></small></div><button class="pre" type="button" data-go="connect" data-i18n="first.go2"></button></div>
+    <div class="first-step" data-step="probe"><span class="n"><span>3</span></span><div><b data-i18n="first.s3"></b><small data-i18n="first.s3.d"></small></div><button class="pre" type="button" data-go="connect" data-i18n="first.go3"></button></div>
+  </div>
   <div class="grid4" id="ov-stats"></div>
   <div class="split">
     <div class="card"><div class="h2"><span data-i18n="ov.circuits"></span><span class="sub" data-i18n="ov.circuits.sub"></span></div><div class="grid2" id="ov-classes"></div><div class="note" id="ov-halt"></div></div>
@@ -353,6 +513,7 @@
           <button class="stopbtn" id="stop-big" type="button"></button>
           <button class="pre" id="stop-drill" type="button" data-i18n="ap.drill"></button>
         </div>
+        <div class="note" data-i18n="ap.stop.hint"></div>
         <div class="drill" id="ap-drill"></div>
         <div class="resume" id="ap-resume" hidden>
           <div class="note" id="ap-resume-hint"></div>
@@ -364,13 +525,13 @@
         </div>
         <div class="msg" id="ap-stop-msg"></div>
       </div>
-      <div class="card"><div class="h2"><span data-i18n="ap.pending"></span><span class="sub" id="ap-pending-sub"></span></div><div id="ap-list" style="display:grid;gap:10px"></div></div>
+      <div class="card"><div class="h2"><span data-i18n="ap.pending"></span><span class="sub" id="ap-pending-sub"></span></div><div class="hint-once" id="ap-hint-once" data-i18n="ap.hint.once" hidden></div><div id="ap-list" style="display:grid;gap:10px"></div></div>
       <div class="card"><div class="h2"><span data-i18n="ap.handled"></span></div><div class="handled" id="ap-handled"></div></div>
     </div>
     <div class="card">
       <div class="h2"><span data-i18n="ap.switches"></span><span class="sub" data-i18n="ap.switches.sub"></span></div>
       <select id="ap-agent"></select>
-      <div id="ap-toggles" style="display:grid;gap:8px"></div>
+      <div id="ap-toggles"></div>
       <div class="note" data-i18n="ap.grey"></div>
       <div class="note" style="border-top:1px solid var(--line);padding-top:10px" data-i18n="ap.cardputer"></div>
       <div class="msg" id="ap-msg"></div>
@@ -437,26 +598,6 @@
 <!-- ===== Connect ===== -->
 <section data-view="connect">
   <!-- W2: the first screen is a question — what do you use? — and then one way in. -->
-  <style>
-    .picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
-    .pick { display: grid; gap: 3px; text-align: left; padding: 11px 13px; border-radius: 9px; border: 1px solid var(--line);
-            background: var(--panel2); color: var(--dim); min-height: 44px; }
-    .pick:hover { border-color: var(--faint); color: var(--text); }
-    .pick.on { border-color: var(--tool); background: rgba(242,165,65,.08); }
-    .pick b { color: var(--text); font-weight: 600; font-size: 13.5px; }
-    .pick small { font-size: 12px; color: var(--faint); line-height: 1.4; }
-    .pick.on small { color: var(--dim); }
-    .cnrow { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 12.5px; }
-    .cnrow label { display: flex; gap: 6px; align-items: center; color: var(--faint); }
-    .cnrow input[type=text] { width: 190px; max-width: 100%; }
-    #cn-tools td { vertical-align: middle; }
-    #cn-tools select { padding: 3px 6px; }
-    #cn-tools input[type=checkbox] { width: 17px; height: 17px; margin: 0; accent-color: var(--tool); }
-    #cn-tools .src { font-size: 11.5px; }
-    #cn-tools .locked { color: var(--faint); font-size: 11.5px; }
-    .srcpat { font-family: var(--mono); font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
-    @media (max-width: 600px) { .cnrow input[type=text] { width: 100%; } }
-  </style>
   <div class="card">
     <div class="h2"><span data-i18n="cn.pick"></span><span class="sub" data-i18n="cn.pick.sub"></span></div>
     <div class="picks">
@@ -545,7 +686,7 @@
 </section>
 </main>
 <!-- On a phone the stop is where the thumb already is; on a desktop it is in the top bar. -->
-<div class="stopdock"><button class="stopbtn" id="stop-all-2" type="button"></button></div>
+<div class="stopdock"><button class="stopbtn" id="stop-all-2" type="button"></button><div class="note" data-i18n="ap.stop.hint"></div></div>
 </div>
 </div>
 
@@ -562,8 +703,9 @@ const AGENT_BITS = ["request", "intent"];
 // ---------- text ----------
 const T = {
   zh: {
-    "nav.overview": "Overview · 总览", "nav.boundaries": "Boundaries · 边界", "nav.approvals": "Approvals · 待确认", "nav.tasks": "Tasks · 任务", "nav.activity": "Activity · 流水", "nav.agents": "Agents", "nav.connect": "Connect · 接入",
-    "nav.foot": "拍不是时间。\n标志位是工具层的承诺。\n链上只复算，不部署。",
+    // phone tabs are 53 px wide: a bilingual label would be cut to "Overvie…", so zh is Chinese only
+    "nav.overview": "总览", "nav.boundaries": "边界", "nav.approvals": "待确认", "nav.tasks": "任务", "nav.activity": "流水", "nav.agents": "Agents", "nav.connect": "接入",
+    "nav.foot": "拍数的是调用，不是时间。\n不可逆由工具层判定。\n链上只复算，不部署。",
     "title.overview": "总览", "sub.overview": "", "title.boundaries": "边界", "sub.boundaries": "规则 → 电路 → 逐行核对 → 遍历证明",
     "title.approvals": "待确认", "sub.approvals": "", "title.tasks": "任务", "sub.tasks": "交一件事给它做；每次调用照旧一条一条过电路", "title.activity": "流水", "sub.activity": "每条决策都带电路原话与链上复算",
     "title.agents": "Agents", "sub.agents": "一个名字，四张电路各一份状态", "title.connect": "接入", "sub.connect": "你的模型、你的工具、你的链——边界都在同一张电路上",
@@ -571,84 +713,95 @@ const T = {
     "tok.viewer.badge": "手机视图（只读 + 确认/封锁）", "tok.viewer.no": "这台手机拿的是查看令牌：能看、能确认屏幕上的调用、能封锁——不能装规则、不能全停/解除、不能解封。这些要在电脑上做。",
     "tok.viewer.have": "我有操作者令牌", "tok.viewer.switches": "手机只能对屏幕上有匹配码的调用按确认或封锁；这些裸开关是操作者的。",
     "chain.off": "链上复核已关闭", "chain.idle": "链上复核就绪（BSC 只读，未部署）", "chain.ok": "链上复核一致 · 未部署", "chain.pend": "链上复核进行中", "chain.err": "链上节点不可用，仅本地裁决", "chain.dis": "链上复核不一致！",
-    "models.n": "{n} 个模型已接入", "models.none": "还没有模型接入",
-    "honest.line": "拍不是时间；标志位是工具层的承诺；链上只复算、不部署。",
+    "models.n": "{n} 个模型已接入", "models.none": "还没有模型接入 · 去「接入」",
+    "honest.line": "「拍」数的是调用次数，不是时间；哪些工具算不可逆是工具层说的；链上只复算、不部署。",
     "cls.spend": "花钱", "cls.message": "发消息", "cls.exec": "执行", "cls.files": "文件", "cls.halt": "停机（共享）",
     "cls.spend.what": "转账、支付、下单、签名", "cls.message.what": "发消息、发邮件、发帖", "cls.exec.what": "跑命令、调工具——没归类的都到这里", "cls.files.what": "写、改、删、移动文件", "cls.halt.what": "每次请求先过它；它不放，四类全见 blocked",
     // overview
     "ov.models": "已接入模型", "ov.models.d": "按 agent 名的前缀数", "ov.models.none": "还没有请求进来",
-    "ov.circ": "电路", "ov.circ.unit": "张", "ov.circ.ok": "全部规则成立 · 全域已核", "ov.circ.bad": "有规则不成立", "ov.circ.none": "只有 exec 一张（默认）",
+    "ov.circ": "电路", "ov.circ.unit": "张", "ov.circ.ok": "每一行都核过 · 每条规则都成立", "ov.circ.bad": "有规则不成立", "ov.circ.none": "只有 exec 一张（默认）",
     "ov.dec": "最近决策", "ov.dec.d": "流水最近 {n} 条 · 放行 {g} · 拒绝 {r}",
-    "ov.pend": "待确认", "ov.pend.d": "等一个人来点，模型点不了", "ov.pend.none": "没有等人的请求",
-    "ov.circuits": "四张电路", "ov.circuits.sub": "一类工具一张，行数相加不相乘",
+    "ov.pend": "待确认", "ov.pend.d": "在等你点头，模型点不了", "ov.pend.none": "没有等人的请求",
+    "ov.circuits": "四条反射弧", "ov.circuits.sub": "一类工具一条：花钱、发消息、执行、文件",
     "ov.recent": "最近决策", "ov.recent.sub": "每条都带电路原话与链上复算",
-    "ov.deny": "整类拒绝 · 没有电路会放行", "ov.none": "尚未装电路 · 不设限 · 共享 halt 仍对它生效", "ov.install": "去装一张 →", "ov.holds": "✓ 每条规则成立 · 全域已核", "ov.fails": "✗ 有规则不成立",
-    "ov.halt.on": "共享停机电路：{rules} — {nand} NAND + {latch} LATCH · {rows} 行", "ov.halt.off": "没有共享停机电路：blocked 只是电平，放下就恢复。",
-    "ov.rows": "{nand} NAND + {latch} LATCH · {rows} 行",
+    // "not limited" is the true reading of an unruled class; Stop everything is a latch in front of every class, so it does reach this one
+    "ov.deny": "整类拒绝 · 没有电路会放行", "ov.none": "还没有规则：这类工具现在不设限，只有「全部停下」拦得住它。", "ov.install": "给它定规则 →", "ov.holds": "✓ 每一行都核过，每条规则都成立", "ov.fails": "✗ 有规则不成立",
+    "ov.halt.on": "共享停机电路：{rules} — {nand} NAND + {latch} LATCH · {rows} 行", "ov.halt.off": "没有装共享停机：手动停下一个 agent（blocked）放下就恢复，不会记住；「全部停下」不受影响，它是一道闩。要「停过就不自动恢复」或心跳，用模板「停机+心跳」装上。",
+    "ov.rows": "{rows} 行全部核过 · {nand} NAND + {latch} LATCH",
     // boundaries
-    "b.blocks": "电路积木", "b.blocks.sub": "十条规则，各自落在哪个通道上", "b.templates": "模板",
+    "b.blocks": "规则", "b.blocks.sub": "十条；蓝色标签的规则 agent 自己能付出代价绕开，橙色的它绕不开", "b.templates": "模板",
     "b.tab.hint": "这张电路管 {cls} 类工具：{what}",
-    "b.denyall": "整类拒绝（没有电路会放行）", "b.denyall.hint": "这是「永不」的唯一写法：上限填 0 表示不限，不是零次。",
-    "b.install": "编译并安装", "b.reload": "读回已装的", "b.remove": "移除这张电路",
+    "b.denyall": "这类工具一律拒绝", "b.denyall.hint": "要「永远不许」就勾这个。下面的数字里 0 表示「不限」，不是零次。",
+    "b.install": "生效", "b.reload": "读回已装的", "b.remove": "移除这张电路",
     "b.note": "重编译、逐行核对、遍历证明；这一类下每个 agent 的计数归零。", "b.note.deny": "不编译任何电路：这一类每个请求都直接拒绝。",
     "b.domain": "编译后 {inputs} 个输入 + {state} 位状态 · 需逐行核对 2^{bits} = {rows} 行", "b.domain.warn": "超过 26 位的穷举上限，服务端会拒绝这组规则。",
-    "b.installing": "编译中…", "b.installed": "已安装到 {cls}：{nand} NAND + {latch} LATCH，核对 {rows} 行，{holds}，用时 {ms} ms。", "b.denied": "已设置：{cls} 整类拒绝。", "b.removed": "已移除 {cls} 的电路：这一类不再设限。",
+    "b.installing": "编译中…", "b.installed": "{cls} 的规则已生效：{rows} 行全部核过，{holds}（{nand} NAND + {latch} LATCH，{ms} ms）。", "b.denied": "已设置：{cls} 整类拒绝。", "b.removed": "已移除 {cls} 的电路：这一类不再设限。",
     "b.refused": "未安装（HTTP {code}）：{err}", "b.neterr": "发不出去：{e}", "holds": "每条规则成立", "fails": "有规则不成立",
-    "tp.nomoney": "不能转钱", "tp.nodelete": "不能删文件", "tp.msgconfirm": "发消息要人确认", "tp.breaker": "连续失败就停", "tp.fly": "果蝇默认", "tp.halt": "停机+心跳", "tp.spend": "花钱：限次+双钥",
+    "tp.nomoney": "不能转钱", "tp.nodelete": "不能删文件", "tp.msgconfirm": "发消息要人确认", "tp.breaker": "连续失败就停", "tp.fly": "果蝇反射弧（出处）", "tp.halt": "停机+心跳", "tp.spend": "花钱：限次+双钥",
     "bd.cost": "代价", "bd.boundary": "边界", "bd.count": "边界 · 计数",
-    "r.gap": "最小放行间隔（拍）", "r.gap.hint": "两次放行之间至少隔这么多拍。0 = 不限。只数放行次数，无论 agent 怎么做都约束它。",
-    "r.commit": "承诺拍数", "r.commit.hint": "放行前需要连续多少拍 intent 为高。0 = 不要求。落在 <code>intent</code> 上——agent 自己写的，所以这是它随时可以付的代价。",
-    "r.blocked": "blocked 为高时一律不放", "r.blocked.hint": "落在 <code>blocked</code> 上——只能来自 agent 写不到的工具层。无记忆：放下就恢复。",
-    "r.max": "总放行上限", "r.max.hint": "累计放行到这个数之后再也不放。<b>0 = 不限</b>（要「永不」请用上面的整类拒绝）。",
-    "r.confirm": "确认窗口（拍）", "r.confirm.hint": "一次 <code>confirm</code> 在接下来这么多拍内有效；填 1 = 每次放行都要当拍确认。0 = 不要求。花钱不用它：一次确认放多次是错的形状。",
-    "r.sticky": "封锁后停机，直到有人确认", "r.sticky.hint": "<code>blocked</code> 一旦为高就停机；放下也不恢复，只有一次 <code>confirm</code> 才解除（解除那一拍本身不放行）。",
-    "r.heartbeat": "连续 N 拍没有心跳就停机", "r.heartbeat.hint": "连续这么多拍 <code>heartbeat</code> 为低就同样停机，直到一次 confirm。0 = 不要求。",
-    "r.irrev": "不可逆动作消耗一次确认", "r.irrev.hint": "<code>irreversible</code> 为高的请求必须有一次尚未用掉的 <code>confirm</code> 才放行，放行即用掉；可逆请求不需要也不消耗。钩子按模式（rm、git push、--force…）标不可逆。",
-    "r.trip": "熔断：连续 N 次失败", "r.trip.hint": "连续这么多拍 <code>failed</code> 为高就跳闸，之后一律不放，直到一次 confirm 复位。0 = 不要求。PostToolUse 钩子上报失败。",
-    "r.twokey": "双钥：confirm 与 confirm_b 都要", "r.twokey.hint": "每次放行都要两把钥匙都到过（或当拍到），放行即同时用掉。落在 <code>confirm</code> 与 <code>confirm_b</code> 上——两个人各一把。",
+    "r.gap": "两次放行至少隔几次调用", "r.gap.hint": "两次放行之间至少隔这么多拍。0 = 不限。只数放行次数，无论 agent 怎么做都约束它。",
+    "r.commit": "放行前要连续表态几次", "r.commit.hint": "放行前需要连续多少拍 intent 为高。0 = 不要求。落在 <code>intent</code> 上——agent 自己写的，所以这是它随时可以付的代价。",
+    "r.blocked": "停下时一律不放", "r.blocked.hint": "落在 <code>blocked</code> 上——只能来自 agent 写不到的工具层。无记忆：放下就恢复。",
+    "r.max": "总共最多放行几次", "r.max.hint": "累计放行到这个数之后再也不放。<b>0 = 不限</b>（要「永不」请用上面的整类拒绝）。",
+    "r.confirm": "一次确认管几次调用", "r.confirm.hint": "一次 <code>confirm</code> 在接下来这么多拍内有效；填 1 = 每次放行都要当拍确认。0 = 不要求。花钱不用它：一次确认放多次是错的形状。",
+    "r.sticky": "停下后不自动恢复，要有人确认", "r.sticky.hint": "<code>blocked</code> 一旦为高就停机；放下也不恢复，只有一次 <code>confirm</code> 才解除（解除那一拍本身不放行）。",
+    "r.heartbeat": "连续几次调用没有心跳就停下", "r.heartbeat.hint": "连续这么多拍 <code>heartbeat</code> 为低就同样停机，直到一次 confirm。0 = 不要求。",
+    "r.irrev": "收不回的动作每次都要人确认", "r.irrev.hint": "<code>irreversible</code> 为高的请求必须有一次尚未用掉的 <code>confirm</code> 才放行，放行即用掉；可逆请求不需要也不消耗。钩子按模式（rm、git push、--force…）标不可逆。",
+    "r.trip": "连续失败几次就停下", "r.trip.hint": "连续这么多拍 <code>failed</code> 为高就跳闸（熔断），之后一律不放，直到一次 confirm 复位。0 = 不要求。PostToolUse 钩子上报失败。",
+    "r.twokey": "两个人都点头才放", "r.twokey.hint": "每次放行都要两把钥匙都到过（或当拍到），放行即同时用掉。落在 <code>confirm</code> 与 <code>confirm_b</code> 上——两个人各一把。",
     // evidence
-    "ev.title": "当前规则的证据", "ev.sub": "编译 · 逐行核对 · 遍历证明",
+    "ev.title": "这组规则的证据", "ev.sub": "编译 · 逐行核对 · 遍历证明",
     "ev.none": "这一类没有电路：不设限。装一张，这里就会出现它的证据。", "ev.deny": "这一类没有电路。每个请求都直接拒绝——不需要证明，因为没有任何东西会放行。",
     "ev.inputs": "电路读取的输入位：", "ev.inputs.agent": "agent 写", "ev.inputs.tool": "工具层",
-    "ev.match": "电路与参考实现逐行一致", "ev.match.no": "电路与参考实现不一致",
+    "ev.proof": "<b>{rows}</b> 行全部核过；<b>{reach}</b> 个可达状态里每条规则都成立。", "ev.proof.sub": "{nand} NAND + {latch} LATCH · 编译加检查 {ms} ms",
+    "ev.proof.no": "有一项没通过：往下看是哪一行。",
+    "ev.match": "电路与规则原文逐行一致", "ev.match.no": "电路与规则原文不一致",
     "ev.match.body": "同一组规则用纯 Python 再写一遍，对定义域全部 <b>{rows}</b> 行（{inputs} 个输入 + {state} 位状态 = 2^{bits}）逐行比较输出和下一状态。",
-    "ev.holds": "每条规则都成立", "ev.holds.no": "有规则不成立",
-    "ev.holds.body": "从复位出发穷尽每个可达状态下的每种输入：可达 <b>{reach} / {poss}</b> 个状态，配合独立计数器共 <b>{conf}</b> 个配置、<b>{proven}</b> 行，逐条规则计违规数。",
+    "ev.holds": "每个可达状态里每条规则都成立", "ev.holds.no": "有规则不成立",
+    "ev.holds.body": "从开机状态出发，把 <b>{reach}</b> 个能到达的状态（共 {poss} 个可能）下的每一种输入都走了一遍，一共 <b>{proven}</b> 行，逐条规则数违规：全部为零。",
     "tl.nand": "NAND", "tl.latch": "LATCH", "tl.bytes": "字节", "tl.depth": "深度", "tl.ms": "编译+检查",
     "ev.viol": "违规计数：", "viol.rate_limit": "限速", "viol.commitment": "承诺", "viol.forbidden": "禁放", "viol.budget": "上限", "viol.confirm_window": "确认窗口", "viol.halted": "停机", "viol.one_shot": "一次性确认", "viol.breaker": "熔断", "viol.two_key": "双钥",
     "ev.netlist": "网表（{bytes} 字节，链上复核送的就是这段）",
     "ev.cross": "跨类别的约束（如「花钱后 3 拍内不发消息」）这里不验证。",
     // approvals
-    "ap.lead": "这里是 <code>confirm</code> 通道。模型碰不到这一页。列出来的是电路因为「缺一个人的一次点头」而拒绝的请求；点一下就是写一位，下一次请求会读到它。",
-    "ap.pending": "等一个人来点", "ap.pending.sub": "{n} 条 · 按到达顺序", "ap.none": "没有等人的请求。",
-    "ap.confirm": "确认一次", "ap.confirm_b": "给第二把钥匙", "ap.block": "封锁该 agent",
+    "ap.lead": "这些调用在等你点头。模型看不到、也按不了这一页。你确认的只是那一条：agent 原样重发它，反射弧才放行；它先发别的，不会用掉你的确认。",
+    "ap.pending": "等你点头", "ap.pending.sub": "{n} 条 · 按到达顺序", "ap.none": "没有等人的请求。",
+    "ap.confirm": "确认这一条", "ap.confirm_b": "给出第二把钥匙", "ap.block": "停下这个 agent",
     "ap.approved": "已批准这一次调用", "ap.approved.note": "确认只对上面这一次调用有效，等 agent 原样重发；它先发别的调用不会用掉这次确认。",
-    "ap.wait.note": "这不是确认能解的——只能等。列在这里是让你知道它在等。",
-    "ap.irrev.note": "工具层把这条标成了不可逆；电路要一次未用掉的确认才放。确认只放这一次。",
-    "ap.halt.note": "停机中。一次 confirm 解除，解除那一拍本身不放行。", "ap.break.note": "熔断已跳。一次 confirm 复位。", "ap.win.note": "需要一次当拍的 confirm。", "ap.key.note": "缺第二把钥匙。",
+    // every refusal's sentence says the consequence, then the next step — including "do nothing"
+    "ap.wait.note": "这条不需要你做什么：它在等冷却或上限，agent 自己重发就行。列在这里只是让你知道。",
+    "ap.irrev.note": "这一步做了就收不回来，所以反射弧要你先点头。确认只放行这一条；不想放，就什么也不点，或停下这个 agent。",
+    "ap.halt.note": "共享停机把它停了（被封锁过，或太久没有心跳）。点确认只是解除停机，这一条本身要它再发一次。", "ap.break.note": "它连续失败太多次，反射弧把它停了。点确认就是「让它再试」；不确定就先看流水里它失败了什么。", "ap.win.note": "需要一次当拍的 confirm。", "ap.key.note": "这一条要两个人各点一次。你按下的是第一把钥匙；第二把（confirm_b）由另一个人在他的屏幕上给。",
     "ap.handled": "最近已处理", "ap.handled.none": "还没有处理记录。", "ap.h.tool": "人写了 {bits}", "ap.h.then": "之后 tick {n} {v}",
-    "ap.needs.note": "电路要一个人写一位才放行。", "ap.blocked.note": "这个 agent 正被封锁：它的请求一律被拒。先解除封锁（右边开关面板，或下面的「解除全部封锁」），确认才有意义。",
-    "ap.code": "匹配码", "ap.code.hint": "按钮上的两位数要和这里一样——同一块屏幕上读到的才算。聊天里批准必须带它。",
+    "ap.needs.note": "电路要一个人写一位才放行。", "ap.blocked.note": "这个 agent 正停着，它的每一条都会被拒。只点确认没有用：先让它恢复——只恢复它，用手动开关里 blocked 的「放下」；全部恢复，用「恢复全部」。",
+    "ap.code": "核对码", "ap.hint.once": "每张卡右上的两位数是那条请求的号码；确认按钮上带同样的两位数，对得上，你批的就是它。在 Telegram 里批准要把这两位数一起发。",
     "ap.note": "备注（可选）", "ap.h.note": "备注：{note}",
-    "ap.stop.title": "全部停下", "ap.stop.sub": "一下拒掉所有 agent 的所有请求——认识的、还没出现的都算；要解除得再做一次明确动作",
-    "ap.stop": "全部停下", "ap.stop.all": "已全部停下 · 含尚未出现的 agent", "ap.stop.some": "全部停下（已手动封锁 {m}/{n}）",
-    "ap.stop.done": "已全部停下：所有请求一律被拒，直到有人解除——包括还没出现过的 agent。这里认识的 {n} 个 agent 的 blocked 也已拉高。",
-    "ap.stopped.banner": "全停生效中：任何 agent 的任何请求都会被拒——这里认识的 {n} 个，以及之后才出现或改了名的——直到有人在下面明确解除。这个闩重启也不会松。",
-    "ap.blocked.banner": "{m}/{n} 个 agent 被手动封锁；红键没有按下——不在这份名单里的 agent 仍在运行。",
-    "ap.stop.note": "有人按了全部停下。只有解除（下面，或 `c3s stop-all --resume`）能放开它；confirm 帮不上。",
+    "ap.stop.title": "全部停下", "ap.stop.sub": "按住半秒，所有 agent 的所有请求立刻被拒——认识的、还没出现的都算；恢复要另外做一次明确动作",
+    "ap.stop": "全部停下", "ap.stop.all": "已全部停下 · 含尚未出现的 agent", "ap.stop.some": "全部停下（已手动停下 {m}/{n}）",
+    "ap.stop.hold": "按住不放", "ap.stop.hint": "按住半秒才会停下，防止误触。",
+    "ap.stop.done": "已全部停下：所有请求一律被拒，直到有人恢复——包括还没出现过的 agent。这里认识的 {n} 个 agent 也已逐个停下。",
+    "ap.stopped.banner": "已全部停下：任何 agent 的任何请求都会被拒——这里认识的 {n} 个，以及之后才出现或改了名的——直到你在下面点「恢复全部」。它不会自己恢复，重启也不会松。",
+    "ap.blocked.banner": "{m}/{n} 个 agent 被手动停下；红键没有按下——不在这份名单里的 agent 仍在运行。",
+    "ap.stop.note": "有人按了全部停下。只有「恢复全部」（下面，或 `c3s stop-all --resume`）能放开它；点确认帮不上。",
     "ap.drill": "演练 / Test", "ap.drill.none": "现在还没有 agent；按下去也会拒掉之后出现的任何 agent。（演练，什么都没有改变。）",
     "ap.drill.out": "演练：按下去会拒掉所有 agent 的所有请求——这 {n} 个已知的（{list}）以及之后才出现的。现在什么都没有改变。",
-    "ap.resume.open": "解除全部封锁", "ap.resume.word": "解除", "ap.resume.go": "确认解除",
-    "ap.resume.ask": "解除是第二个动作：先点「解除全部封锁」，再输入 {word}，然后确认。故意麻烦。",
-    "ap.resume.done": "已解除全停：请求重新由电路决定；{n} 个已知 agent 的封锁也已放开。",
+    "ap.resume.open": "恢复全部", "ap.resume.word": "解除", "ap.resume.go": "确认恢复",
+    "ap.resume.ask": "恢复要三步：点「恢复全部」，输入 {word}，再确认。故意比停下麻烦。",
+    "ap.resume.done": "已恢复：请求重新由电路决定；{n} 个已知 agent 也已放开。",
     "eff.read": "读取 read", "eff.send": "发出 send", "eff.delete": "删除 delete", "eff.move": "移动 move", "eff.write": "写入 write", "eff.pay": "付款 pay", "eff.exec": "执行 exec",
     "eff.rev": "可逆", "eff.irrev": "不可逆", "eff.unknown": "可逆性未知", "eff.more": "其他字段",
-    "ap.switches": "工具层的其他开关", "ap.switches.sub": "按 agent",
-    "ap.grey": "灰掉的位是这个 agent 的电路都不读取的：面板不会提示一个电路忽略的输入。",
-    "ap.cardputer": "Cardputer 插着并用 REFLEX_CARDPUTER=1 启动后台时：设备菜单 3 是这一页，Enter 就是「确认一次」，b/u 封锁/解封，s 让所有 agent 停下。设备拔掉时，装了心跳规则的停机电路会让所有 agent 停下。",
+    "ap.switches": "手动开关（高级）", "ap.switches.sub": "按 agent",
+    "ap.grey": "灰掉的开关这个 agent 的反射弧不读，按了也没用，所以不给按。",
+    "ap.cardputer": "Cardputer 插着并用 REFLEX_CARDPUTER=1 启动后台时：设备菜单 3 就是这一页，Enter 是「确认这一条」，b/u 停下/恢复该 agent，s 是「全部停下」。设备拔掉时，装了心跳规则的共享停机会让所有 agent 停下。",
     "sw.blocked": "电平，持续到你放下", "sw.confirm": "一次；下一次请求用掉", "sw.irreversible": "标注下一次动作不可逆", "sw.failed": "上报一次失败（钩子会自动）", "sw.heartbeat": "打一次心跳", "sw.confirm_b": "第二个人的钥匙",
     "sw.on": "拉高", "sw.off": "放下", "sw.once": "给一次", "sw.unread": "这个 agent 的电路不读它",
-    "ap.done": "已写 {agent}：{bits}", "ap.noagent": "还没有 agent。",
+    "ap.done": "已写 {agent}：{bits}", "ap.noagent": "还没有 agent 接进来——去「接入」页接一个。",
+    // first run (overview)
+    "first.title": "三步接上你的第一个 agent",
+    "first.lead": "这是你 agent 的反射弧：你写规则，规则编成电路并逐行验证；agent 每一次调用先过它。你拿着确认和停下两把钥匙。",
+    "first.s1": "定规则", "first.s1.d": "从模板挑一个：不能转钱、删文件要人确认、发消息要人确认。", "first.go1": "去定规则",
+    "first.s2": "接上你的模型", "first.s2.d": "Claude Code、任何 MCP 客户端，或 BNBAgent 钱包——选一个，复制一段配置。", "first.go2": "去接入",
+    "first.s3": "看它拒绝一次", "first.s3.d": "在「接入」页发一条探测，第一眼就看见边界在。", "first.go3": "发一条探测",
     // tasks (I-6)
     "tk.lead": "任务是<b>你交给它的一件事</b>，也是你之后按这条线读回来的凭据。任务本身<b>不是权限</b>：它做的每次调用照旧一条一条过电路，该确认的还得你确认。",
     "tk.file": "交一件事", "tk.file.sub": "只有你能交，也只有你能关",
@@ -669,19 +822,20 @@ const T = {
     "tk.filed.ok": "已交：{id}。适配器下一次调用就能带上它。", "tk.closed.ok": "{id} 已关掉：再拿这个编号来的调用会被拒。",
     "tk.need.text": "先写一句：这件事是什么。", "tk.belongs": "属于任务",
     // activity
-    "ac.tester": "发一条请求", "ac.tester.sub": "演示用：这里两栏都是你在按，所以只是演示", "ac.intent": "intent 为高", "ac.send": "发出（1 拍）",
+    "ac.tester": "发一条请求", "ac.tester.sub": "演示用：从这里发出的请求是你替 agent 按的，不算真边界", "ac.intent": "intent 为高", "ac.send": "发出（1 拍）",
     "ac.log": "决策流水", "ac.sub": "最近 {n} 条 · 放行 {g} · 拒绝 {r}", "ac.none": "还没有记录。",
+    "ac.more": "同一个 agent 连续 {n} 条同样的拒绝 · 展开", "ac.more.ok": "同一个 agent 连续 {n} 条同样的放行 · 展开", "ac.less": "收起",
     "f.all": "全部", "f.granted": "放行", "f.refused": "拒绝", "f.tool": "工具层", "f.policy": "规则",
     "v.grant": "放行", "v.refuse": "拒绝", "v.tool": "工具层", "v.policy": "规则", "v.spoof": "冒名", "v.task": "任务", "v.stop": "全停",
     "e.stop.on": "有人按了全部停下：所有 agent 的所有请求一律被拒（当时认识 {n} 个），直到解除。", "e.stop.off": "有人解除了全停：请求重新由电路决定（{n} 个已知 agent 放开）。", "e.stop.from": "来自 {source}",
     "e.task.filed": "你交了一件事", "e.task.closed": "这件事关掉了", "e.task.cap": "上限 {n} 次放行",
     "e.spoof.missing": "这个名字已绑定令牌，请求却没带令牌 —— 没问任何电路就拒了。", "e.spoof.wrong": "这个名字已绑定令牌，请求带的不是它的令牌 —— 没问任何电路就拒了。",
-    "e.tick": "第 {n} 拍", "e.gap": "距上次放行 {n} 拍", "e.why": "拒绝原因（电路原话）：", "e.granted": "每条检查都过，电路输出 grant = 1。",
+    "e.tick": "第 {n} 拍", "e.gap": "距上次放行 {n} 拍", "e.why": "为什么拒绝（反射弧原话）：", "e.granted": "每条检查都过，电路输出 grant = 1。",
     "e.ungated": "这一类没有电路：未设限。", "e.halt.no": "共享停机电路拒绝", "e.halt.ok": "共享停机电路放行",
     "e.chain.ok": "BSC（链 {id}）只读复核一致 · 未部署，无钱包", "e.chain.dis": "BSC（链 {id}）复核不一致：节点算出 grant = {g}", "e.chain.err": "链上复核不可用：{err}（裁决不受影响）",
     "e.tool": "写入 {bits}", "e.policy": "{cls}：{rules}", "e.policy.s": "{nand} NAND + {latch} LATCH · 核对 {rows} 行 · {holds}", "e.policy.none": "{cls}：移除电路，不再设限",
     "l.sending": "已发出，等电路…", "l.neterr": "发不出去：{e}",
-    "tok.prompt": "操作者令牌（安装规则、写 confirm/blocked 需要）。在后台启动日志里，也在 ~/.c3s-circuit-agent/operator-token。只存在这个浏览器里；只随它所守的写操作发出，读取从不带它。",
+    "tok.prompt": "这一步需要你的操作者令牌（确认、停下、改规则都要它，agent 拿不到）。它在后台启动时打印过，也在 ~/.c3s-circuit-agent/operator-token 里。粘贴一次，只存这个浏览器；只随它所守的写操作发出，读取从不带它。",
     // agents
     "ag.title": "接入的 agent", "ag.sub": "每个名字在每张电路上各有一份独立状态；一拍 = 该 agent 的一次请求",
     "ag.none": "还没有任何请求。",
@@ -707,7 +861,7 @@ const T = {
   },
   en: {
     "nav.overview": "Overview", "nav.boundaries": "Boundaries", "nav.approvals": "Approvals", "nav.tasks": "Tasks", "nav.activity": "Activity", "nav.agents": "Agents", "nav.connect": "Connect",
-    "nav.foot": "Ticks are not time.\nFlags are the tool layer's promise.\nOn chain: replayed, never deployed.",
+    "nav.foot": "A tick is a call, not time.\nIrreversible is the tool layer's call.\nOn chain: replayed, never deployed.",
     "title.overview": "Overview", "sub.overview": "", "title.boundaries": "Boundaries", "sub.boundaries": "rules → circuit → every row checked → every rule proven",
     "title.approvals": "Approvals", "sub.approvals": "", "title.tasks": "Tasks", "sub.tasks": "hand it a job; its calls still go through the circuits one at a time", "title.activity": "Activity", "sub.activity": "every decision with the circuit's words and the chain re-check",
     "title.agents": "Agents", "sub.agents": "one name, one state per circuit", "title.connect": "Connect", "sub.connect": "your model, your tools, your chain — the boundary is the same circuit",
@@ -715,80 +869,88 @@ const T = {
     "tok.viewer.badge": "phone view (read + confirm/block)", "tok.viewer.no": "This phone holds a viewer token: it can read, confirm a call shown here, and block — not install rules, stop or resume everything, or unblock. Those happen on the console itself.",
     "tok.viewer.have": "I have the operator token", "tok.viewer.switches": "A phone presses confirm or block only for a call with a code on this screen; these bare switches are the operator's.",
     "chain.off": "chain check off", "chain.idle": "chain check ready (BSC, read-only, nothing deployed)", "chain.ok": "chain check agrees · nothing deployed", "chain.pend": "chain re-check running", "chain.err": "chain node unavailable, local verdict only", "chain.dis": "chain check DISAGREES",
-    "models.n": "{n} model(s) connected", "models.none": "no model connected yet",
-    "honest.line": "Ticks are not time; flags are the tool layer's promise; on chain everything is replayed, nothing deployed.",
+    "models.n": "{n} model(s) connected", "models.none": "no model connected yet · see Connect",
+    "honest.line": "A tick counts calls, not time; which tools count as irreversible is the tool layer's word; on chain everything is replayed, nothing deployed.",
     "cls.spend": "spend", "cls.message": "message", "cls.exec": "exec", "cls.files": "files", "cls.halt": "halt (shared)",
     "cls.spend.what": "transfers, payments, orders, signing", "cls.message.what": "messages, mail, posts", "cls.exec.what": "commands and tools — anything unclassified lands here", "cls.files.what": "write, edit, delete, move files", "cls.halt.what": "ticked first on every request; when it refuses, every class sees blocked",
     "ov.models": "models connected", "ov.models.d": "distinct agent-name prefixes", "ov.models.none": "no requests yet",
-    "ov.circ": "circuits", "ov.circ.unit": "", "ov.circ.ok": "every rule holds · every row checked", "ov.circ.bad": "a rule FAILS", "ov.circ.none": "only exec (default)",
+    "ov.circ": "circuits", "ov.circ.unit": "", "ov.circ.ok": "every row checked · every rule holds", "ov.circ.bad": "a rule FAILS", "ov.circ.none": "only exec (default)",
     "ov.dec": "recent decisions", "ov.dec.d": "last {n} in the log · {g} granted · {r} refused",
-    "ov.pend": "awaiting a person", "ov.pend.d": "a person must press; the model cannot", "ov.pend.none": "nothing waiting",
-    "ov.circuits": "Four circuits", "ov.circuits.sub": "one per class of tool; rows add, not multiply",
+    "ov.pend": "waiting for you", "ov.pend.d": "waiting for your nod; the model cannot press", "ov.pend.none": "nothing waiting",
+    "ov.circuits": "Four reflex arcs", "ov.circuits.sub": "one per kind of tool: spend, message, exec, files",
     "ov.recent": "Recent decisions", "ov.recent.sub": "each with the circuit's words and the chain re-check",
-    "ov.deny": "class denied outright · no circuit grants here", "ov.none": "no circuit yet · not gated · the shared halt still applies", "ov.install": "install one →", "ov.holds": "✓ every rule holds · every row checked", "ov.fails": "✗ a rule FAILS",
-    "ov.halt.on": "Shared halt circuit: {rules} — {nand} NAND + {latch} LATCH · {rows} rows", "ov.halt.off": "No shared halt circuit: blocked is a level, lifted the moment it is lowered.",
-    "ov.rows": "{nand} NAND + {latch} LATCH · {rows} rows",
-    "b.blocks": "Circuit blocks", "b.blocks.sub": "ten rules, and which channel each rests on", "b.templates": "templates",
+    "ov.deny": "class denied outright · no circuit grants here", "ov.none": "No rules yet: this kind of tool is not limited — only Stop everything reaches it.", "ov.install": "Set its rules →", "ov.holds": "✓ every row checked, every rule holds", "ov.fails": "✗ a rule FAILS",
+    "ov.halt.on": "Shared halt circuit: {rules} — {nand} NAND + {latch} LATCH · {rows} rows", "ov.halt.off": "No shared halt installed: stopping one agent by hand (blocked) lifts the moment it is lowered and is not remembered; Stop everything is unaffected — it is a latch. For \"once stopped, stays stopped\" or a heartbeat, install the \"halt + heartbeat\" template.",
+    "ov.rows": "{rows} rows, all checked · {nand} NAND + {latch} LATCH",
+    "b.blocks": "Rules", "b.blocks.sub": "ten of them; a blue tag means the agent can pay its way past, an orange tag means it cannot", "b.templates": "templates",
     "b.tab.hint": "this circuit answers {cls} tools: {what}",
-    "b.denyall": "deny the whole class (no circuit grants here)", "b.denyall.hint": "The only way to say never: a limit of 0 means unlimited, not zero.",
-    "b.install": "Compile and install", "b.reload": "reload what is installed", "b.remove": "remove this circuit",
+    "b.denyall": "Refuse this kind of tool outright", "b.denyall.hint": "Tick this to mean never. In the numbers below, 0 means \"no limit\", not zero times.",
+    "b.install": "Apply", "b.reload": "reload what is installed", "b.remove": "remove this circuit",
     "b.note": "recompiles, rechecks, reproves; every agent's counters for this class reset.", "b.note.deny": "compiles nothing: every request in this class is refused outright.",
     "b.domain": "compiles to {inputs} inputs + {state} state bits · 2^{bits} = {rows} rows to check", "b.domain.warn": "over the 26-bit exhaustive limit; the service will refuse this set.",
-    "b.installing": "compiling…", "b.installed": "Installed for {cls}: {nand} NAND + {latch} LATCH, {rows} rows checked, {holds}, in {ms} ms.", "b.denied": "Set: {cls} denied outright.", "b.removed": "Removed the {cls} circuit: the class is no longer gated.",
+    "b.installing": "compiling…", "b.installed": "Rules for {cls} are live: {rows} rows checked, {holds} ({nand} NAND + {latch} LATCH, {ms} ms).", "b.denied": "Set: {cls} denied outright.", "b.removed": "Removed the {cls} circuit: the class is no longer gated.",
     "b.refused": "Not installed (HTTP {code}): {err}", "b.neterr": "could not send: {e}", "holds": "every rule holds", "fails": "a rule FAILS",
-    "tp.nomoney": "no money out", "tp.nodelete": "no deleting files", "tp.msgconfirm": "every message confirmed", "tp.breaker": "stop after failures", "tp.fly": "fly default", "tp.halt": "halt + heartbeat", "tp.spend": "spend: budget + two keys",
+    "tp.nomoney": "no money out", "tp.nodelete": "no deleting files", "tp.msgconfirm": "every message confirmed", "tp.breaker": "stop after failures", "tp.fly": "fruit-fly reflex (the origin)", "tp.halt": "halt + heartbeat", "tp.spend": "spend: budget + two keys",
     "bd.cost": "cost", "bd.boundary": "boundary", "bd.count": "boundary · counts grants",
-    "r.gap": "minimum gap (ticks)", "r.gap.hint": "At least this many ticks between two grants. 0 = off. Counts grants, reads no input: binds whatever the agent does.",
-    "r.commit": "commitment (ticks)", "r.commit.hint": "A grant needs this many consecutive ticks with intent high first. 0 = off. Rests on <code>intent</code> — the agent writes it, so this is a cost it can always pay.",
-    "r.blocked": "nothing while blocked", "r.blocked.hint": "Rests on <code>blocked</code> — from the tool layer only. Stateless: lowered, it lifts.",
-    "r.max": "total grants", "r.max.hint": "After this many grants nothing more is granted. <b>0 = unlimited</b> (for never, use deny-the-class above).",
-    "r.confirm": "confirmation window (ticks)", "r.confirm.hint": "One <code>confirm</code> authorises the next this-many ticks; 1 = every grant needs a confirm on its own tick. 0 = off. Not for spending: one confirm for many grants is the wrong shape.",
-    "r.sticky": "halt stays until a confirm", "r.sticky.hint": "A tick with <code>blocked</code> high halts the agent; lowering it does not lift the halt, only a <code>confirm</code> does (and that tick grants nothing).",
-    "r.heartbeat": "halt after N ticks without a heartbeat", "r.heartbeat.hint": "This many consecutive ticks with <code>heartbeat</code> low halt the same way, until a confirm. 0 = off.",
-    "r.irrev": "an irreversible action spends its confirm", "r.irrev.hint": "A request with <code>irreversible</code> high is granted only with an unspent <code>confirm</code>, and spends it; reversible requests neither need nor spend one. The hook marks rm, git push, --force… irreversible.",
-    "r.trip": "breaker: N consecutive failures", "r.trip.hint": "This many consecutive ticks with <code>failed</code> high trip it; nothing is granted until a confirm resets it. 0 = off. The PostToolUse hook reports failures.",
-    "r.twokey": "two keys: confirm and confirm_b", "r.twokey.hint": "Every grant needs both keys (arrived, or arriving now) and spends both. Rests on <code>confirm</code> and <code>confirm_b</code> — one per person.",
-    "ev.title": "Evidence for the rules installed", "ev.sub": "compiled · checked row by row · proven by search",
+    "r.gap": "Calls between two grants, at least", "r.gap.hint": "At least this many ticks between two grants. 0 = off. Counts grants, reads no input: binds whatever the agent does.",
+    "r.commit": "Consecutive intents before a grant", "r.commit.hint": "A grant needs this many consecutive ticks with intent high first. 0 = off. Rests on <code>intent</code> — the agent writes it, so this is a cost it can always pay.",
+    "r.blocked": "Nothing while stopped", "r.blocked.hint": "Rests on <code>blocked</code> — from the tool layer only. Stateless: lowered, it lifts.",
+    "r.max": "Total grants allowed", "r.max.hint": "After this many grants nothing more is granted. <b>0 = unlimited</b> (for never, use deny-the-class above).",
+    "r.confirm": "Calls one confirm covers", "r.confirm.hint": "One <code>confirm</code> authorises the next this-many ticks; 1 = every grant needs a confirm on its own tick. 0 = off. Not for spending: one confirm for many grants is the wrong shape.",
+    "r.sticky": "Stays stopped until a person confirms", "r.sticky.hint": "A tick with <code>blocked</code> high halts the agent; lowering it does not lift the halt, only a <code>confirm</code> does (and that tick grants nothing).",
+    "r.heartbeat": "Stop after this many calls without a heartbeat", "r.heartbeat.hint": "This many consecutive ticks with <code>heartbeat</code> low halt the same way, until a confirm. 0 = off.",
+    "r.irrev": "Anything that cannot be undone needs a confirm each time", "r.irrev.hint": "A request with <code>irreversible</code> high is granted only with an unspent <code>confirm</code>, and spends it; reversible requests neither need nor spend one. The hook marks rm, git push, --force… irreversible.",
+    "r.trip": "Stop after this many failures in a row", "r.trip.hint": "This many consecutive ticks with <code>failed</code> high trip the breaker; nothing is granted until a confirm resets it. 0 = off. The PostToolUse hook reports failures.",
+    "r.twokey": "Two people must both confirm", "r.twokey.hint": "Every grant needs both keys (arrived, or arriving now) and spends both. Rests on <code>confirm</code> and <code>confirm_b</code> — one per person.",
+    "ev.title": "Proof for these rules", "ev.sub": "compiled · checked row by row · proven by search",
     "ev.none": "No circuit for this class: not gated. Install one and its evidence appears here.", "ev.deny": "No circuit for this class. Every request is refused outright — nothing to prove, because nothing can grant.",
     "ev.inputs": "inputs the circuit reads:", "ev.inputs.agent": "agent-written", "ev.inputs.tool": "tool layer",
-    "ev.match": "Circuit matches the reference on every row", "ev.match.no": "Circuit DIFFERS from the reference",
+    "ev.proof": "All <b>{rows}</b> rows checked; every rule holds in each of the <b>{reach}</b> reachable states.", "ev.proof.sub": "{nand} NAND + {latch} LATCH · compiled and checked in {ms} ms",
+    "ev.proof.no": "One check did not pass: the rows below say which.",
+    "ev.match": "The circuit agrees with the rules on every row", "ev.match.no": "The circuit DIFFERS from the rules",
     "ev.match.body": "The same rules written again in plain Python, compared with the circuit on all <b>{rows}</b> rows of its domain ({inputs} inputs + {state} state bits = 2^{bits}), output and next state alike.",
-    "ev.holds": "Every rule holds", "ev.holds.no": "A rule FAILS",
-    "ev.holds.body": "From reset, every input in every reachable state: <b>{reach} of {poss}</b> states reachable, <b>{conf}</b> configurations with independent monitors, <b>{proven}</b> rows, violations counted per rule.",
+    "ev.holds": "Every rule holds in every reachable state", "ev.holds.no": "A rule FAILS",
+    "ev.holds.body": "Starting from reset, every input was tried in each of the <b>{reach}</b> reachable states (of {poss} possible), <b>{proven}</b> rows in all, counting violations rule by rule: all zero.",
     "tl.nand": "NAND", "tl.latch": "LATCH", "tl.bytes": "bytes", "tl.depth": "depth", "tl.ms": "compile + checks",
     "ev.viol": "violations:", "viol.rate_limit": "rate limit", "viol.commitment": "commitment", "viol.forbidden": "forbidden", "viol.budget": "budget", "viol.confirm_window": "confirm window", "viol.halted": "halt", "viol.one_shot": "one-shot confirm", "viol.breaker": "breaker", "viol.two_key": "two keys",
     "ev.netlist": "netlist ({bytes} bytes; this is what the chain check is sent)",
     "ev.cross": "An invariant across classes (\"no message within 3 ticks of a payment\") is verified by nothing here.",
-    "ap.lead": "This is the <code>confirm</code> channel. The model cannot reach this page. Listed here are requests the circuit refused for want of one person's nod; a click writes one bit, and the next request reads it.",
-    "ap.pending": "Awaiting a person", "ap.pending.sub": "{n} · in order of arrival", "ap.none": "Nothing waits on a person.",
-    "ap.confirm": "confirm once", "ap.confirm_b": "give the second key", "ap.block": "block this agent",
+    "ap.lead": "These calls are waiting for your nod. The model cannot see or press this page. A confirm covers one call only: the agent must send that exact call again for the reflex arc to grant it, and anything else it sends first does not spend it.",
+    "ap.pending": "Waiting for you", "ap.pending.sub": "{n} · in order of arrival", "ap.none": "Nothing waits on a person.",
+    "ap.confirm": "Confirm this one", "ap.confirm_b": "Give the second key", "ap.block": "Stop this agent",
     "ap.approved": "approved for this call", "ap.approved.note": "The confirm is for the call above only and waits for the agent to send it again; anything else it sends first does not spend it.",
-    "ap.wait.note": "Not something a confirm can fix — only waiting. Listed so you know it is waiting.",
-    "ap.irrev.note": "The tool layer marked this call irreversible; the circuit wants one unspent confirm. A confirm grants this once.",
-    "ap.halt.note": "Halted. One confirm lifts it; the lifting tick itself grants nothing.", "ap.break.note": "Breaker tripped. One confirm resets it.", "ap.win.note": "Needs a confirm on the same tick.", "ap.key.note": "The second key is missing.",
+    "ap.wait.note": "Nothing for you to do here: it is waiting on a cooldown or a limit and will pass when the agent sends again. Listed so you know.",
+    "ap.irrev.note": "This step cannot be undone, so the reflex arc wants your nod first. A confirm grants this one call only; if you do not want it, press nothing — or stop this agent.",
+    "ap.halt.note": "The shared halt stopped it (it was blocked, or went too long without a heartbeat). Confirming only lifts the halt; this call itself needs to be sent again.", "ap.break.note": "It failed too many times in a row, so the reflex arc stopped it. Confirming means \"let it try again\"; if unsure, look in Activity at what failed.", "ap.win.note": "Needs a confirm on the same tick.", "ap.key.note": "This one needs two people. Yours is the first key; the second (confirm_b) is given by the other person on their own screen.",
     "ap.handled": "Recently handled", "ap.handled.none": "Nothing handled yet.", "ap.h.tool": "a person wrote {bits}", "ap.h.then": "then tick {n} {v}",
-    "ap.needs.note": "The circuit wants one bit from a person before it grants this.", "ap.blocked.note": "This agent is blocked: everything it asks is refused. Lift the block first (the switches panel, or \"lift every block\" below) — a confirm cannot help while it stands.",
-    "ap.code": "matching code", "ap.code.hint": "The two digits on the button must be the two digits here — read off the same screen as the request. A chat channel must send them.",
+    "ap.needs.note": "The circuit wants one bit from a person before it grants this.", "ap.blocked.note": "This agent is stopped and everything it asks is refused. A confirm alone does nothing: resume it first — this agent only, with \"lower\" on the blocked switch in Manual switches; every agent, with \"Resume everything\".",
+    "ap.code": "check code", "ap.hint.once": "The two digits on each card are that request's number; the confirm button carries the same two, so if they match you are approving that one. Approving from Telegram means sending those two digits too.",
     "ap.note": "note (optional)", "ap.h.note": "note: {note}",
-    "ap.stop.title": "Stop everything", "ap.stop.sub": "one press refuses every request from every agent, known or not yet seen; getting back needs a second, deliberate action",
-    "ap.stop": "Stop everything", "ap.stop.all": "everything stopped · including agents not seen yet", "ap.stop.some": "Stop everything ({m}/{n} blocked by hand)",
-    "ap.stop.done": "Stopped everything: every request is refused until a person lifts it — including from agents not seen yet. blocked is also high for the {n} known agent(s).",
-    "ap.stopped.banner": "Stop in force: every request from every agent is refused — the {n} known here, and any that appears or renames itself — until a person lifts it below. The latch survives a restart.",
-    "ap.blocked.banner": "{m} of {n} agents are blocked by hand; the stop button is not pressed — an agent not on that list still runs.",
-    "ap.stop.note": "A person pressed stop. Only the resume (below, or `c3s stop-all --resume`) lifts this; a confirm cannot.",
+    "ap.stop.title": "Stop everything", "ap.stop.sub": "hold for half a second and every request from every agent is refused, known or not yet seen; resuming is a separate, deliberate action",
+    "ap.stop": "Stop everything", "ap.stop.all": "everything stopped · including agents not seen yet", "ap.stop.some": "Stop everything ({m}/{n} stopped by hand)",
+    "ap.stop.hold": "Hold to stop", "ap.stop.hint": "Hold for half a second; a tap alone does nothing.",
+    "ap.stop.done": "Stopped everything: every request is refused until a person resumes — including from agents not seen yet. The {n} known agent(s) are also stopped one by one.",
+    "ap.stopped.banner": "Everything is stopped: every request from every agent is refused — the {n} known here, and any that appears or renames itself — until you press \"Resume everything\" below. It does not lift by itself, and it survives a restart.",
+    "ap.blocked.banner": "{m} of {n} agents are stopped by hand; the stop button is not pressed — an agent not on that list still runs.",
+    "ap.stop.note": "A person pressed stop. Only \"Resume everything\" (below, or `c3s stop-all --resume`) lifts this; a confirm cannot.",
     "ap.drill": "Drill / Test", "ap.drill.none": "No agents known yet; pressing it would still refuse any that appears. (A drill: nothing changed.)",
     "ap.drill.out": "Drill: pressing it refuses every request from every agent — these {n} known ({list}) and any that appears later. Nothing has changed.",
-    "ap.resume.open": "lift every block", "ap.resume.word": "RESUME", "ap.resume.go": "confirm lift",
-    "ap.resume.ask": "Lifting is a second action: press \"lift every block\", type {word}, then confirm. Deliberately awkward.",
-    "ap.resume.done": "Lifted the stop: requests are decided by the circuits again, and the {n} known agent(s) are unblocked.",
+    "ap.resume.open": "Resume everything", "ap.resume.word": "RESUME", "ap.resume.go": "Confirm resume",
+    "ap.resume.ask": "Resuming takes three steps: press \"Resume everything\", type {word}, then confirm. Deliberately harder than stopping.",
+    "ap.resume.done": "Resumed: requests are decided by the circuits again, and the {n} known agent(s) are released.",
     "eff.read": "read", "eff.send": "send", "eff.delete": "delete", "eff.move": "move", "eff.write": "write", "eff.pay": "pay", "eff.exec": "exec",
     "eff.rev": "reversible", "eff.irrev": "irreversible", "eff.unknown": "reversibility unknown", "eff.more": "other fields",
-    "ap.switches": "The tool layer's other switches", "ap.switches.sub": "per agent",
-    "ap.grey": "A greyed bit is one none of this agent's circuits read: the panel never suggests an input a circuit ignores.",
-    "ap.cardputer": "With a Cardputer plugged in and the console started with REFLEX_CARDPUTER=1: the device's agent page mirrors this one, Enter is \"confirm once\", b/u block and unblock, s stops every agent. Unplug it and a halt circuit with a heartbeat rule stops every agent.",
+    "ap.switches": "Manual switches (advanced)", "ap.switches.sub": "per agent",
+    "ap.grey": "A greyed switch is one this agent's reflex arc does not read; pressing it would do nothing, so it cannot be pressed.",
+    "ap.cardputer": "With a Cardputer plugged in and the console started with REFLEX_CARDPUTER=1: the device's agent page mirrors this one, Enter is \"Confirm this one\", b/u stop and resume that agent, s is \"Stop everything\". Unplug it and a shared halt with a heartbeat rule stops every agent.",
     "sw.blocked": "a level; stays until lowered", "sw.confirm": "once; spent by the next request", "sw.irreversible": "mark the next action irreversible", "sw.failed": "report one failure (the hook does this)", "sw.heartbeat": "beat once", "sw.confirm_b": "the second person's key",
     "sw.on": "raise", "sw.off": "lower", "sw.once": "give once", "sw.unread": "not read by this agent's circuits",
-    "ap.done": "wrote {agent}: {bits}", "ap.noagent": "No agents yet.",
+    "ap.done": "wrote {agent}: {bits}", "ap.noagent": "No agent has connected yet — go to Connect.",
+    "first.title": "Three steps to your first agent",
+    "first.lead": "This is your agent's reflex arc: you write rules, they compile to a circuit that is checked row by row, and every call the agent makes passes through it first. You hold the confirm and stop keys.",
+    "first.s1": "Set the rules", "first.s1.d": "Pick a template: no money out, deletes need a person, messages need a person.", "first.go1": "Set rules",
+    "first.s2": "Connect your model", "first.s2.d": "Claude Code, any MCP client, or the BNBAgent wallet — pick one and paste one block.", "first.go2": "Connect",
+    "first.s3": "Watch it refuse once", "first.s3.d": "Send a probe from Connect and see the boundary answer.", "first.go3": "Send a probe",
     // tasks (I-6)
     "tk.lead": "A task is <b>one job you hand the agent</b>, and the thread you read it back along afterwards. A task is <b>not an authority</b>: every call it makes still goes through the circuits one at a time, and anything that needs your confirm still needs it.",
     "tk.file": "Hand it a job", "tk.file.sub": "only you can file one, and only you can close one",
@@ -808,19 +970,20 @@ const T = {
     "tk.th.id": "id", "tk.th.text": "the job", "tk.th.spent": "granted/refused", "tk.th.why": "how it closed", "tk.th.at": "closed",
     "tk.filed.ok": "Filed {id}. The adapter can name it on its next call.", "tk.closed.ok": "{id} is closed: a call naming it is refused.",
     "tk.need.text": "Say what the job is, in one line.", "tk.belongs": "part of",
-    "ac.tester": "Send a request", "ac.tester.sub": "for demos: you press both channels here, so it is only a demonstration", "ac.intent": "intent high", "ac.send": "Send (1 tick)",
+    "ac.tester": "Send a request", "ac.tester.sub": "for demos: a request sent from here is you pressing on the agent's behalf, so it proves nothing about the boundary", "ac.intent": "intent high", "ac.send": "Send (1 tick)",
     "ac.log": "Decision log", "ac.sub": "last {n} · {g} granted · {r} refused", "ac.none": "No entries yet.",
+    "ac.more": "{n} identical refusals from the same agent in a row · expand", "ac.more.ok": "{n} identical grants from the same agent in a row · expand", "ac.less": "collapse",
     "f.all": "all", "f.granted": "granted", "f.refused": "refused", "f.tool": "tool layer", "f.policy": "rules",
     "v.grant": "GRANTED", "v.refuse": "REFUSED", "v.tool": "TOOL LAYER", "v.policy": "RULES", "v.spoof": "NOT ITS TOKEN", "v.task": "TASK", "v.stop": "STOP",
     "e.stop.on": "a person pressed stop: every request from every agent is refused ({n} known at the time) until a person resumes.", "e.stop.off": "a person lifted the stop: requests are decided by the circuits again ({n} known agent(s) unblocked).", "e.stop.from": "from {source}",
     "e.task.filed": "you filed a job", "e.task.closed": "the job was closed", "e.task.cap": "a ceiling of {n} grants",
     "e.spoof.missing": "This name is bound to a token and the request sent none — refused before any circuit was asked.", "e.spoof.wrong": "This name is bound to a token and the request sent a different one — refused before any circuit was asked.",
-    "e.tick": "tick {n}", "e.gap": "{n} ticks since the previous grant", "e.why": "refused because (the circuit's own words):", "e.granted": "every check passed; the circuit output grant = 1.",
+    "e.tick": "tick {n}", "e.gap": "{n} ticks since the previous grant", "e.why": "why it was refused (the reflex arc's own words):", "e.granted": "every check passed; the circuit output grant = 1.",
     "e.ungated": "no circuit for this class: not gated.", "e.halt.no": "shared halt circuit refused", "e.halt.ok": "shared halt circuit granted",
     "e.chain.ok": "BSC (chain {id}) read-only re-check agrees · nothing deployed, no wallet", "e.chain.dis": "BSC (chain {id}) DISAGREES: node computed grant = {g}", "e.chain.err": "chain check unavailable: {err} (verdict unaffected)",
     "e.tool": "wrote {bits}", "e.policy": "{cls}: {rules}", "e.policy.s": "{nand} NAND + {latch} LATCH · {rows} rows checked · {holds}", "e.policy.none": "{cls}: circuit removed, no longer gated",
     "l.sending": "sent, waiting for the circuit…", "l.neterr": "could not send: {e}",
-    "tok.prompt": "Operator token (needed to install rules and write confirm/blocked). It is in the console's startup log and in ~/.c3s-circuit-agent/operator-token. Kept in this browser only; sent only with the writes it gates, never on a read.",
+    "tok.prompt": "This needs your operator token (confirming, stopping and changing rules all need it; the agent never has it). It was printed when the console started and is in ~/.c3s-circuit-agent/operator-token. Paste it once; it stays in this browser and goes out only with the writes it gates, never on a read.",
     "ag.title": "Connected agents", "ag.sub": "one independent state per circuit per name; a tick is one request from that agent",
     "ag.none": "No requests yet.",
     "ag.name": "agent", "ag.ticks": "ticks", "ag.by": "per class ticks/grants", "ag.cool": "cooldown", "ag.latch": "latches", "ag.armed": "armed", "ag.seen": "last seen",
@@ -844,7 +1007,7 @@ const T = {
   },
 };
 const HTML_KEYS = new Set(["r.commit.hint", "r.blocked.hint", "r.max.hint", "r.confirm.hint", "r.sticky.hint", "r.heartbeat.hint", "r.irrev.hint", "r.trip.hint", "r.twokey.hint",
-                           "ev.match.body", "ev.holds.body", "ap.lead", "cn.s1", "cn.s2", "cn.s3", "e.tool", "ap.h.tool", "ap.done",
+                           "ev.match.body", "ev.holds.body", "ev.proof", "ev.proof.sub", "ap.lead", "cn.s1", "cn.s2", "cn.s3", "e.tool", "ap.h.tool", "ap.done",
                            "tk.lead", "tk.expects.note", "tk.grants.nothing"]);
 let lang = "zh";
 try { lang = localStorage.getItem("reflex.lang") || (navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en"); } catch (e) { /* storage unavailable */ }
@@ -888,6 +1051,10 @@ function show(v) {
 }
 document.querySelectorAll(".nav-item").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
 window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+// The "no model connected yet · see Connect" dot in the bar is the first thing an empty console
+// shows; it is also the way there.
+$("models").parentElement.style.cursor = "pointer";
+$("models").parentElement.addEventListener("click", () => show("connect"));
 
 // ---------- shared formatting ----------
 const ruleWordsZh = (s) => {
@@ -937,8 +1104,13 @@ const NOTE_FOR = [
 function itemNote(p) {
   const why = p.why || [];
   if (why.some((w) => String(w).startsWith("stopped:"))) return "ap.stop.note";  // the operator-stop latch
+  // The shared halt's own refusal also says "blocked is high" — that is the halt circuit's output,
+  // not a bit a person raised — so it is read before the blocked sentence (audit F6).
+  if (why.some((w) => String(w).startsWith("halted (shared halt circuit)"))) return "ap.halt.note";
   if (why.some((w) => String(w).startsWith("blocked is high"))) return "ap.blocked.note";
-  for (const w of why) for (const [re, key] of NOTE_FOR) if (re.test(w)) return key;
+  // Rule order wins, not line order: a two-key call is also irreversible, and the second key is
+  // what the person needs to know about (audit F2).
+  for (const [re, key] of NOTE_FOR) if (why.some((w) => re.test(String(w)))) return key;
   return p.bit && !p.waiting_on_time ? "ap.needs.note" : "ap.wait.note";
 }
 // The effect (I-1) is the agent's own text: every field goes through esc(), and `kind`
@@ -1033,8 +1205,18 @@ function renderOverview(s, models, pending) {
   }).join("");
   const h = policyOf(HALT);
   $("ov-halt").innerHTML = isLive(h) ? t("ov.halt.on", { rules: esc((lang === "zh" ? ruleWordsZh(h.settings) : h.rules).join("; ")), nand: num(h.circuit.nand), latch: num(h.circuit.latch), rows: num(h.checked.rows) }) : t("ov.halt.off");
-  $("ov-recent").innerHTML = s.transcript.length ? s.transcript.slice(0, 6).map((e) => entryHtml(e, true)).join("") : `<div class="muted">${t("ac.none")}</div>`;
+  $("ov-recent").innerHTML = s.transcript.length ? foldRuns(s.transcript).slice(0, 6).map((g) => runHtml(g, true)).join("") : `<div class="muted">${t("ac.none")}</div>`;
+  bindRuns($("ov-recent"));
   $("ov-classes").querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => { selectClass(b.dataset.cls); show("boundaries"); }));
+  // First run: the three steps, with the ones already done ticked. Hidden once all three are.
+  // "Rules set" = any class other than exec has rules, or exec is no longer the default set.
+  const rulesDone = TOOL_CLASSES.some((c) => { const p = policyOf(c); return !!p && (p.deny_all || c !== "exec" || JSON.stringify(p.rules) !== JSON.stringify(s.default_rules || [])); });
+  const connectDone = models.some((m) => m !== "console" && m !== "probe");
+  const probeDone = s.transcript.some((e) => e.kind === "request" && !e.granted);
+  const first = $("ov-first");
+  first.hidden = rulesDone && connectDone && probeDone;
+  [["rules", rulesDone], ["connect", connectDone], ["probe", probeDone]].forEach(([k, d]) => first.querySelector(`[data-step="${k}"]`).classList.toggle("done", d));
+  first.querySelectorAll("[data-go]").forEach((b) => { b.onclick = () => show(b.dataset.go); });
 }
 
 // -- boundaries --
@@ -1158,7 +1340,9 @@ function renderBoundaries(s) {
   const agentW = c.agent_writable || AGENT_BITS, nIn = (c.inputs || []).length || 4;
   const vrow = (ok, head, headNo, body) => `<div class="verdict-row ${ok ? "ok" : "bad"}"><span class="mark">${ok ? "✓" : "✗"}</span><div><div class="head">${t(ok ? head : headNo)}</div><div class="body">${body}</div></div></div>`;
   const V = k.violations || {};
+  const proven = k.matches_reference && k.every_rule_holds;
   ev.innerHTML = `<div style="display:grid;gap:10px">
+    <div class="proof${proven ? "" : " bad"}"><span class="mark">${proven ? "✓" : "✗"}</span><span>${proven ? t("ev.proof", { rows: num(k.rows), reach: num(k.reachable_states) }) : t("ev.proof.no")}<small>${t("ev.proof.sub", { nand: num(c.nand), latch: num(c.latch), ms: num(p.compiled_in_ms) })}</small></span></div>
     <ul class="words">${words.map((w, i) => `<li><span>${esc(w)}${zh && p.rules[i] ? `<span class="en">${esc(p.rules[i])}</span>` : ""}</span></li>`).join("")}</ul>
     <div class="inputs">${t("ev.inputs")} ${(c.inputs || []).map((n) => `<code class="${agentW.includes(n) ? "c-agent" : "c-tool"}">${esc(n)}</code>`).join(" ")}
       <span class="muted"><i class="sw" style="background:var(--agent)"></i>${t("ev.inputs.agent")}<i class="sw" style="background:var(--tool)"></i>${t("ev.inputs.tool")}</span></div>
@@ -1197,10 +1381,11 @@ function renderApprovals(s) {
       ${p.reason ? `<div class="call">${esc(p.reason)}</div>` : ""}
       <ul class="why">${(p.why || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>
       <div class="note">${t(p.armed ? "ap.approved.note" : itemNote(p))}</div>
-      ${wait || !p.code ? "" : `<div class="note">${t("ap.code.hint")}</div>`}</div><div class="btns">${btns}</div></div>`;
+      </div><div class="btns">${btns}</div></div>`;
   };
   const cards = pending.concat(waiting);
   $("ap-list").innerHTML = cards.length ? cards.map(item).join("") : `<div class="muted">${t("ap.none")}</div>`;
+  $("ap-hint-once").hidden = !pending.some((p) => p.code && !p.armed);  // what the two digits are, said once above the list, not on every card
   $("ap-list").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => {
     const box = b.dataset.note ? $(b.dataset.note) : null;
     arm(b.dataset.agent, b.dataset.arm, 1, b, b.dataset.for, b.dataset.code, box ? box.value : "");
@@ -1220,6 +1405,9 @@ function renderApprovals(s) {
   if (!AP_AGENT || !names.includes(AP_AGENT)) AP_AGENT = pending[0] ? pending[0].agent : names[0] || null;
   sel.innerHTML = names.length ? names.map((n) => `<option value="${esc(n)}"${n === AP_AGENT ? " selected" : ""}>${esc(n)}</option>`).join("") : `<option>${t("ap.noagent")}</option>`;
   sel.disabled = !names.length;
+  // With no agent there is nothing to switch: the card hides the raw bits and says where to go.
+  sel.closest(".card").classList.toggle("agentless", !names.length);
+  if (!names.length) $("ap-msg").innerHTML = `<span class="muted">${t("ap.noagent")}</span>`;
   const a = s.agents.find((x) => x.agent === AP_AGENT), read = readInputs(), armed = (a && a.armed) || {};
   $("ap-toggles").innerHTML = TOOL_BITS.map((bit) => {
     const ok = read.has(bit), lvl = bit === "blocked";
@@ -1378,9 +1566,9 @@ function renderStop(s) {
   ["stop-all", "stop-all-2", "stop-big"].forEach((id) => {
     const b = $(id);
     if (!b) return;
-    b.textContent = label;
+    if (!b.classList.contains("holding")) b.textContent = label;  // mid-hold the button says "hold"; do not talk over it
     b.disabled = stopped || v;  // the stop is already in force: the way back is the resume control
-    b.title = v ? t("tok.viewer.no") : "";
+    b.title = v ? t("tok.viewer.no") : t("ap.stop.hint");
   });
   ["resume-open", "resume-go"].forEach((id) => { if (v) $(id).disabled = true; });
   if (v && !$("ap-stop-msg").dataset.viewer) { $("ap-stop-msg").innerHTML = `<span class="muted">${t("tok.viewer.no")}</span>`; $("ap-stop-msg").dataset.viewer = "1"; }
@@ -1411,9 +1599,39 @@ async function stopAll(stop, note) {
   } catch (err) { $("ap-stop-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
   await refresh();
 }
+// Hold to stop. A press that lasts 600 ms fires; lifting the finger, leaving the button, or
+// moving it more than a few pixels cancels — and when a scroll starts on the dock the browser
+// takes the pointer (pointercancel), so a swipe cannot stop anything. A tap alone does nothing,
+// and a click is not the gesture: no confirm dialog, because a dialog is an obstacle in a hurry
+// and a hold is not. The fill rising across the button (.holding) is the only feedback needed.
+const HOLD_MS = 600, HOLD_SLOP = 8;
 ["stop-all", "stop-all-2", "stop-big"].forEach((id) => {
   const b = $(id);
-  if (b) b.addEventListener("click", () => { show("approvals"); stopAll(true); });  // the banner and the way back are there
+  if (!b) return;
+  let timer = null, label = null, x0 = 0, y0 = 0;
+  const cancel = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    b.classList.remove("holding");
+    if (label !== null) { b.textContent = label; label = null; }
+    b.style.minWidth = "";
+  };
+  const start = (ev) => {
+    if (b.disabled || timer) return;
+    if (ev.type === "pointerdown") { if (ev.button !== 0) return; x0 = ev.clientX; y0 = ev.clientY; }
+    label = b.textContent;
+    b.style.minWidth = `${b.offsetWidth}px`;   // the words change; the button must not shrink out from under the pointer
+    b.textContent = t("ap.stop.hold");
+    b.classList.add("holding");
+    timer = setTimeout(() => { timer = null; cancel(); show("approvals"); stopAll(true); }, HOLD_MS);  // the banner and the way back are there
+  };
+  b.addEventListener("pointerdown", start);
+  b.addEventListener("pointermove", (ev) => { if (timer && Math.hypot(ev.clientX - x0, ev.clientY - y0) > HOLD_SLOP) cancel(); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach((e) => b.addEventListener(e, cancel));
+  b.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); if (!ev.repeat) start(ev); } });
+  b.addEventListener("keyup", cancel);
+  b.addEventListener("blur", cancel);
+  b.addEventListener("click", (ev) => ev.preventDefault());
 });
 // The drill answers "what would this do?" without doing it: the same list of agents the
 // button would write to, computed from the state already on screen. Nothing is sent.
@@ -1455,8 +1673,37 @@ function renderActivity(s) {
     if (FILTER_KIND === "policy") return e.kind === "policy";
     return true;
   });
-  $("ac-log").innerHTML = rows.length ? rows.map((e) => entryHtml(e, false)).join("") : `<div class="muted">${t("ac.none")}</div>`;
+  $("ac-log").innerHTML = rows.length ? foldRuns(rows).map((g) => runHtml(g, false)).join("") : `<div class="muted">${t("ac.none")}</div>`;
+  bindRuns($("ac-log"));
   if (LAST) showLast(LAST);
+}
+// A run of identical decisions — the same agent asking the same class, getting the same verdict
+// for the same words, one after another — is one row and a count. The sixty-first identical
+// refusal tells a person nothing the first did not (audit F5). Folding is display only: every
+// entry is still in the transcript and a click shows them. Open runs are remembered by the
+// first entry's agent and tick, which do not move as new entries arrive.
+const AC_OPEN = new Set();
+const runKey = (e) => (e.kind === "request" && !e.error ? [e.agent, e.class || "exec", e.granted ? 1 : 0, (e.why || []).join("|"), e.task || ""].join(" ") : null);
+function foldRuns(entries) {
+  const out = [];
+  for (const e of entries) {
+    const k = runKey(e), last = out[out.length - 1];
+    if (k && last && last.key === k) last.run.push(e); else out.push({ e, key: k, run: [] });
+  }
+  return out;
+}
+function runHtml(g, compact) {
+  let html = entryHtml(g.e, compact);
+  if (!g.run.length) return html;
+  const id = `${g.e.agent}|${g.e.tick}`, open = AC_OPEN.has(id), n = g.run.length + 1;
+  if (open) html += g.run.map((e) => entryHtml(e, compact)).join("");
+  return html + `<div class="e more"><div class="t"></div><div class="d"><span class="cnt">${num(n)}</span> <button class="link" type="button" data-run="${esc(id)}">${t(open ? "ac.less" : g.e.granted ? "ac.more.ok" : "ac.more", { n: num(n) })}</button></div></div>`;
+}
+function bindRuns(root) {
+  root.querySelectorAll("[data-run]").forEach((b) => b.addEventListener("click", () => {
+    if (AC_OPEN.has(b.dataset.run)) AC_OPEN.delete(b.dataset.run); else AC_OPEN.add(b.dataset.run);
+    if (STATE) render(STATE);
+  }));
 }
 function entryHtml(e, compact) {
   const at = `<div class="t">${clock(e.at)}</div>`;

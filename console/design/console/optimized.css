@@ -25,7 +25,7 @@
   --agent: var(--blue); --tool: var(--amber);
   --ok-rgb: 70,200,120; --bad-rgb: 227,106,82; --tool-rgb: 242,165,65; --agent-rgb: 111,168,220; --dim-rgb: 151,156,163;
   --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #E36A52; --text-fill: #ECE7DC;
-  --on-fill: #121417; --on-bad: #190E0B;
+  --on-fill: #121417; --on-text: #121417; --on-bad: #190E0B;   /* --on-text: the words on a --text-fill button; --on-fill: on the amber/blue ones */
   --focus: var(--amber);
   --shadow: 0 1px 0 rgba(0,0,0,.25);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -40,7 +40,7 @@
     --ok: #1F8A48; --bad: #B8412B; --amber: #9A5E0E; --blue: #2C6BA3;
     --ok-rgb: 31,138,72; --bad-rgb: 184,65,43; --tool-rgb: 200,125,30; --agent-rgb: 44,107,163; --dim-rgb: 75,82,91;
     --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #D9553B; --text-fill: #1B1F24;
-    --on-fill: #121417; --on-bad: #FFF6F3;
+    --on-fill: #121417; --on-text: #F3F1EB; --on-bad: #FFF6F3;
     --focus: #C8761A;
     --shadow: 0 1px 2px rgba(20,20,20,.06);
   }
@@ -53,7 +53,7 @@
   --ok: #1F8A48; --bad: #B8412B; --amber: #9A5E0E; --blue: #2C6BA3;
   --ok-rgb: 31,138,72; --bad-rgb: 184,65,43; --tool-rgb: 200,125,30; --agent-rgb: 44,107,163; --dim-rgb: 75,82,91;
   --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #D9553B; --text-fill: #1B1F24;
-  --on-fill: #121417; --on-bad: #FFF6F3;
+  --on-fill: #121417; --on-text: #F3F1EB; --on-bad: #FFF6F3;
   --focus: #C8761A;
   --shadow: 0 1px 2px rgba(20,20,20,.06);
 }
@@ -65,7 +65,7 @@
   --ok: #46C878; --bad: #E36A52; --amber: #F2A541; --blue: #6FA8DC;
   --ok-rgb: 70,200,120; --bad-rgb: 227,106,82; --tool-rgb: 242,165,65; --agent-rgb: 111,168,220; --dim-rgb: 151,156,163;
   --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #E36A52; --text-fill: #ECE7DC;
-  --on-fill: #121417; --on-bad: #190E0B;
+  --on-fill: #121417; --on-text: #121417; --on-bad: #190E0B;
   --focus: var(--amber);
   --shadow: 0 1px 0 rgba(0,0,0,.25);
 }
@@ -82,9 +82,10 @@ code, .mono { font-family: var(--mono); font-size: 12.5px; }
 .c-agent { color: var(--agent); } .c-tool { color: var(--tool); }
 button { font: inherit; cursor: pointer; color: inherit; }
 button:disabled { opacity: .5; cursor: not-allowed; }
-input, select { background: var(--field); border: 1px solid var(--line); color: var(--text); padding: 6px 8px; font: inherit; font-size: 13px; border-radius: 6px; min-width: 0; }
+input, select, textarea { background: var(--field); border: 1px solid var(--line); color: var(--text); padding: 6px 8px; font: inherit; font-size: 13px; border-radius: 6px; min-width: 0; }
 input[type=number] { font-family: var(--mono); }
-input:focus, select:focus, button:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+textarea { width: 100%; resize: vertical; line-height: 1.5; }   /* the Tasks form's one free-text field */
+input:focus, select:focus, textarea:focus, button:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
 ::placeholder { color: var(--faint); }
 
 /* ---------- shell ---------- */
@@ -149,8 +150,8 @@ section[data-view].on { display: grid; gap: 16px; }
 .pre:hover { color: var(--text); border-color: var(--faint); }
 .pre.tool { border-color: rgba(var(--tool-rgb), .5); color: var(--tool); }
 .pre.on { background: var(--line); color: var(--text); }
-.go { border: 0; border-radius: 8px; padding: 7px 16px; font-weight: 600; color: var(--on-fill); background: var(--text-fill); }
-.go.tool { background: var(--tool-fill); } .go.agent { background: var(--agent-fill); }
+.go { border: 0; border-radius: 8px; padding: 7px 16px; font-weight: 600; color: var(--on-text); background: var(--text-fill); }
+.go.tool { background: var(--tool-fill); color: var(--on-fill); } .go.agent { background: var(--agent-fill); color: var(--on-fill); }
 .danger { border-radius: 8px; padding: 6px 14px; font-weight: 500; color: var(--bad); border: 1px solid rgba(var(--bad-rgb), .5); background: none; }
 .link { background: none; border: 0; color: var(--faint); font-size: 12px; padding: 0; text-decoration: underline dotted; }
 .link:hover { color: var(--text); }
@@ -283,6 +284,7 @@ section[data-view="approvals"] .split.a > div > .card:has(.stopbanner:not([hidde
 .resume input { flex: 1 1 150px; min-height: 44px; font-size: 16px; }
 .resume button { min-height: 44px; }
 .stopdock { display: none; }
+.stopdock .note { text-align: center; font-size: 11px; margin-top: 4px; }   /* "hold for half a second": the dock says it, the desktop button's title does */
 .why { margin: 3px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
 .why li { font-family: var(--mono); font-size: 12px; color: var(--text); display: grid; grid-template-columns: 12px 1fr; gap: 4px; overflow-wrap: anywhere; }
 .why li::before { content: "↳"; color: var(--faint); }
@@ -292,6 +294,7 @@ section[data-view="approvals"] .split.a > div > .card:has(.stopbanner:not([hidde
 .togl .lbl small { color: var(--faint); font-size: 11.5px; }
 .togl button { white-space: nowrap; }
 .handled { display: grid; gap: 6px; }
+#ap-toggles { display: grid; gap: 8px; }   /* was an inline style; it lives here so .agentless can turn it off */
 /* with no agent there is nothing to switch: the panel says so and hides the raw bits (new markup: .agentless on the card) */
 .agentless #ap-toggles, .agentless #ap-agent { display: none; }
 
@@ -390,13 +393,14 @@ tr + tr td { border-top: 1px solid var(--line2); }
   .stopdock { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--nav);
               border-top: 1px solid var(--line); padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
   .stopdock .stopbtn { width: 100%; min-height: 50px; font-size: 16px; }
-  main { padding-bottom: 86px; }
+  main { padding-bottom: 108px; }                /* the dock: 8 + 50 + hint 20 + 8, plus room to breathe */
+  .cnrow input[type=text] { width: 100%; }
   /* the dock is the stop on a phone; the card keeps the banner, the drill and the way back */
   section[data-view="approvals"] .card.warn > .actions > .stopbtn { display: none; }
   .pend .btns button, .pend .btns .notein { width: 100%; font-size: 16px; }
   .pend .btns { flex-direction: column; }
   .pend .btns .notein { font-size: 16px; }
-  input, select { font-size: 16px; min-height: 44px; }
+  input, select, textarea { font-size: 16px; } input, select { min-height: 44px; }
   .nav-item, .pre, .link, .danger, .go, .tab { min-height: 44px; }
   .togl { padding: 8px 10px; }
   .tester input[type=text] { width: 100%; }
