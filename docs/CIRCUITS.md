@@ -247,6 +247,7 @@ python scripts/build_loom_escape.py     # teacher, table, policies, cores, manif
 python scripts/export_components.py
 python scripts/build_minimal_cores.py    # circuits/loom-escape-min/; ABC-dependent bytes
 python scripts/check_properties.py --controls   # P1-P5 both ways, see PROPERTIES.md
+python scripts/run_sensitivity.py        # circuits/loom-escape/sensitivity.json, ~20 min
 python scripts/export_evm_fixtures.py
 cd contracts && forge install foundry-rs/forge-std --no-git && forge test
 ```

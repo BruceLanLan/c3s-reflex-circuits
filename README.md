@@ -168,6 +168,8 @@ python scripts/extract_connectome.py      # L0
 python scripts/build_loom_escape.py       # L1–L3: calibration, table, circuits, cores
 python scripts/build_minimal_cores.py     # smaller cores with the same behaviour
 python scripts/check_properties.py --controls   # temporal properties, two methods
+python scripts/run_sensitivity.py         # how much the three free parameters decide
+python scripts/verify_onchain.py          # a BSC node evaluates the core, nothing deployed
 python scripts/train_dlgn.py --widths 128,128,64
 python scripts/run_controls.py
 python scripts/export_evm_fixtures.py && (cd contracts && forge test)
