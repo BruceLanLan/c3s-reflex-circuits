@@ -185,6 +185,8 @@ class Relay(threading.Thread):
                             text = raw.decode("ascii", "replace").strip()
                             if text.startswith("K|"):
                                 self._key(text)
+                            elif text.startswith(("brain view", "c3s escape core", "digest ")):
+                                self.log(f"cardputer says: {text}")
             except Exception as e:  # unplugged, reset, port busy (e.g. while flashing)
                 if self.connected:
                     self.log(f"cardputer: lost the device ({e}); retrying")
