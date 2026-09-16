@@ -216,11 +216,11 @@ class Boundary:
     def agent(self, name: str) -> dict:
         return self.agents.setdefault(
             name,
-            {"ticks": 0, "armed": {bit: 0 for bit in MUST_COME_FROM_THE_TOOL_LAYER},
+            {"ticks": 0, "armed": {bit: 0 for bit in MUST_COME_FROM_THE_TOOL_LAYER}, "bound": {},
              "classes": {c: _fresh_class_state() for c in CLASSES}},
         )
 
-    def arm(self, name: str, bits: dict) -> dict:
+    def arm(self, name: str, bits: dict, bind_to: str | None = None) -> dict:
         """The tool layer's bits, held until the agent's next request reads them. Bits no
         installed policy reads are stored all the same: they describe the agent, and a
         later policy may read them. Armed bits are per agent, shared by its classes."""
@@ -231,11 +231,20 @@ class Boundary:
             a = self.agent(name)
             for bit, value in bits.items():
                 a["armed"][bit] = int(bool(value))
+                # A person confirms *that* call, not whatever comes next: a confirm bound to
+                # a request's reason is delivered only to a request with the same reason, and
+                # waits, unspent, while other calls tick past it.
+                if bit in ("confirm", "confirm_b"):
+                    if value and bind_to:
+                        a["bound"][bit] = bind_to
+                    else:
+                        a["bound"].pop(bit, None)
             entry = {
                 "at": time.time(),
                 "kind": "tool",
                 "agent": name,
                 "armed": dict(a["armed"]),
+                "bound": dict(a["bound"]),
                 "blocked": a["armed"]["blocked"],
                 "confirm": a["armed"]["confirm"],
             }
@@ -282,6 +291,13 @@ class Boundary:
             # heartbeat rule stops them all when it is unplugged or goes quiet.
             if self.heartbeat_source is not None and self.heartbeat_source():
                 armed["heartbeat"] = 1
+            # A bound confirm is not this call's: this tick reads it as absent and leaves it armed.
+            held = {bit: armed[bit] for bit, reason_for in a["bound"].items() if armed[bit] and reason_for != reason}
+            for bit in held:
+                armed[bit] = 0
+            for bit in a["bound"].keys() - held.keys():
+                if armed[bit]:
+                    a["bound"].pop(bit, None)  # delivered to its call; spent below with the rest
             decisive: dict[str, tuple] = {}
 
             halt_entry = None
@@ -315,6 +331,7 @@ class Boundary:
 
             for bit in CONSUMED_BY_A_TICK:
                 armed[bit] = 0
+            armed.update(held)
             entry = {
                 "at": time.time(),
                 "kind": "request",
@@ -376,6 +393,7 @@ class Boundary:
                         "counters": flat["counters"],
                         "by_class": by_class,
                         "armed": dict(a["armed"]),
+                        "bound": dict(a["bound"]),
                         "armed_blocked": a["armed"]["blocked"],
                         "armed_confirm": a["armed"]["confirm"],
                     }
@@ -487,6 +505,30 @@ def class_from(payload: dict, allowed: tuple[str, ...]) -> str:
     return cls
 
 
+CHAIN_WAIT_S = float(os.environ.get("CHAIN_WAIT_S", "1.5"))
+
+
+def chain_check(entry: dict, decisive: dict, cls: str) -> None:
+    """Re-evaluate the rows that decided, read-only on a public node, and record the result
+    in the transcript entry itself (the same dict the transcript holds)."""
+    circuits, agrees_all, error = {}, True, None
+    for label, (inputs, state, grant, next_state, netlist, n_in, state_bits) in decisive.items():
+        try:
+            got, got_state = CHAIN.evaluate(netlist, n_in, 1, state_bits, inputs, state)
+            ok = (got, got_state) == (grant, next_state)
+            circuits[label] = {"grant": got, "agrees": ok}
+            agrees_all = agrees_all and ok
+        except Exception as e:
+            error = str(e)[:120]
+            break
+    if error is not None:
+        entry["chain"] = {"error": error}
+    else:
+        decided = circuits.get(cls) or circuits.get(HALT) or {}
+        entry["chain"] = {"chain_id": CHAIN.chain(), "grant": decided.get("grant"), "agrees": agrees_all,
+                          "circuits": circuits, "deployed": False}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "reflex-console"
 
@@ -591,9 +633,10 @@ class Handler(BaseHTTPRequestHandler):
             TRANSCRIPTS.appendleft(note)
             self._json(200, summary)
         elif self.path == "/api/tool":
-            bits = {k: v for k, v in payload.items() if k != "agent"}
+            bits = {k: v for k, v in payload.items() if k not in ("agent", "for_reason")}
+            bind_to = payload.get("for_reason")
             try:
-                self._json(200, BOUNDARY.arm(name, bits))
+                self._json(200, BOUNDARY.arm(name, bits, str(bind_to)[:160] if bind_to else None))
             except ValueError as e:
                 self._json(400, {"error": str(e)})
         elif self.path == "/api/request":
@@ -605,27 +648,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             decisive = entry.pop("_decisive", None) or {}
             if CHAIN is not None and decisive:
-                circuits, agrees_all, error = {}, True, None
-                for label, (inputs, state, grant, next_state, netlist, n_in, state_bits) in decisive.items():
-                    try:
-                        got, got_state = CHAIN.evaluate(netlist, n_in, 1, state_bits, inputs, state)
-                        ok = (got, got_state) == (grant, next_state)
-                        circuits[label] = {"grant": got, "agrees": ok}
-                        agrees_all = agrees_all and ok
-                    except Exception as e:
-                        error = str(e)[:120]
-                        break
-                if error is not None:
-                    entry["chain"] = {"error": error}
-                else:
-                    decided = circuits.get(cls) or circuits.get(HALT) or {}
-                    entry["chain"] = {
-                        "chain_id": CHAIN.chain(),
-                        "grant": decided.get("grant"),
-                        "agrees": agrees_all,
-                        "circuits": circuits,
-                        "deployed": False,
-                    }
+                # The second opinion never holds up the decision: wait briefly so a quick
+                # node's answer comes back in this response, and otherwise let it land in
+                # the transcript entry when the node gets there.
+                entry["chain"] = {"pending": True, "deployed": False}
+                worker = threading.Thread(target=chain_check, args=(entry, decisive, cls), daemon=True)
+                worker.start()
+                worker.join(CHAIN_WAIT_S)
             self._json(200, entry)
         else:
             self._json(404, {"error": "no such path"})

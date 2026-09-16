@@ -32,7 +32,7 @@ def test_frame_carries_the_blocked_count_and_closes_with_the_item_count(boundary
     lines, shown = frame(boundary.status())
     s = lines[0].split("|")
     assert s[0] == "S" and len(s) == 6 and s[5] == "1"
-    assert lines[-1] == "E|0" and shown == set()
+    assert lines[-1] == "E|0" and shown == []
 
 
 def test_stop_all_blocks_every_known_agent_and_resume_all_lifts_it(boundary):
@@ -56,7 +56,7 @@ def test_a_confirm_for_an_agent_not_on_the_screen_is_ignored(boundary):
     boundary.request("hidden", 1, "ls", "files")
     r = relay_for(boundary)
     _, r.shown = frame(boundary.status())
-    assert r.shown == {"shown"}
+    assert [it["agent"] for it in r.shown] == ["shown"]
     r._key("K|confirm|hidden")
     r._key("K|confirm|shown")
     armed = {a["agent"]: a["armed"] for a in boundary.status()["agents"]}
@@ -96,3 +96,39 @@ def test_present_needs_a_connection_and_a_fresh_beat(boundary):
     assert r.present()
     r.heard_at -= Relay.HEARTBEAT_FRESH_S + 1
     assert not r.present()
+
+
+def test_a_confirm_is_for_the_call_a_person_saw_not_the_next_one(boundary):
+    """The mailbox run found it: confirming 'reply to Lena' must not let a trash through.
+    A confirm bound to one reason waits, unspent, while other calls tick past it."""
+    for cls in ("message", "files"):
+        boundary.install(cls, Policy(confirm_per_irreversible=True, forbid_when_blocked=True))
+    reply, trash = "[message] reply_email [irreversible]: id=m1", "[files] trash_email [irreversible]: id=m3"
+    boundary.arm("mail", {"irreversible": 1})
+    assert not boundary.request("mail", 1, reply, "message")["granted"]
+    boundary.arm("mail", {"confirm": 1}, bind_to=reply)
+    boundary.arm("mail", {"irreversible": 1})
+    first = boundary.request("mail", 1, trash, "files")
+    assert not first["granted"] and first["why"][0].startswith("irreversible")
+    agent = next(a for a in boundary.status()["agents"] if a["agent"] == "mail")
+    assert agent["armed"]["confirm"] == 1 and agent["bound"]["confirm"] == reply  # still waiting for its call
+    boundary.arm("mail", {"irreversible": 1})
+    assert boundary.request("mail", 1, reply, "message")["granted"]
+    agent = next(a for a in boundary.status()["agents"] if a["agent"] == "mail")
+    assert agent["armed"]["confirm"] == 0 and agent["bound"] == {}
+    boundary.arm("mail", {"irreversible": 1})
+    assert not boundary.request("mail", 1, reply, "message")["granted"]  # spent
+
+
+def test_a_device_confirm_binds_to_the_item_it_had_selected(boundary):
+    boundary.install("files", Policy(confirm_per_irreversible=True, forbid_when_blocked=True))
+    boundary.install("message", Policy(confirm_per_irreversible=True, forbid_when_blocked=True))
+    for reason, cls in (("[files] trash_email [irreversible]: id=m3", "files"), ("[message] reply_email [irreversible]: id=m1", "message")):
+        boundary.arm("mail", {"irreversible": 1})
+        boundary.request("mail", 1, reason, cls)
+    r = relay_for(boundary)
+    _, r.shown = frame(boundary.status())
+    idx = next(i for i, it in enumerate(r.shown) if it["class"] == "files")
+    r._key(f"K|confirm|mail|{idx}")
+    agent = next(a for a in boundary.status()["agents"] if a["agent"] == "mail")
+    assert agent["bound"]["confirm"] == "[files] trash_email [irreversible]: id=m3"

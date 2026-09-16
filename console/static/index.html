@@ -363,7 +363,7 @@ const T = {
     "title.approvals": "待确认", "sub.approvals": "", "title.activity": "流水", "sub.activity": "每条决策都带电路原话与链上复算",
     "title.agents": "Agents", "sub.agents": "一个名字，四张电路各一份状态", "title.connect": "接入", "sub.connect": "你的模型、你的工具、你的链——边界都在同一张电路上",
     "svc.ok": "服务已连接", "svc.bad": "服务无响应", "svc.wait": "连接中…",
-    "chain.off": "链上复核已关闭", "chain.idle": "链上复核就绪（BSC 只读，未部署）", "chain.ok": "链上复核一致 · 未部署", "chain.err": "链上节点不可用，仅本地裁决", "chain.dis": "链上复核不一致！",
+    "chain.off": "链上复核已关闭", "chain.idle": "链上复核就绪（BSC 只读，未部署）", "chain.ok": "链上复核一致 · 未部署", "chain.pend": "链上复核进行中", "chain.err": "链上节点不可用，仅本地裁决", "chain.dis": "链上复核不一致！",
     "models.n": "{n} 个模型已接入", "models.none": "还没有模型接入",
     "honest.line": "拍不是时间；标志位是工具层的承诺；链上只复算、不部署。",
     "cls.spend": "花钱", "cls.message": "发消息", "cls.exec": "执行", "cls.files": "文件", "cls.halt": "停机（共享）",
@@ -465,7 +465,7 @@ const T = {
     "title.approvals": "Approvals", "sub.approvals": "", "title.activity": "Activity", "sub.activity": "every decision with the circuit's words and the chain re-check",
     "title.agents": "Agents", "sub.agents": "one name, one state per circuit", "title.connect": "Connect", "sub.connect": "your model, your tools, your chain — the boundary is the same circuit",
     "svc.ok": "service connected", "svc.bad": "service not responding", "svc.wait": "connecting…",
-    "chain.off": "chain check off", "chain.idle": "chain check ready (BSC, read-only, nothing deployed)", "chain.ok": "chain check agrees · nothing deployed", "chain.err": "chain node unavailable, local verdict only", "chain.dis": "chain check DISAGREES",
+    "chain.off": "chain check off", "chain.idle": "chain check ready (BSC, read-only, nothing deployed)", "chain.ok": "chain check agrees · nothing deployed", "chain.pend": "chain re-check running", "chain.err": "chain node unavailable, local verdict only", "chain.dis": "chain check DISAGREES",
     "models.n": "{n} model(s) connected", "models.none": "no model connected yet",
     "honest.line": "Ticks are not time; flags are the tool layer's promise; on chain everything is replayed, nothing deployed.",
     "cls.spend": "spend", "cls.message": "message", "cls.exec": "exec", "cls.files": "files", "cls.halt": "halt (shared)",
@@ -663,6 +663,7 @@ function chainStatus(s) {
   if (!s.chain || !s.chain.enabled) return ["", "chain.off"];
   const e = s.transcript.find((x) => x.kind === "request" && x.chain);
   if (!e) return ["", "chain.idle"];
+  if (e.chain.pending) return ["", "chain.pend"];
   if (e.chain.error) return ["amber", "chain.err"];
   return e.chain.agrees ? ["ok", "chain.ok"] : ["bad", "chain.dis"];
 }
@@ -856,7 +857,7 @@ function renderApprovals(s) {
     const e = x.e;
     const btns = wait
       ? `<button class="go tool" type="button" disabled>${t("ap.confirm")}</button><button class="danger" type="button" disabled>${t("ap.block")}</button>`
-      : `<button class="go tool" type="button" data-arm="${esc(x.bit)}" data-agent="${esc(e.agent)}">${t(x.bit === "confirm_b" ? "ap.confirm_b" : "ap.confirm")}</button><button class="danger" type="button" data-arm="blocked" data-agent="${esc(e.agent)}">${t("ap.block")}</button>`;
+      : `<button class="go tool" type="button" data-arm="${esc(x.bit)}" data-agent="${esc(e.agent)}" data-for="${esc(e.reason || "")}">${t(x.bit === "confirm_b" ? "ap.confirm_b" : "ap.confirm")}</button><button class="danger" type="button" data-arm="blocked" data-agent="${esc(e.agent)}">${t("ap.block")}</button>`;
     return `<div class="pend${wait ? " wait" : ""}"><div style="display:grid;gap:4px;min-width:0">
       <div class="who"><b>${esc(e.agent)}</b>${chipFor(e.class || "exec")}<span class="mono muted">tick ${num(e.tick)} · ${clock(e.at)}</span></div>
       ${e.reason ? `<div class="call">${esc(e.reason)}</div>` : ""}
@@ -864,7 +865,7 @@ function renderApprovals(s) {
       <div class="note">${t(wait ? "ap.wait.note" : x.note)}</div></div><div class="btns">${btns}</div></div>`;
   };
   $("ap-list").innerHTML = (pending.length + waiting.length) ? pending.map((x) => item(x, false)).join("") + waiting.map((x) => item(x, true)).join("") : `<div class="muted">${t("ap.none")}</div>`;
-  $("ap-list").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => arm(b.dataset.agent, b.dataset.arm, 1, b)));
+  $("ap-list").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => arm(b.dataset.agent, b.dataset.arm, 1, b, b.dataset.for)));
   // recently handled: tool-layer writes, with what the next request of that agent did
   const tr = s.transcript, handled = [];
   tr.forEach((e, i) => {
@@ -872,7 +873,7 @@ function renderApprovals(s) {
     const written = TOOL_BITS.filter((n) => N((e.armed || {})[n]));
     let then = null;
     for (let j = i - 1; j >= 0; j--) if (tr[j].kind === "request" && tr[j].agent === e.agent) { then = tr[j]; break; }
-    handled.push(`<div class="e tool"><div class="t">${clock(e.at)}</div><div><div class="h"><span class="agent">${esc(e.agent)}</span><span class="bits">${t("ap.h.tool", { bits: written.length ? written.map(esc).join(", ") : "—" })}</span>${then ? `<span class="chain ${then.granted ? "ok" : "muted"}">${t("ap.h.then", { n: num(then.tick), v: t(then.granted ? "v.grant" : "v.refuse") })}${then.chain && !then.chain.error ? (then.chain.agrees ? " · chain ✓" : " · chain ✗") : ""}</span>` : ""}</div></div></div>`);
+    handled.push(`<div class="e tool"><div class="t">${clock(e.at)}</div><div><div class="h"><span class="agent">${esc(e.agent)}</span><span class="bits">${t("ap.h.tool", { bits: written.length ? written.map(esc).join(", ") : "—" })}</span>${then ? `<span class="chain ${then.granted ? "ok" : "muted"}">${t("ap.h.then", { n: num(then.tick), v: t(then.granted ? "v.grant" : "v.refuse") })}${then.chain && !then.chain.error && !then.chain.pending ? (then.chain.agrees ? " · chain ✓" : " · chain ✗") : ""}</span>` : ""}</div></div></div>`);
   });
   $("ap-handled").innerHTML = handled.length ? handled.join("") : `<div class="muted">${t("ap.handled.none")}</div>`;
   // switches per agent
@@ -891,11 +892,15 @@ function renderApprovals(s) {
   $("ap-toggles").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => arm(AP_AGENT, b.dataset.arm, N(b.dataset.v), b)));
 }
 $("ap-agent").addEventListener("change", () => { AP_AGENT = $("ap-agent").value; if (STATE) renderApprovals(STATE); });
-async function arm(agent, bit, v, btn) {
+async function arm(agent, bit, v, btn, forReason) {
   if (!agent) return;
   if (btn) btn.disabled = true;
   try {
-    const d = await post("/api/tool", { agent, [bit]: v });
+    // A confirm from a pending item is for that exact call; the console holds it for the
+    // request with the same reason and lets other calls tick past it.
+    const body = { agent, [bit]: v };
+    if (forReason && (bit === "confirm" || bit === "confirm_b")) body.for_reason = forReason;
+    const d = await post("/api/tool", body);
     $("ap-msg").innerHTML = d.error ? `<span class="bad">${esc(d.error)}</span>` : `<span class="c-tool">${t("ap.done", { agent: esc(agent), bits: armedHtml(d.armed || {}, shownBits(d.armed)) })}</span>`;
   } catch (err) { $("ap-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
   await refresh();
@@ -941,7 +946,7 @@ function entryHtml(e, compact) {
   const inp = e.inputs || { request: 1, intent: e.intent, blocked: e.blocked, confirm: e.confirm };
   const bits = `intent ${N(inp.intent)} · ` + bitsHtml(inp, Object.keys(inp).filter((n) => n !== "request" && n !== "intent"));
   let chain = "";
-  if (e.chain) chain = e.chain.error ? `<span class="chain amber" title="${esc(e.chain.error)}">chain ?</span>` : e.chain.agrees ? `<span class="chain ok">chain ✓</span>` : `<span class="chain bad">chain ✗ grant=${N(e.chain.grant)}</span>`;
+  if (e.chain) chain = e.chain.pending ? `<span class="chain muted">chain …</span>` : e.chain.error ? `<span class="chain amber" title="${esc(e.chain.error)}">chain ?</span>` : e.chain.agrees ? `<span class="chain ok">chain ✓</span>` : `<span class="chain bad">chain ✗ grant=${N(e.chain.grant)}</span>`;
   let body = "";
   if (!compact) {
     const lines = [`<b>${t("e.tick", { n: num(e.tick) })}</b>`];
@@ -951,7 +956,7 @@ function entryHtml(e, compact) {
     if (ok) lines.push(t("e.granted"));
     body = `<div class="d">${lines.join(" · ")}</div>`;
     if (!ok && (e.why || []).length) body += `<div class="d">${t("e.why")}</div><ul class="why">${e.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>`;
-    if (e.chain) body += `<div class="d">${e.chain.error ? `<span class="amber">${t("e.chain.err", { err: esc(e.chain.error) })}</span>` : e.chain.agrees ? `<span class="ok">${t("e.chain.ok", { id: N(e.chain.chain_id) })}</span>` : `<span class="bad">${t("e.chain.dis", { id: N(e.chain.chain_id), g: N(e.chain.grant) })}</span>`}</div>`;
+    if (e.chain && !e.chain.pending) body += `<div class="d">${e.chain.error ? `<span class="amber">${t("e.chain.err", { err: esc(e.chain.error) })}</span>` : e.chain.agrees ? `<span class="ok">${t("e.chain.ok", { id: N(e.chain.chain_id) })}</span>` : `<span class="bad">${t("e.chain.dis", { id: N(e.chain.chain_id), g: N(e.chain.grant) })}</span>`}</div>`;
   } else {
     if (e.reason) body = `<div class="d">${esc(e.reason)}</div>`;
     if (!ok && (e.why || []).length) body += `<ul class="why"><li>${esc(e.why.join("; "))}</li></ul>`;

@@ -59,9 +59,9 @@ def test_an_agent_chat_can_ask_but_not_confirm_or_stop(sent):
 def test_a_person_sees_what_waits_and_confirms_it(sent):
     name = waiting_agent()
     bot.handle("person-chat", "/pending")
-    assert name in sent[-1][1] and "irreversible" in sent[-1][1] and f"/confirm {name}" in sent[-1][1]
+    assert name in sent[-1][1] and "irreversible" in sent[-1][1] and "call: rm" in sent[-1][1]
     bot.handle("person-chat", f"/confirm {name}")
-    assert "confirm written" in sent[-1][1]
+    assert "confirm written" in sent[-1][1] and "for this call only" in sent[-1][1]
     bot.call("/api/tool", {"agent": name, "irreversible": 1})
     assert bot.call("/api/request", {"agent": name, "intent": 1, "reason": "rm", "class": "files"})["granted"]
 
