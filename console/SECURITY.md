@@ -16,8 +16,11 @@ is the deployment that actually has that property.
 
 **Who the adversary is.** A capable agent — a language model with tools — running on your
 machine, under your user, with a shell. Not a remote attacker: nothing here is exposed to
-the internet, the console binds `127.0.0.1` and refuses any request whose `Host` is not
-its own. The agent is not assumed malicious; it is assumed *optimising*, which in practice
+the internet, and the console refuses any request whose `Host` is not one of its own names.
+It binds `127.0.0.1` by default — but `CONSOLE_HOST=0.0.0.0` is a real posture (it is what
+the pairing QR needs, and it is what the development console on this machine runs with),
+and then everyone on the Wi-Fi can open a socket to it. That is what the shared-network
+rule below is for, and why it is not optional. The agent is not assumed malicious; it is assumed *optimising*, which in practice
 looks the same when the shortest path to its goal runs through the guard.
 
 **What we are protecting.** Actions that cannot be taken back: money moved, a message
