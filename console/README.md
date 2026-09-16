@@ -52,9 +52,9 @@ tick 4   files   rm -rf ./build     refused — irreversible, and no unspent con
 
 Tick 2 is the model rewording its retry; the approval did not follow it, and the reply
 named the call it was waiting for. Tick 4 is the point: the approval was spent by the one
-call a person read and approved. It did not become a standing permission. Every one of
-those replies also carried `"chain": {"chain_id": 56, "agrees": true, "deployed": false}` —
-a public BNB Smart Chain node evaluated the same netlist and reached the same verdict.
+call a person read and approved. It did not become a standing permission. The refusal at
+tick 2 also carried `"chain": {"chain_id": 56, "agrees": true, "deployed": false}` — a
+public BNB Smart Chain node evaluated the same netlist and reached the same verdict.
 
 ## The one idea worth taking away
 
