@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LoomEscape Handheld</title>
-<meta name="description" content="The Cardputer ADV firmware of a fruit-fly escape reflex circuit, simulated in the browser: the firmware's own C evaluator compiled to WebAssembly runs 173 NAND gates and 6 latches tick by tick.">
+<title>C3S Circuit Agent</title>
+<meta name="description" content="C3S Circuit Agent: an agent whose actions pass through a circuit you wrote — rules compiled to NAND gates, checked on every row, proven over every reachable state, replayable read-only on BNB Smart Chain. The first circuit, a fruit fly's escape reflex, runs here in the browser.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2315181C'/%3E%3Crect x='3' y='4' width='10' height='6' fill='%23F2A541'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,6 +30,7 @@
     --display: "Silkscreen", ui-monospace, "SFMono-Regular", Menlo, monospace;
     --ui: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Noto Sans SC", sans-serif;
     --mono: "Martian Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    --gutter: clamp(16px, 4vw, 40px);
   }
   * { box-sizing: border-box; }
   body {
@@ -45,7 +46,114 @@
   :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
   a { color: var(--amber); }
 
-  .app { display: grid; grid-template-columns: minmax(0, 1fr) 400px; min-height: 100vh; min-height: 100dvh; }
+  /* ---------- product home ---------- */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding-block: 14px;
+    padding-inline: var(--gutter);
+    border-bottom: 1px solid var(--line);
+  }
+  .topnav { display: flex; align-items: center; gap: 18px; min-width: 0; }
+  .topnav a { color: var(--dim); text-decoration: none; font-size: 13px; white-space: nowrap; }
+  .topnav a:hover { color: var(--paper); }
+  .wrap { max-width: 1180px; margin-inline: auto; padding-inline: var(--gutter); }
+  .hero { padding-block: clamp(36px, 7vw, 76px) clamp(28px, 5vw, 48px); }
+  .eyebrow { margin: 0 0 14px; font-family: var(--display); font-size: 12px; letter-spacing: 0.08em; color: var(--amber); }
+  .hero h1 {
+    margin: 0 0 16px;
+    max-width: 22ch;
+    font-size: clamp(30px, 5.2vw, 56px);
+    line-height: 1.06;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+  .pitch { margin: 0 0 18px; max-width: 62ch; font-size: clamp(16px, 1.9vw, 19px); color: #CFCAC0; text-wrap: pretty; }
+  .provenance {
+    margin: 0;
+    max-width: 72ch;
+    padding-left: 12px;
+    border-left: 2px solid var(--gf);
+    color: var(--dim);
+    font-size: 13.5px;
+    text-wrap: pretty;
+  }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  .btn {
+    display: inline-block;
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    background: var(--rail-raised);
+    color: var(--paper);
+    text-decoration: none;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .btn.primary { background: var(--amber); border-color: #C9852F; color: var(--ink); font-weight: 600; }
+  .band { padding-block: 30px; border-top: 1px solid var(--line); }
+  .band-head { display: grid; gap: 4px; margin-bottom: 18px; }
+  .band-head p { margin: 0; color: var(--dim); max-width: 70ch; }
+  .band h2, .panel-head h2 { font-size: 12px; }
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 12px;
+  }
+  .step {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    padding: 16px;
+    background: var(--rail-raised);
+    border: 1px solid var(--line);
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+  .step-n { font-family: var(--display); font-size: 12px; color: var(--amber); }
+  .step h3 { margin: 0; font-size: 16px; font-weight: 600; }
+  .step p { margin: 0; color: var(--dim); font-size: 13px; text-wrap: pretty; }
+  .step .figure { font-family: var(--mono); font-size: 11.5px; color: var(--paper); line-height: 1.6; }
+  .limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 12px; }
+  .limit-col { padding: 16px; border: 1px solid var(--line); min-width: 0; }
+  .limit-col h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+  .limit-col .checks { gap: 10px; }
+  .limit-col .checks span { color: #CFCAC0; }
+
+  .tabs-band { border-top: 1px solid var(--line); }
+  .tabs-scroll { overflow-x: auto; border-bottom: 1px solid var(--line); }
+  .tabs { display: flex; gap: 2px; padding-inline: var(--gutter); max-width: 1180px; margin-inline: auto; }
+  .tabs button {
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    padding: 12px 12px 10px;
+    color: var(--dim);
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 14px;
+  }
+  .tabs button[aria-selected="true"] { color: var(--paper); border-bottom-color: var(--amber); }
+  .tabs button:hover { color: var(--paper); }
+
+  .panel-3d, .panel-chain { padding-block: 28px 36px; }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .panel-lede { margin: 0 0 14px; color: var(--dim); max-width: 78ch; text-wrap: pretty; }
+  .stage-note { margin: 12px 0 0; color: var(--dim); font-size: 12.5px; max-width: 78ch; }
+  .chain-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 28px; }
+  .chain-grid > * { min-width: 0; }
+  .aside-card { padding: 16px; border: 1px solid var(--line); background: var(--rail-raised); display: grid; gap: 8px; align-content: start; }
+  .aside-card p { margin: 0; color: var(--dim); font-size: 13px; }
+
+  .site-foot { border-top: 1px solid var(--line); padding-block: 22px 30px; color: var(--faint); font-size: 12.5px; display: grid; gap: 4px; }
+  .site-foot a { color: var(--dim); }
+
+  .app { display: grid; grid-template-columns: minmax(0, 1fr) 400px; }
 
   /* ---------- bench ---------- */
   .bench {
@@ -119,12 +227,15 @@
   .bench-facts b { color: #33383E; font-weight: 600; }
   .bench h2 { color: #6A7078; }  /* the rail's heading colour is tuned for its dark background */
   .bench-log { width: 100%; max-width: 780px; min-width: 0; margin-top: 20px; }
-  .bench-wiring { width: 100%; max-width: 780px; min-width: 0; margin-top: 22px; }
   #wiring { display: block; width: 100%; max-width: 100%; min-width: 0; height: auto; aspect-ratio: 13 / 5;
             background: #0C0E12; border: 1px solid var(--line); }
-  @media (max-width: 560px) { #wiring { aspect-ratio: 5 / 4; } }  /* 13:5 is only 142 px tall on a phone */
+  #wiring.cells { aspect-ratio: 16 / 10; }
+  @media (max-width: 560px) {
+    #wiring { aspect-ratio: 5 / 4; }  /* 13:5 is only 142 px tall on a phone */
+    #wiring.cells { aspect-ratio: 1 / 1; }
+  }
   .bench-facts code { font-family: var(--mono); font-size: 11.5px; }
-  .chain-fields { display: grid; gap: 6px; margin: 0; }
+  .chain-fields { display: grid; gap: 6px; margin: 14px 0 0; }
   .chain-field { width: 100%; background: none; border: 1px solid var(--line); color: inherit; padding: 4px 6px; font: inherit; font-size: 12.5px; }
   .chain-fields .modes { justify-self: start; }
 
@@ -139,9 +250,9 @@
     min-width: 0;
   }
   .masthead { display: grid; gap: 6px; }
-  .masthead-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-  .wordmark { font-family: var(--display); font-size: 20px; letter-spacing: 0.02em; line-height: 1; margin: 0; font-weight: 400; }
+  .wordmark { font-family: var(--display); font-size: 18px; letter-spacing: 0.02em; line-height: 1; margin: 0; font-weight: 400; white-space: nowrap; }
   .wordmark b { color: var(--amber); font-weight: 400; }
+  .research-name { font-family: var(--display); font-size: 16px; margin: 0; }
   .lede { margin: 0; color: var(--dim); text-wrap: pretty; }
   .lang { display: inline-flex; flex: none; border: 1px solid var(--line); }
   .lang button { background: none; border: 0; padding: 3px 9px; font-size: 12px; color: var(--dim); cursor: pointer; white-space: nowrap; }
@@ -164,7 +275,7 @@
   .facts dd { margin: 0; overflow-wrap: anywhere; }
   .facts code, .checks code { font-family: var(--mono); font-size: 11.5px; }
   .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
-  .checks li { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+  .checks li { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 8px; align-items: baseline; overflow-wrap: anywhere; }
   .checks i { width: 9px; height: 9px; display: inline-block; background: var(--faint); }
   .checks li.ok i { background: var(--ok); }
   .checks li.bad i { background: var(--bad); }
@@ -183,116 +294,223 @@
     white-space: pre;
   }
   .notes { margin: 0; padding-left: 18px; color: var(--dim); display: grid; gap: 4px; font-size: 13px; }
-  .foot { margin-top: auto; color: var(--faint); font-size: 12.5px; display: grid; gap: 4px; }
-  .foot a { color: var(--dim); }
 
   @media (max-width: 960px) {
     .app { grid-template-columns: minmax(0, 1fr); }
     .rail { border-left: 0; border-top: 1px solid var(--line); }
+    .chain-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .topnav a { display: none; }
   }
   @media (max-width: 560px) {
     .bench { padding-block: 16px; padding-inline: 16px; }
     .device { padding: 14px 12px 12px; border-radius: 16px; }
     .keys { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
     .rail { padding-inline: 16px; }
+    .wordmark { font-size: 15px; }
+    .tabs button { padding-inline: 9px; font-size: 13px; }
   }
 </style>
 </head>
 <body>
-<main class="app">
-  <section class="bench" aria-label="Simulated device">
-    <div>
-      <div class="device">
-        <div class="device-top"><b>C3S ESCAPE CORE</b><span>240 × 135</span></div>
-        <div class="bezel"><canvas id="screen" width="960" height="540" role="img" aria-label="Simulated firmware screen"></canvas></div>
-        <div class="keys" id="keys"></div>
-      </div>
-      <p class="bench-note" data-i18n="benchNote">Click the keys, or type them: Enter launches a loom; the arrow keys or ; . , / change l/v and azimuth.</p>
+<header class="topbar">
+  <span class="wordmark">C3S CIRCUIT <b>AGENT</b></span>
+  <nav class="topnav" aria-label="Page">
+    <a href="#how" data-i18n="navHow">How it works</a>
+    <a href="#limits" data-i18n="navLimits">Guarantees</a>
+    <a href="#try" data-i18n="navTry">Try it</a>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" data-lang="en" aria-pressed="true">EN</button>
+      <button type="button" data-lang="zh" aria-pressed="false">中文</button>
+    </div>
+  </nav>
+</header>
 
-      <div class="bench-facts">
-        <span><b data-i18n="bfDomainH">Verified on every row.</b> <span data-i18n="bfDomain">The core's step relation was checked on all 8,388,608 (input, state) combinations, not sampled.</span></span>
-        <span><b data-i18n="bfAgreeH">Five evaluators agree.</b> <span data-i18n="bfAgree">Python, this WebAssembly build, the Cardputer ADV firmware's C, a Solidity evaluator and a BNB Smart Chain node produce the same SHA-256 chain over that whole domain.</span></span>
-        <span><b data-i18n="bfDeviceH">Measured, not claimed.</b> <span data-i18n="bfDevice">The device digests all 8,388,608 rows in 10,218 ms; this page's boot self-test takes about 50 ms.</span></span>
-        <span><b data-i18n="bfProofsH">Five temporal properties proven.</b> <span data-i18n="bfProofs">No takeoff for seven ticks after one, four consecutive raising ticks before a long-mode takeoff, and three more, each proven twice by two independent engines.</span></span>
-      </div>
-
-      <section class="bench-wiring">
-        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
-          <h2 data-i18n="wiringTitle">Measured wiring</h2>
-          <div class="modes" id="wiring-view" role="group" aria-label="View">
-            <button type="button" data-view="graph" aria-pressed="true" data-i18n="wiringGraph">Connections</button>
-            <button type="button" data-view="cells" aria-pressed="false" data-i18n="wiringCells">Real shapes</button>
-          </div>
-        </div>
-        <canvas id="wiring" width="1560" height="600" role="img"
-                aria-label="Measured LC4 and LPLC2 input wiring of the two giant fibers"></canvas>
-        <p class="bench-note" id="wiring-note-graph" data-i18n="wiringNote">Every LC4 and LPLC2 cell that synapses onto the two giant fibers in MaleCNS v1.0, each line as thick as that cell's measured synapse count: 55 LC4 and 91 LPLC2 cells onto the right fiber, 71 and 94 onto the left. The layout is not anatomy — the release's positions are not used — and the lamps follow the policy's two pathways, never individual cells, because the circuit only ever sees 16 sensory bits.</p>
-        <p class="bench-note" id="wiring-note-cells" hidden data-i18n="wiringNoteCells">The real shapes of 26 of those cells, as MaleCNS v1.0 published them: both giant fibers and, per fiber, the six strongest LC4 and LPLC2 inputs by synapse count, decimated to fit a web page. Here the positions are the release's own. Colour follows the model's own mapping and nothing finer: the speed field lights the LC4 population of that eye, the size field the LPLC2 population, and the giant fibers light when the policy's GF pathway crosses. No cell is ever lit on its own — the circuit cannot tell them apart.</p>
-      </section>
-
-      <section class="bench-log">
-        <h2 data-i18n="logTitle">Serial log</h2>
-        <pre id="log" aria-live="off"></pre>
-      </section>
+<main>
+  <section class="hero wrap" aria-labelledby="hero-title">
+    <p class="eyebrow">C3S CIRCUIT AGENT</p>
+    <h1 id="hero-title" data-i18n="heroTitle">An agent whose actions pass through a circuit you wrote.</h1>
+    <p class="pitch" data-i18n="heroPitch">Your rules are compiled to NAND gates and latches, checked on every row of their domain, proven over every state reachable from reset, and replayable read-only on BNB Smart Chain. The model is your own; the circuit decides only whether each of its actions is granted.</p>
+    <p class="provenance" data-i18n="heroProv">The first circuit is a fruit fly's escape reflex, kept under its research name: 173 NAND gates checked on all 8,388,608 rows. The method that built it builds yours.</p>
+    <div class="cta">
+      <a class="btn primary" href="#handheld" data-i18n="ctaTry">Run the first circuit</a>
+      <a class="btn" href="https://github.com/BruceLanLan/c3s-reflex-circuits/blob/main/docs/AGENT.md" data-i18n="ctaDocs">Read how rules become circuits</a>
     </div>
   </section>
 
-  <aside class="rail">
-    <header class="masthead">
-      <div class="masthead-top">
-        <h1 class="wordmark">LOOMESCAPE <b>HANDHELD</b></h1>
-        <div class="lang" role="group" aria-label="Language">
-          <button type="button" data-lang="en" aria-pressed="true">EN</button>
-          <button type="button" data-lang="zh" aria-pressed="false">中文</button>
-        </div>
+  <section class="band wrap" id="how" aria-labelledby="how-title">
+    <div class="band-head">
+      <h2 id="how-title" data-i18n="howTitle">How it works</h2>
+    </div>
+    <ol class="steps">
+      <li class="step">
+        <span class="step-n">01</span>
+        <h3 data-i18n="s1Title">Write the rules</h3>
+        <p data-i18n="s1Body">Nine rule shapes: a cooldown, a commitment, a block, a budget, a confirmation window, a halt that stays down (or a missed heartbeat), a confirm per irreversible action, a breaker after repeated failures, and two keys. One policy per tool class.</p>
+      </li>
+      <li class="step">
+        <span class="step-n">02</span>
+        <h3 data-i18n="s2Title">Compile and prove</h3>
+        <p data-i18n="s2Body">The rules become a NAND/LATCH circuit. It is checked against a plain statement of the same rules on every row, and each rule is proven over every reachable state; a rule the circuit does not enforce fails the check.</p>
+        <span class="figure" data-i18n="s2Fig">spend: 108 NAND + 9 LATCH · 32,768 rows</span>
+        <span class="figure" data-i18n="s2Fig2">exec: 123 + 9 · shared halt: 56 + 4 · 512 rows</span>
+      </li>
+      <li class="step">
+        <span class="step-n">03</span>
+        <h3 data-i18n="s3Title">Plug your model in</h3>
+        <p data-i18n="s3Body">Your model does the work. Its tool calls go through the circuit: a Claude Code PreToolUse hook, or a proxy in front of any MCP server. A wallet provider for the BNBAgent SDK is planned.</p>
+      </li>
+      <li class="step">
+        <span class="step-n">04</span>
+        <h3 data-i18n="s4Title">A person holds the keys</h3>
+        <p data-i18n="s4Body">Block and confirm come from a person, never from the model: an Approvals inbox in the console, or the Cardputer's physical confirm key. Anyone can replay a decision on BNB Smart Chain with one read-only call, with nothing deployed.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="band wrap" id="limits" aria-labelledby="limits-title">
+    <div class="band-head">
+      <h2 id="limits-title" data-i18n="limitsTitle">What it guarantees, and what it does not</h2>
+      <p data-i18n="limitsLede">A proven circuit borrows credibility easily. These are the edges of the claim, in plain words.</p>
+    </div>
+    <div class="limits">
+      <div class="limit-col">
+        <h3 data-i18n="gTitle">Guaranteed</h3>
+        <ul class="checks">
+          <li class="ok"><i></i><span data-i18n="g1">The compiled circuit equals your rules on every row of its domain, not on a sample.</span></li>
+          <li class="ok"><i></i><span data-i18n="g2">Every rule holds in every state reachable from reset, for any sequence of requests the model makes.</span></li>
+          <li class="ok"><i></i><span data-i18n="g3">On chain, the Safe-module form is structural: a person owns the Safe, the agent is not an owner, and every action goes through the module, which derives the bits it reads itself.</span></li>
+          <li class="ok"><i></i><span data-i18n="g4">Every decision can be replayed by anyone on a public node, read-only.</span></li>
+        </ul>
       </div>
-      <p class="lede" data-i18n="lede">The escape core's Cardputer ADV firmware, running in your browser. Decoding the netlist bytes, evaluating 173 NAND + 6 LATCH gate by gate, the looming geometry, the 16-bit sensory encoding and the boot self-test are the firmware's own C code compiled to WebAssembly. The screen is redrawn in JavaScript following the firmware's drawing code.</p>
-    </header>
-
-    <section>
-      <h2 data-i18n="bootTitle">Boot self-test</h2>
-      <ul class="checks" id="checks"><li class="info"><i></i><span data-i18n="loading">Loading the WebAssembly module…</span></li></ul>
-    </section>
-
-    <section>
-      <h2 data-i18n="runsTitle">What runs here</h2>
-      <dl class="facts" id="facts"></dl>
-    </section>
-
-    <section>
-      <h2 data-i18n="chainTitle">Run it on a public chain</h2>
-      <div class="modes" id="chain-mode" role="group" aria-label="Evaluator">
-        <button type="button" data-mode="local" aria-pressed="true" data-i18n="modeLocal">In this browser</button>
-        <button type="button" data-mode="chain" aria-pressed="false" data-i18n="modeChain">On BNB Smart Chain</button>
+      <div class="limit-col">
+        <h3 data-i18n="nTitle">Not guaranteed</h3>
+        <ul class="checks">
+          <li class="bad"><i></i><span data-i18n="n1">A local hook or proxy bounds only the channels routed through it. If the model can reach money or files another way, the gate never sees it.</span></li>
+          <li class="bad"><i></i><span data-i18n="n2">You deploy the Safe module yourself. The maintainers deploy nothing and hold no wallet and no key.</span></li>
+          <li class="bad"><i></i><span data-i18n="n3">Ticks are not time. Limits count ticks, and ticks must be driven by the tool layer, not by the agent.</span></li>
+          <li class="bad"><i></i><span data-i18n="n4">Flags are the tool layer's promise. Whether "irreversible", "failed" or "blocked" was set honestly is outside the circuit.</span></li>
+          <li class="bad"><i></i><span data-i18n="n5">It can only withhold a grant: it cannot undo an action, and it checks each tool class on its own, not rules that span classes.</span></li>
+        </ul>
       </div>
-      <ul class="notes">
-        <li data-i18n="chainNote">Nothing is deployed, and no wallet, key or gas is involved: one read-only eth_call, whose state override installs the compiled evaluator at a throwaway address, makes a public node run the same netlist. Choosing this sends the netlist bytes, which are already public, and your IP address to the endpoint below.</li>
-      </ul>
-      <p class="chain-fields">
-        <input id="chain-rpc" class="chain-field" type="text" spellcheck="false" aria-label="RPC endpoint"
-               placeholder="https://bsc-rpc.publicnode.com">
-        <input id="chain-addr" class="chain-field" type="text" spellcheck="false"
-               aria-label="Your own NandMachine address (optional)" placeholder="0x… your own NandMachine (optional)">
-        <span class="modes"><button type="button" id="chain-run" data-i18n="chainRun">Check four ticks on chain</button></span>
-      </p>
-      <ul class="checks" id="chain-checks"></ul>
-    </section>
+    </div>
+  </section>
 
-    <section>
-      <h2 data-i18n="diffTitle">Not the same as the device</h2>
-      <ul class="notes">
-        <li data-i18n="diff1">The screen follows firmware/cardputer/src/main.cpp but is not pixel-identical; text uses a browser font.</li>
-        <li data-i18n="diff2">atan and tan come from the browser's Math, not the ESP32's maths library, so a live episode can differ from the device by a tick at a bin edge. The self-test replays embedded samples, which does not depend on either.</li>
-        <li data-i18n="diff3">Ticks follow the browser's frame clock; the circuit's behaviour depends only on the tick sequence.</li>
-      </ul>
-    </section>
+  <section class="tabs-band" id="try" aria-label="The first circuit">
+    <div class="tabs-scroll">
+      <div class="tabs" role="tablist" aria-label="Views">
+        <button type="button" role="tab" id="tab-handheld" data-tab="handheld" aria-controls="panel-handheld" aria-selected="true" data-i18n="tabHandheld">Handheld</button>
+        <button type="button" role="tab" id="tab-fly" data-tab="fly" aria-controls="panel-3d" aria-selected="false" tabindex="-1" data-i18n="tabFly">Fly brain</button>
+        <button type="button" role="tab" id="tab-wiring" data-tab="wiring" aria-controls="panel-3d" aria-selected="false" tabindex="-1" data-i18n="tabWiring">Wiring</button>
+        <button type="button" role="tab" id="tab-chain" data-tab="chain" aria-controls="panel-chain" aria-selected="false" tabindex="-1" data-i18n="tabChain">On chain</button>
+      </div>
+    </div>
 
-    <footer class="foot">
-      <span><a href="../demo/" data-i18n="demoLink">Voxel-world web demo</a> · <a href="https://github.com/BruceLanLan/c3s-reflex-circuits/blob/main/docs/FIRMWARE.md" data-i18n="fwLink">Firmware notes</a> · <a href="https://github.com/BruceLanLan/c3s-reflex-circuits" data-i18n="repoLink">Source, proofs and docs</a></span>
-      <span><span data-i18n="author">Author</span> <a href="https://github.com/BruceLanLan">BruceBlue</a> · X <a href="https://x.com/BruceBlue">@BruceBlue</a></span>
-    </footer>
-  </aside>
+    <div id="panel-handheld" role="tabpanel" aria-labelledby="tab-handheld">
+      <div class="app">
+        <section class="bench" aria-label="Simulated device">
+          <div>
+            <div class="device">
+              <div class="device-top"><b>C3S ESCAPE CORE</b><span>240 × 135</span></div>
+              <div class="bezel"><canvas id="screen" width="960" height="540" role="img" aria-label="Simulated firmware screen"></canvas></div>
+              <div class="keys" id="keys"></div>
+            </div>
+            <p class="bench-note" data-i18n="benchNote">Click the keys, or type them: Enter launches a loom; the arrow keys or ; . , / change l/v and azimuth.</p>
+
+            <div class="bench-facts">
+              <span><b data-i18n="bfDomainH">Verified on every row.</b> <span data-i18n="bfDomain">The core's step relation was checked on all 8,388,608 (input, state) combinations, not sampled.</span></span>
+              <span><b data-i18n="bfAgreeH">Five evaluators agree.</b> <span data-i18n="bfAgree">Python, this WebAssembly build, the Cardputer ADV firmware's C, a Solidity evaluator and a BNB Smart Chain node produce the same SHA-256 chain over that whole domain.</span></span>
+              <span><b data-i18n="bfDeviceH">Measured, not claimed.</b> <span data-i18n="bfDevice">The device digests all 8,388,608 rows in 10,218 ms; this page's boot self-test takes about 50 ms.</span></span>
+              <span><b data-i18n="bfProofsH">Five temporal properties proven.</b> <span data-i18n="bfProofs">No takeoff for seven ticks after one, four consecutive raising ticks before a long-mode takeoff, and three more, each proven twice by two independent engines.</span></span>
+            </div>
+
+            <section class="bench-log">
+              <h2 data-i18n="logTitle">Serial log</h2>
+              <pre id="log" aria-live="off"></pre>
+            </section>
+          </div>
+        </section>
+
+        <aside class="rail">
+          <header class="masthead">
+            <h2 data-i18n="cardTitle">First circuit, kept under its research name</h2>
+            <p class="research-name">LoomEscape</p>
+            <p class="lede" data-i18n="lede">The escape core's Cardputer ADV firmware, running in your browser. Decoding the netlist bytes, evaluating 173 NAND + 6 LATCH gate by gate, the looming geometry, the 16-bit sensory encoding and the boot self-test are the firmware's own C code compiled to WebAssembly. The screen is redrawn in JavaScript following the firmware's drawing code.</p>
+          </header>
+
+          <section>
+            <h2 data-i18n="bootTitle">Boot self-test</h2>
+            <ul class="checks" id="checks"><li class="info"><i></i><span data-i18n="loading">Loading the WebAssembly module…</span></li></ul>
+          </section>
+
+          <section>
+            <h2 data-i18n="runsTitle">What runs here</h2>
+            <dl class="facts" id="facts"></dl>
+          </section>
+
+          <section>
+            <h2 data-i18n="diffTitle">Not the same as the device</h2>
+            <ul class="notes">
+              <li data-i18n="diff1">The screen follows firmware/cardputer/src/main.cpp but is not pixel-identical; text uses a browser font.</li>
+              <li data-i18n="diff2">atan and tan come from the browser's Math, not the ESP32's maths library, so a live episode can differ from the device by a tick at a bin edge. The self-test replays embedded samples, which does not depend on either.</li>
+              <li data-i18n="diff3">Ticks follow the browser's frame clock; the circuit's behaviour depends only on the tick sequence.</li>
+            </ul>
+          </section>
+        </aside>
+      </div>
+    </div>
+
+    <div id="panel-3d" class="panel-3d wrap" role="tabpanel" aria-labelledby="tab-fly" hidden>
+      <div class="panel-head">
+        <h2 id="title-cells" data-i18n="flyTitle">Fly brain: the cells the first circuit was built from</h2>
+        <h2 id="title-graph" data-i18n="wiringTitle" hidden>Measured wiring</h2>
+        <span class="modes"><button type="button" id="stage-launch" data-i18n="stageLaunch">Launch a loom</button></span>
+      </div>
+      <p class="panel-lede" id="lede-cells" data-i18n="flyLede">These are a fly's neurons, not the agent's. The model that does the work is the one you connect; the fly lent the method its first circuit. The colours follow that circuit as it runs in the Handheld tab.</p>
+      <p class="panel-lede" id="lede-graph" data-i18n="wiringLede" hidden>Who synapses onto the two giant fibers, drawn as connections. The colours follow the circuit as it runs in the Handheld tab.</p>
+      <canvas id="wiring" width="1560" height="600" role="img"
+              aria-label="Measured LC4 and LPLC2 input wiring of the two giant fibers"></canvas>
+      <p class="stage-note" id="wiring-note-graph" hidden data-i18n="wiringNote">Every LC4 and LPLC2 cell that synapses onto the two giant fibers in MaleCNS v1.0, each line as thick as that cell's measured synapse count: 55 LC4 and 91 LPLC2 cells onto the right fiber, 71 and 94 onto the left. The layout is not anatomy — the release's positions are not used — and the lamps follow the policy's two pathways, never individual cells, because the circuit only ever sees 16 sensory bits.</p>
+      <p class="stage-note" id="wiring-note-cells" data-i18n="wiringNoteCells">The real shapes of 26 of those cells, as MaleCNS v1.0 published them: both giant fibers and, per fiber, the six strongest LC4 and LPLC2 inputs by synapse count, decimated to fit a web page. Here the positions are the release's own. Colour follows the model's own mapping and nothing finer: the speed field lights the LC4 population of that eye, the size field the LPLC2 population, and the giant fibers light when the policy's GF pathway crosses. No cell is ever lit on its own — the circuit cannot tell them apart.</p>
+    </div>
+
+    <div id="panel-chain" class="panel-chain wrap" role="tabpanel" aria-labelledby="tab-chain" hidden>
+      <div class="chain-grid">
+        <section>
+          <div class="panel-head"><h2 data-i18n="chainTitle">Run it on a public chain</h2></div>
+          <p class="panel-lede" data-i18n="chainLede">The same evaluator and the same netlist bytes, run by a public BNB Smart Chain node. This replays four real rows of the first circuit; a compiled policy is replayed the same way, with its own netlist.</p>
+          <div class="modes" id="chain-mode" role="group" aria-label="Evaluator">
+            <button type="button" data-mode="local" aria-pressed="true" data-i18n="modeLocal">In this browser</button>
+            <button type="button" data-mode="chain" aria-pressed="false" data-i18n="modeChain">On BNB Smart Chain</button>
+          </div>
+          <ul class="notes" style="margin-top: 12px">
+            <li data-i18n="chainNote">Nothing is deployed, and no wallet, key or gas is involved: one read-only eth_call, whose state override installs the compiled evaluator at a throwaway address, makes a public node run the same netlist. Choosing this sends the netlist bytes, which are already public, and your IP address to the endpoint below.</li>
+          </ul>
+          <p class="chain-fields">
+            <input id="chain-rpc" class="chain-field" type="text" spellcheck="false" aria-label="RPC endpoint"
+                   placeholder="https://bsc-rpc.publicnode.com">
+            <input id="chain-addr" class="chain-field" type="text" spellcheck="false"
+                   aria-label="Your own NandMachine address (optional)" placeholder="0x… your own NandMachine (optional)">
+            <span class="modes"><button type="button" id="chain-run" data-i18n="chainRun">Check four ticks on chain</button></span>
+          </p>
+          <ul class="checks" id="chain-checks"></ul>
+        </section>
+        <aside class="aside-card">
+          <h2 data-i18n="deployTitle">Putting it in front of real actions</h2>
+          <p data-i18n="deploy1">Replaying is free and needs nothing deployed. Bounding real transfers is a different form: a Safe module that a person owns, through which the agent can only ask, and which grants only on ticks the circuit grants.</p>
+          <p data-i18n="deploy2">You deploy that module yourself, to your own Safe. The maintainers deploy nothing, hold no wallet and no key, and issue no token.</p>
+        </aside>
+      </div>
+    </div>
+  </section>
 </main>
+
+<footer class="site-foot wrap">
+  <span><a href="../demo/" data-i18n="demoLink">Voxel-world web demo</a> · <a href="https://github.com/BruceLanLan/c3s-reflex-circuits/blob/main/docs/AGENT.md" data-i18n="agentLink">Rules as circuits (AGENT.md)</a> · <a href="https://github.com/BruceLanLan/c3s-reflex-circuits/blob/main/docs/FIRMWARE.md" data-i18n="fwLink">Firmware notes</a> · <a href="https://github.com/BruceLanLan/c3s-reflex-circuits" data-i18n="repoLink">Source, proofs and docs</a></span>
+  <span><span data-i18n="footProduct">C3S Circuit Agent. The first circuit is published under its research name, LoomEscape.</span></span>
+  <span><span data-i18n="author">Author</span> <a href="https://github.com/BruceLanLan">BruceBlue</a> · X <a href="https://x.com/BruceBlue">@BruceBlue</a></span>
+</footer>
 
 <script>
 "use strict";
@@ -357,6 +575,53 @@ const I18N = {
     wiringGraph: "连接图",
     wiringCells: "真实形态",
     wiringNoteCells: "其中 26 个细胞的真实形态，直接来自 MaleCNS v1.0 发布的骨架：两根巨纤维，加上每根纤维上按突触数最强的 6 个 LC4 与 6 个 LPLC2，为了能放进网页做了抽稀。这里的坐标就是发布数据自己的坐标。着色只跟随模型自己的映射、不再更细：速度字段点亮该侧眼的 LC4 群体，大小字段点亮 LPLC2 群体，巨纤维在策略的 GF 通路越过阈值时点亮。任何单个细胞都不会被单独点亮——电路根本分辨不出它们。",
+    navHow: "工作方式",
+    navLimits: "保证什么",
+    navTry: "上手试",
+    heroTitle: "一个 agent，它的每个动作都要穿过你写的电路。",
+    heroPitch: "你写的规则被编译成 NAND 门和锁存器，在定义域的每一行上核对过，在从复位出发可达的每一个状态上证明过，并且可以在 BNB 智能链上只读复算。模型是你自己的；电路只决定它的每个动作放不放行。",
+    heroProv: "第一颗电路是一只果蝇的逃逸反射，沿用研究名：173 个 NAND 门，全部 8,388,608 行逐行核过。造出它的方法，也用来造你的电路。",
+    ctaTry: "运行第一颗电路",
+    ctaDocs: "看规则怎样变成电路",
+    howTitle: "工作方式",
+    s1Title: "写规则",
+    s1Body: "九种规则形状：冷却、承诺、阻断、额度、确认窗口、需人复位的停机（或心跳超时）、每个不可逆动作一次确认、连续失败熔断、双钥匙。每类工具一份策略。",
+    s2Title: "编译并证明",
+    s2Body: "规则变成 NAND/LATCH 电路。电路与同一套规则的直白写法在每一行上逐行核对，每条规则在每个可达状态上被证明；电路没有执行的规则，核对一定失败。",
+    s2Fig: "spend：108 NAND + 9 LATCH · 32,768 行",
+    s2Fig2: "exec：123 + 9 · 共享 halt：56 + 4 · 512 行",
+    s3Title: "接上你的模型",
+    s3Body: "干活的是你的模型。它的工具调用要先过电路：Claude Code 的 PreToolUse 钩子，或挡在任意 MCP 服务器前面的代理。BNBAgent SDK 的钱包 provider 在计划中。",
+    s4Title: "钥匙在人手里",
+    s4Body: "阻断与确认只来自人，绝不来自模型：值班台里的待确认收件箱，或者 Cardputer 上的实体确认键。任何人都能在 BNB 智能链上用一次只读调用复算一条裁决，什么都不用部署。",
+    limitsTitle: "它保证什么，不保证什么",
+    limitsLede: "被证明过的电路很容易被借走信誉。下面用白话写清这份声明的边界。",
+    gTitle: "保证",
+    g1: "编译出的电路在定义域的每一行上都等于你的规则，不是抽样。",
+    g2: "无论模型发来什么样的请求序列，每条规则在从复位可达的每个状态上都成立。",
+    g3: "链上的 Safe 模块形态在结构上成立：Safe 归人所有，agent 不是 owner，所有动作都得经过模块，模块读的每一位都由它自己推出。",
+    g4: "每一条裁决，任何人都能在公共节点上只读复算。",
+    nTitle: "不保证",
+    n1: "本机的钩子或代理只管得住经过它的通道。模型如果能从别的路径碰到钱或文件，闸门看不见。",
+    n2: "Safe 模块由你自己部署。维护者什么都不部署，不持有钱包，也不持有私钥。",
+    n3: "拍不是时间。限制按拍计数，而拍必须由工具层驱动，不能由 agent 驱动。",
+    n4: "标志位是工具层的承诺。“irreversible”“failed”“blocked”是否如实设置，在电路之外。",
+    n5: "它只能扣住放行：撤销不了已经发生的动作；每类工具单独核对，跨类别的规则不在其内。",
+    tabHandheld: "掌机",
+    tabFly: "果蝇神经元",
+    tabWiring: "连线",
+    tabChain: "上链",
+    cardTitle: "第一颗电路，沿用研究名",
+    flyTitle: "果蝇神经元：第一颗电路取材的细胞",
+    flyLede: "这些是一只果蝇的神经元，不属于 agent。干活的是你接进来的模型；果蝇只为这套方法提供了第一颗电路。颜色跟随这颗电路在“掌机”页里的运行。",
+    wiringLede: "哪些细胞与两根巨纤维成突触，画成连接图。颜色跟随电路在“掌机”页里的运行。",
+    stageLaunch: "发射逼近物",
+    chainLede: "同一个求值器、同一份网表字节，交给一个公共的 BNB 智能链节点去算。这里复算的是第一颗电路的四行真实数据；编译出的策略也以同样方式、用它自己的网表复算。",
+    deployTitle: "放到真实动作前面",
+    deploy1: "复算免费，也不需要部署任何东西。要管住真实转账是另一种形态：一个归人所有的 Safe 模块，agent 通过它只能提出请求，只有电路放行的拍才会执行。",
+    deploy2: "这个模块由你自己部署到你自己的 Safe。维护者什么都不部署，不持有钱包和私钥，也不发代币。",
+    agentLink: "规则即电路（AGENT.md）",
+    footProduct: "C3S Circuit Agent。第一颗电路以研究名 LoomEscape 发布。",
   },
 };
 Object.assign(I18N.en, {
@@ -746,8 +1011,10 @@ function renderKeys() {
 }
 const ARROWS = { ArrowUp: ";", ArrowDown: ".", ArrowLeft: ",", ArrowRight: "/" };
 document.addEventListener("keydown", (e) => {
-  if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest(".lang")) return;
-  let c = ARROWS[e.key] ?? (e.key === "Enter" ? "\n" : e.key.length === 1 ? e.key.toLowerCase() : null);
+  // Keys belong to the simulator only when no other control has focus: a focused tab,
+  // link or button keeps Enter and Space, and the RPC fields keep every character.
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.target.closest("input, textarea, select, a, button:not(.key), [role=tablist]")) return;  let c = ARROWS[e.key] ?? (e.key === "Enter" ? "\n" : e.key.length === 1 ? e.key.toLowerCase() : null);
   if (c === null) return;
   if (e.target.closest(".key") && (c === "\n" || c === " ")) return;  // the button's own click handles it
   e.preventDefault();
@@ -1020,6 +1287,9 @@ function drawSkeletonView(ctx, W, H, cos, sin, R) {
   const label = (s, y) => { ctx.fillStyle = "#8A93A0"; ctx.font = `${Math.round(0.03 * R)}px ui-monospace, monospace`; ctx.fillText(s, 0.02 * W, y); };
   if (!skel) { loadSkeletons(); label(skelPending ? "loading skeletons…" : "skeletons unavailable", 0.09 * H); return; }
   const pts = skel.pts, segs = skel.segs;
+  // One scale for both axes, so the cells keep their proportions at any canvas shape;
+  // the box is ±0.86 wide and ±0.51 tall, and perspective scales it by 0.42× (far) to 0.7× (near).
+  const s = Math.min(W * 0.7, H * 1.1), cy = H * 0.47;
   for (const cell of skel.cells) {
     ctx.strokeStyle = skeletonTint(cell);
     ctx.lineWidth = cell.type === "DNp01" ? 0.004 * R : 0.0016 * R;
@@ -1030,30 +1300,36 @@ function drawSkeletonView(ctx, W, H, cos, sin, R) {
       const ax = pts[a] * cos - pts[a + 2] * sin, az = pts[a] * sin + pts[a + 2] * cos;
       const bx = pts[b] * cos - pts[b + 2] * sin, bz = pts[b] * sin + pts[b + 2] * cos;
       const as = 1 / (1.9 - az * 0.55), bs = 1 / (1.9 - bz * 0.55);
-      ctx.moveTo(W / 2 + ax * W * 0.60 * as, H / 2 + pts[a + 1] * R * 1.35 * as);
-      ctx.lineTo(W / 2 + bx * W * 0.60 * bs, H / 2 + pts[b + 1] * R * 1.35 * bs);
+      ctx.moveTo(W / 2 + ax * s * as, cy + pts[a + 1] * s * as);
+      ctx.lineTo(W / 2 + bx * s * bs, cy + pts[b + 1] * s * bs);
     }
     ctx.stroke();
   }
   label("MaleCNS v1.0 skeletons · CC-BY · 26 cells", H - 0.05 * H);
 }
 
-for (const b of document.querySelectorAll("#wiring-view button")) {
-  b.addEventListener("click", () => {
-    wiringView = b.dataset.view;
-    if (wiringView === "cells") loadSkeletons();
-    for (const o of document.querySelectorAll("#wiring-view button")) {
-      o.setAttribute("aria-pressed", String(o.dataset.view === wiringView));
-    }
-    document.getElementById("wiring-note-graph").hidden = wiringView !== "graph";
-    document.getElementById("wiring-note-cells").hidden = wiringView !== "cells";
-  });
+// The Fly brain and Wiring tabs share one canvas: the tab picks the view.
+function setWiringView(view) {
+  wiringView = view;
+  if (view === "cells") loadSkeletons();
+  const cells = view === "cells";
+  document.getElementById("wiring").classList.toggle("cells", cells);
+  for (const [id, show] of [["title-cells", cells], ["lede-cells", cells], ["wiring-note-cells", cells],
+                            ["title-graph", !cells], ["lede-graph", !cells], ["wiring-note-graph", !cells]]) {
+    document.getElementById(id).hidden = !show;
+  }
+  document.getElementById("panel-3d").setAttribute("aria-labelledby", cells ? "tab-fly" : "tab-wiring");
 }
+document.getElementById("stage-launch").addEventListener("click", buttonG0);
 
 function drawWiring(now) {
   const c = document.getElementById("wiring");
   if (!c || !wiringEdges || now - wiringDrawMs < 33) return;
+  if (c.offsetParent === null) return;  // its tab is not showing
   wiringDrawMs = now;
+  // Match the drawing buffer to the box the CSS gives it, so neither view is stretched.
+  const want = Math.round(c.width * c.clientHeight / c.clientWidth);
+  if (c.clientWidth > 0 && Math.abs(c.height - want) > 2) c.height = want;
   wiringSpin += 0.005;
   const ctx = c.getContext("2d"), W = c.width, H = c.height, R = Math.min(W, H);
   ctx.fillStyle = "#0C0E12";
@@ -1122,6 +1398,48 @@ function splash(lines, color) {
   fillRect(0, 0, 240, 135, kBg);
   lines.forEach((l, i) => text(4, 4 + i * 16, i === 0 ? kText : color, l));
 }
+
+// ---------------------------------------------------------------- tabs
+
+const TABS = ["handheld", "fly", "wiring", "chain"];
+const tabButtons = [...document.querySelectorAll("[role=tab]")];
+function showTab(name, focus) {
+  if (!TABS.includes(name)) name = "handheld";
+  for (const b of tabButtons) {
+    const on = b.dataset.tab === name;
+    b.setAttribute("aria-selected", String(on));
+    b.tabIndex = on ? 0 : -1;
+    if (on && focus) b.focus();
+  }
+  document.getElementById("panel-handheld").hidden = name !== "handheld";
+  document.getElementById("panel-3d").hidden = name !== "fly" && name !== "wiring";
+  document.getElementById("panel-chain").hidden = name !== "chain";
+  if (name === "fly") setWiringView("cells");
+  if (name === "wiring") setWiringView("graph");
+}
+for (const b of tabButtons) {
+  b.addEventListener("click", () => {
+    showTab(b.dataset.tab);
+    try { history.replaceState(null, "", "#" + b.dataset.tab); } catch { /* sandboxed */ }
+  });
+  b.addEventListener("keydown", (e) => {
+    const i = tabButtons.indexOf(b);
+    const j = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? tabButtons.length - 1 : null;
+    if (j === null) return;
+    e.preventDefault();
+    const next = tabButtons[(j + tabButtons.length) % tabButtons.length];
+    showTab(next.dataset.tab, true);
+    try { history.replaceState(null, "", "#" + next.dataset.tab); } catch { /* sandboxed */ }
+  });
+}
+function tabFromHash(scroll) {
+  const name = location.hash.slice(1);
+  if (!TABS.includes(name)) return;
+  showTab(name);
+  if (scroll) document.getElementById("try").scrollIntoView();
+}
+window.addEventListener("hashchange", () => tabFromHash(true));
+tabFromHash(true);
 
 applyLang();
 splash(["SELF-TEST", "hashing and replaying the netlists..."], kMuted);
