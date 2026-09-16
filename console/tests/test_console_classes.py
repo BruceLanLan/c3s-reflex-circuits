@@ -1,3 +1,4 @@
+from reflex_token import json_headers as _json_headers
 """One agent, one circuit per class, and a shared halt — against the LIVE console.
 
 Skips when the console at REFLEX_CONSOLE (default http://127.0.0.1:8765) is down.
@@ -19,7 +20,7 @@ TIMEOUT = 20
 
 def api(path: str, payload=None) -> dict:
     req = urllib.request.Request(f"{CONSOLE}{path}", data=None if payload is None else json.dumps(payload).encode(),
-                                 headers={"content-type": "application/json"})
+                                 headers=_json_headers())
     with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
         return json.loads(resp.read())
 

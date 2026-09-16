@@ -46,6 +46,12 @@ from cardputer_relay import pending_items  # noqa: E402  (same "waiting for a pe
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CONSOLE = os.environ.get("CONSOLE_URL", "http://127.0.0.1:8765").rstrip("/")
 TOOL_LAYER_CHATS = {c.strip() for c in os.environ.get("TOOL_LAYER_CHATS", "").split(",") if c.strip()}
+# The operator token gates installing rules and writing the person's bits. The bot is a
+# person's tool, so it reads the token the console wrote; a person's chat then holds the keys.
+_TOKEN_FILE = os.path.expanduser(
+    os.environ.get("REFLEX_TOKEN_FILE", os.path.join(os.environ.get("REFLEX_CONFIG_DIR", "~/.c3s-circuit-agent"), "operator-token")))
+OPERATOR_TOKEN = os.environ.get("REFLEX_OPERATOR_TOKEN") or (
+    open(os.path.expanduser(_TOKEN_FILE)).read().strip() if os.path.exists(os.path.expanduser(_TOKEN_FILE)) else "")
 API = f"https://api.telegram.org/bot{TOKEN}"
 CLASSES = ("spend", "message", "exec", "files")
 
@@ -70,7 +76,11 @@ REFUSED_HERE = ("blocked, confirm and stop are written by a layer the agent cann
 def call(path_or_url: str, payload: dict | None = None, timeout: int = 40) -> dict:
     url = path_or_url if path_or_url.startswith("http") else f"{CONSOLE}{path_or_url}"
     data = json.dumps(payload).encode() if payload is not None else None
-    req = urllib.request.Request(url, data=data, headers={"content-type": "application/json"})
+    headers = {"content-type": "application/json"}
+    # The person's endpoints (install rules, write confirm/blocked) carry the token.
+    if OPERATOR_TOKEN and not str(url).startswith("https://api.telegram.org"):
+        headers["x-reflex-token"] = OPERATOR_TOKEN
+    req = urllib.request.Request(url, data=data, headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read())
 

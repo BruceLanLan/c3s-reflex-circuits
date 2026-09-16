@@ -167,7 +167,13 @@ def reaches_the_guard(tool: str, args: dict) -> str | None:
             return f"it edits the boundary's own files or hook configuration ({path})"
     if tool == "Bash":
         cmd = str(args.get("command", ""))
-        if any(a in cmd for a in GUARDED_API) and ("curl" in cmd or "wget" in cmd or "http" in cmd or "python" in cmd):
+        # The literal path can be reconstructed (127.0.0.1:8765/api/to''ol), so do not rely on
+        # it: any net tool aimed at the console's own host:port is refused, endpoint or not. The
+        # token is the real defence — this only turns the cheap tries into an early, clear no.
+        nettools = ("curl", "wget", "nc ", "ncat", "/dev/tcp/", "socket", "http")
+        if any(m in cmd for m in _console_markers()) and any(n in cmd for n in nettools):
+            return "it would reach the boundary console; the console is the tool layer's, not the agent's"
+        if any(a in cmd for a in GUARDED_API) and ("python" in cmd or "perl" in cmd or "ruby" in cmd or "node" in cmd):
             return "it calls the boundary console's tool-layer or rules endpoint"
         writes = (">", "tee ", "sed -i", "mv ", "rm ", "cp ", "chmod ", "truncate", "python", "perl -i", "kill ")
         if any(g in cmd for g in GUARDED_PATHS) and any(w in cmd for w in writes):

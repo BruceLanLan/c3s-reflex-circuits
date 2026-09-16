@@ -67,6 +67,14 @@ from c3s.policy import AGENT_WRITABLE, MUST_COME_FROM_THE_TOOL_LAYER, Policy  # 
 # is one beat; `failed` reports the outcome of the previous action to the next tick.
 CONSUMED_BY_A_TICK = ("confirm", "confirm_b", "irreversible", "heartbeat", "failed")
 
+# Which tool-layer bits are the *person's*, and so need the operator token to write over
+# HTTP. `confirm`/`confirm_b` authorise; `blocked` and `heartbeat` are what an agent would
+# want to forge to lift a block or hold a dead-man's halt open. `irreversible` and `failed`
+# are left tokenless because the adapters (the tool runner) arm them and setting either can
+# only make a decision stricter — an agent gains nothing by writing them. The Cardputer
+# relay writes the person's bits in-process, never over HTTP, so the token never gates it.
+PERSON_BITS = ("confirm", "confirm_b", "blocked", "heartbeat")
+
 # The classes of tool an agent's calls fall into, each with its own circuit, plus the
 # one circuit every class shares. `exec` is where an unclassified call lands, so it
 # always has a circuit.
@@ -80,9 +88,36 @@ FLY_DEFAULT = Policy(min_gap_ticks=8, commit_ticks=4, forbid_when_blocked=True)
 # Installed rules survive a restart. Without this, restarting the console would quietly
 # turn "no transfers" back into "spend has no circuit" — a boundary that resets open.
 KEEP_AGENTS, KEEP_AGENTS_DAYS = 500, 30
-STATE_FILE = Path(os.environ.get("REFLEX_STATE_FILE", Path.home() / ".c3s-circuit-agent" / "policies.json")).expanduser()
+CONFIG_DIR = Path(os.environ.get("REFLEX_CONFIG_DIR", Path.home() / ".c3s-circuit-agent")).expanduser()
+STATE_FILE = Path(os.environ.get("REFLEX_STATE_FILE", CONFIG_DIR / "policies.json")).expanduser()
+TOKEN_FILE = Path(os.environ.get("REFLEX_TOKEN_FILE", CONFIG_DIR / "operator-token")).expanduser()
+
+
+def operator_token() -> str:
+    """The secret that gates the person's endpoints: installing rules and writing the
+    person's bits (confirm, confirm_b, blocked, heartbeat). Generated once, kept in a file
+    only the owner can read, and printed to the console's own log. The adapters never
+    receive it, so an agent that reaches the console over HTTP still cannot write its own
+    confirm or lift a block — unless it reads this file, which is the same-machine limit
+    the README names (run the agent where it cannot). REFLEX_OPERATOR_TOKEN overrides."""
+    env = os.environ.get("REFLEX_OPERATOR_TOKEN")
+    if env:
+        return env
+    if TOKEN_FILE.exists() and TOKEN_FILE.read_text().strip():
+        return TOKEN_FILE.read_text().strip()
+    import secrets
+
+    token = secrets.token_urlsafe(24)
+    TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    TOKEN_FILE.write_text(token)
+    try:
+        TOKEN_FILE.chmod(0o600)
+    except OSError:
+        pass
+    return token
 TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
 CHAIN = None  # set in __main__ when the chain second opinion is on
+TOKEN = None  # set in __main__: the operator secret gating the person's endpoints
 STARTED_AT = time.time()
 
 
@@ -666,6 +701,16 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def _has_token(self, payload: dict) -> bool:
+        """The operator token, from the header or the body. compare_digest, not ==, so a
+        wrong guess leaks nothing through timing."""
+        import hmac
+
+        if not TOKEN:
+            return True  # no token configured (e.g. a test Boundary with no server)
+        given = self.headers.get("X-Reflex-Token") or str(payload.get("token", ""))
+        return hmac.compare_digest(given, TOKEN)
+
     def do_GET(self) -> None:
         if not self._local_only():
             return
@@ -732,6 +777,9 @@ class Handler(BaseHTTPRequestHandler):
         name = str(payload.get("agent", "anonymous"))[:40] or "anonymous"
 
         if self.path == "/api/policy":
+            if not self._has_token(payload):
+                self._json(403, {"error": "installing rules is the operator's: send the token (see the console's log)"})
+                return
             try:
                 cls = class_from(payload, CLASSES)
                 if payload.get("remove") is True:
@@ -754,7 +802,13 @@ class Handler(BaseHTTPRequestHandler):
             TRANSCRIPTS.appendleft(note)
             self._json(200, summary)
         elif self.path == "/api/tool":
-            bits = {k: v for k, v in payload.items() if k not in ("agent", "for_reason")}
+            bits = {k: v for k, v in payload.items() if k not in ("agent", "for_reason", "token")}
+            # The person's bits need the operator token; the adapter's own (irreversible,
+            # failed) do not, because setting either can only make a decision stricter.
+            if any(b in PERSON_BITS for b in bits) and not self._has_token(payload):
+                self._json(403, {"error": f"{', '.join(b for b in bits if b in PERSON_BITS)} are the person's: "
+                                          "send the token (see the console's log). An agent may not write these."})
+                return
             bind_to = payload.get("for_reason")
             try:
                 self._json(200, BOUNDARY.arm(name, bits, str(bind_to)[:160] if bind_to else None))
@@ -804,5 +858,11 @@ if __name__ == "__main__":
         from cardputer_relay import Relay
 
         Relay(BOUNDARY, os.environ["REFLEX_CARDPUTER"], log=lambda m: print(m, flush=True)).start()
+    TOKEN = operator_token()
+    print(f"\noperator token (the person's key to install rules and confirm/block over HTTP):\n"
+          f"  {TOKEN}\n"
+          f"  kept in {TOKEN_FILE}. The page asks for it once; the Telegram bot reads the file.\n"
+          f"  the model's adapters never get it, so an agent cannot write its own confirm — "
+          f"unless it can read this file. Run the agent where it cannot.\n", flush=True)
     print(f"boundary console on http://{HOST}:{PORT}  (no wallet, no key, nothing signed)", flush=True)
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
