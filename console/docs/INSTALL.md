@@ -77,6 +77,7 @@ c3s up --port 8766     # 换端口，可以和另一个后台并存
 c3s status             # 在不在、有几件事等人、日志在哪
 c3s pair               # 再打一次二维码（--ip 选网卡、--no-token 不把令牌放进 URL）
 c3s token              # 看令牌；c3s token rotate 换一个新的
+c3s token rotate --agent <名字>   # 换的是那个 agent 自己的令牌（I-3）：删掉绑定，它下次带令牌的请求重新绑
 c3s stop-all           # 给后台认识的每个 agent 写 blocked=1（要令牌）
 c3s stop-all --resume   # 解除
 c3s down               # 停（--service 同时卸掉 launchd 并删 plist）
@@ -148,6 +149,11 @@ http://<本机局域网 IP>:8765/?token=<操作者令牌>#approvals
 `REFLEX_OPERATOR_TOKEN` 环境变量起的（`docs/DEV-v1.0-workstreams.md` §0.2 那条 nohup 命令就
 是），文件换了也没用，命令会直接这么告诉你。换完：所有页面、手机、bot 都得重新给一次，旧二
 维码作废。
+
+**`c3s token rotate --agent <名字>`** 换的是另一样东西：`docs/API.md` I-3 里那个 **agent 自己
+的令牌**。后台从来只存它的哈希，所以"轮换"就是**删掉绑定**（`~/.c3s-circuit-agent/agents.json`
+里那一条），下一次那个 agent 带着新的 `REFLEX_AGENT_TOKEN` 发请求就重新绑上。这一条不需要后台
+在跑（绑定在文件里），命令直接调 `console.py` 的 `token_rotate()`，不自己动那个文件。
 
 ## 6. 二维码是自己编的
 
