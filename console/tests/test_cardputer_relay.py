@@ -18,6 +18,7 @@ from cardputer_relay import Relay, frame  # noqa: E402
 
 @pytest.fixture
 def boundary():
+    console.TRANSCRIPTS.clear()  # the log is module-wide; other in-process tests leave decisions in it
     return console.Boundary(Policy(forbid_when_blocked=True))
 
 
