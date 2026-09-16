@@ -1522,7 +1522,11 @@ function cnEnter() {
 async function cnFetchMap() {
   CN_BUSY = true;
   try {
-    const r = await fetch(`/api/classes?agent=${encodeURIComponent($("cn-cc-agent").value.trim() || "claude-code:mine")}`, { cache: "no-store" });
+    // The token goes on this read only because the map names paths on the console's own
+    // machine, and the console closes that to the network (a phone that scanned the
+    // pairing link has the token; on the console's machine none is needed).
+    const r = await fetch(`/api/classes?agent=${encodeURIComponent($("cn-cc-agent").value.trim() || "claude-code:mine")}`,
+                          { cache: "no-store", headers: TOKEN ? { "x-reflex-token": TOKEN } : {} });
     CN_MAP = await r.json();
     CN_EDITS = {};
     cnRenderTools();
