@@ -173,6 +173,13 @@ class Compiled:
         return Compiled(None, None, None, b"", 0, 0, summary, deny_all=True)
 
 
+def _netlist_print(compiled: "Compiled | None") -> str | None:
+    if compiled is None or compiled.deny_all:
+        return None
+    import hashlib
+    return hashlib.sha256(compiled.netlist).hexdigest()
+
+
 def _fresh_class_state() -> dict:
     return {"state": 0, "ticks": 0, "grants": 0, "last_grant_tick": None}
 
@@ -184,6 +191,7 @@ class Boundary:
 
     def __init__(self, default_exec: Policy, state_file: Path | None = None) -> None:
         self.lock = threading.Lock()
+        self.save_lock = threading.Lock()
         self.policies: dict[str, Compiled | None] = {c: None for c in CLASSES}
         self.agents: dict[str, dict] = {}
         self.state_file = state_file
@@ -191,13 +199,29 @@ class Boundary:
         if saved is None:
             self.install(DEFAULT_CLASS, default_exec)
             return
-        for cls, entry in saved.items():  # recompiled and re-proven, not trusted from disk
+        for cls, entry in saved["classes"].items():  # recompiled and re-proven, not trusted from disk
             if entry.get("deny_all"):
                 self._switch(cls, Compiled.denied(), save=False)
             else:
                 self._switch(cls, Compiled.build(policy_from(entry["settings"])), save=False)
         if self.policies[DEFAULT_CLASS] is None:
             self._switch(DEFAULT_CLASS, Compiled.build(default_exec), save=False)
+        # Agents come back where they were: a spent budget stays spent, a sticky halt stays
+        # halted, a blocked agent stays blocked. A class state is restored only onto the very
+        # circuit it was saved from; otherwise that class starts from reset, as an install does.
+        prints = {c: _netlist_print(p) for c, p in self.policies.items()}
+        for name, rec in saved.get("agents", {}).items():
+            a = self.agent(name)
+            a["armed"]["blocked"] = int(bool(rec.get("blocked")))
+            a["ticks"] = int(rec.get("ticks", 0))
+            for cls, cs in (rec.get("classes") or {}).items():
+                if cls in CLASSES and prints.get(cls) and cs.get("netlist") == prints[cls]:
+                    compiled = self.policies[cls]
+                    state = int(cs.get("state", 0))
+                    if not 0 <= state < (1 << compiled.state_bits):
+                        continue
+                    a["classes"][cls] = {"state": state, "ticks": int(cs.get("ticks", 0)),
+                                         "grants": int(cs.get("grants", 0)), "last_grant_tick": cs.get("last_grant_tick")}
 
     def _load(self) -> dict | None:
         """The saved rules, or None when there is no file yet. A file that exists but cannot
@@ -209,7 +233,9 @@ class Boundary:
             classes = data["classes"]
             if not isinstance(classes, dict) or any(c not in CLASSES for c in classes):
                 raise ValueError(f"unknown class in {sorted(classes)}")
-            return classes
+            if not isinstance(data.get("agents", {}), dict):
+                raise ValueError("agents is not an object")
+            return data
         except Exception as e:
             raise SystemExit(f"cannot read the saved rules in {self.state_file} ({e}); refusing to start "
                              f"without them. Fix or move the file to start from the defaults.")
@@ -220,10 +246,22 @@ class Boundary:
         with self.lock:
             classes = {c: ({"deny_all": True} if p.deny_all else {"settings": p.summary["settings"]})
                        for c, p in self.policies.items() if p is not None}
-        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.state_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"format": "c3s.console.policies/1", "saved_at": time.time(), "classes": classes}, indent=2))
-        tmp.replace(self.state_file)  # atomic: a crash mid-write never leaves half a file
+            # Per agent: each class's latch state with the hash of the netlist it belongs to
+            # (a state is meaningless for any other circuit), and the level bit `blocked`.
+            # Events (confirm, irreversible, …) are not kept: they belong to the moment.
+            prints = {c: _netlist_print(p) for c, p in self.policies.items()}
+            agents = {
+                name: {"blocked": a["armed"]["blocked"], "ticks": a["ticks"],
+                       "classes": {c: dict(cs, netlist=prints[c]) for c, cs in a["classes"].items() if prints[c]}}
+                for name, a in self.agents.items()
+            }
+        body = json.dumps({"format": "c3s.console.policies/1", "saved_at": time.time(), "classes": classes,
+                           "agents": agents}, indent=2)
+        with self.save_lock:  # request threads save concurrently; one writer at a time
+            self.state_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.state_file.with_suffix(".tmp")
+            tmp.write_text(body)
+            tmp.replace(self.state_file)  # atomic: a crash mid-write never leaves half a file
 
     # -- what is installed ---------------------------------------------------
 
@@ -291,7 +329,8 @@ class Boundary:
                 "confirm": a["armed"]["confirm"],
             }
             TRANSCRIPTS.appendleft(entry)
-            return entry
+        self._save()
+        return entry
 
     @staticmethod
     def _tick(compiled: Compiled, cs: dict, armed: dict, intent: int, blocked: int) -> tuple[int, dict, list, tuple]:
@@ -400,7 +439,8 @@ class Boundary:
                 "_decisive": decisive,
             }
             TRANSCRIPTS.appendleft(entry)
-            return entry
+        self._save()
+        return entry
 
     # -- reporting ---------------------------------------------------------------
 

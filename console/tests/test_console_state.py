@@ -13,6 +13,13 @@ console = pytest.importorskip("console")
 from c3s.policy import Policy  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def clean_log():
+    console.TRANSCRIPTS.clear()
+    yield
+    console.TRANSCRIPTS.clear()
+
+
 def test_rules_come_back_after_a_restart(tmp_path):
     state = tmp_path / "policies.json"
     first = console.Boundary(console.FLY_DEFAULT, state)
@@ -52,3 +59,36 @@ def test_the_file_is_written_whole(tmp_path):
     data = json.loads(state.read_text())
     assert data["classes"]["spend"] == {"deny_all": True} and "exec" in data["classes"]
     assert not state.with_suffix(".tmp").exists()
+
+
+def test_a_spent_budget_a_halt_and_a_block_survive_a_restart(tmp_path):
+    state = tmp_path / "policies.json"
+    b = console.Boundary(console.FLY_DEFAULT, state)
+    b.install("spend", Policy(max_grants=2, forbid_when_blocked=True))
+    b.install("halt", Policy(sticky_block=True, forbid_when_blocked=True))
+    assert [b.request("payer", 1, "pay", "spend")["granted"] for _ in range(3)] == [True, True, False]
+    b.arm("haltee", {"blocked": 1})
+    b.request("haltee", 1, "x", "exec")  # trips the sticky halt
+    b.arm("haltee", {"blocked": 0})
+    b.arm("blockee", {"blocked": 1})
+
+    again = console.Boundary(console.FLY_DEFAULT, state)
+    refused = again.request("payer", 1, "pay", "spend")
+    assert not refused["granted"] and any(w.startswith("budget") for w in refused["why"])
+    assert not again.request("haltee", 1, "x", "exec")["granted"]  # still halted, blocked is 0
+    blockee = next(a for a in again.status()["agents"] if a["agent"] == "blockee")
+    assert blockee["armed"]["blocked"] == 1
+
+
+def test_a_saved_state_is_not_loaded_into_a_different_circuit(tmp_path):
+    state = tmp_path / "policies.json"
+    b = console.Boundary(console.FLY_DEFAULT, state)
+    b.install("spend", Policy(max_grants=2, forbid_when_blocked=True))
+    for _ in range(2):
+        b.request("payer", 1, "pay", "spend")
+    data = json.loads(state.read_text())
+    data["classes"]["spend"]["settings"]["max_grants"] = 3  # the rules changed while it was down
+    state.write_text(json.dumps(data))
+    again = console.Boundary(console.FLY_DEFAULT, state)
+    payer = next(a for a in again.status()["agents"] if a["agent"] == "payer")
+    assert payer["by_class"]["spend"]["ticks"] == 0  # a different circuit starts from reset, as an install does
