@@ -11,6 +11,7 @@
 
 #include "c3s_core.h"
 #include "c3s_data.h"
+#include "c3s_brain.h"
 
 namespace {
 
@@ -40,7 +41,7 @@ bool autoDemo = true;
 bool paused = false;
 bool sound = true;
 
-enum class Page { Main, SelfTest, Help, Digest, Lattice, Agent, Menu };
+enum class Page { Main, SelfTest, Help, Digest, Lattice, Agent, Menu, Brain };
 enum class Phase { Idle, Looming, TookOff, Ended };
 Page page = Page::SelfTest;
 Phase phase = Phase::Idle;
@@ -596,6 +597,95 @@ void drawAgent() {
   text(4, 125, kMuted, "ENT confirm  b block  u unblock  ` menu");
 }
 
+// ---- fly brain: the published cells, lit by the circuit ---------------------------
+//
+// 26 cells from the MaleCNS v1.0 release (c3s_brain.h, built by
+// scripts/build_firmware_brain.py from the simulator's skeletons): both giant fibers
+// and, per fiber, its six strongest LC4 and LPLC2 inputs. Their shapes and positions
+// are the release's. What lights them is the circuit running on this chip, and only at
+// the resolution the circuit has: an eye's speed field lights that eye's LC4
+// population, its size field the LPLC2 population, the GF pathway both giant fibers.
+// Lighting single cells would claim a resolution the circuit does not have. The faint
+// outline is where these cells are (derived from them), not a neuropil mesh.
+
+int16_t brainX[C3S_BRAIN_POINTS], brainY[C3S_BRAIN_POINTS];
+uint32_t brainFrames = 0, brainMsSum = 0;
+
+uint32_t mix(uint32_t a, uint32_t b, float k) {
+  const auto ch = [&](int sh) { return (uint32_t)(((a >> sh) & 255) * (1 - k) + ((b >> sh) & 255) * k) & 255; };
+  return ch(16) << 16 | ch(8) << 8 | ch(0);
+}
+
+void drawBrain() {
+  const uint32_t t0 = millis();
+  const float ang = 0.62f * sin(t0 / 2600.0f);  // a slow sway, never edge-on
+  const float ca = cos(ang), sa = sin(ang);
+  const float k = 86.0f, cx = 120.0f, cy = 66.0f;
+  const auto project = [&](float x, float y, float z, int16_t *sx, int16_t *sy) {
+    const float rx = x * ca - z * sa, rz = x * sa + z * ca;
+    const float s = 1.9f / (1.9f - 0.55f * rz);
+    *sx = (int16_t)(cx + rx * k * s);
+    *sy = (int16_t)(cy + y * k * s);
+  };
+
+  // outline: where these cells are
+  const uint32_t kOutline = rgb(38, 44, 56);
+  for (int e = 0; e < 3; e++) {
+    const c3s_brain_ellipse &el = c3s_brain_outline[e];
+    int16_t px = 0, py = 0;
+    for (int i = 0; i <= 40; i++) {
+      const float a = i * 2 * M_PI / 40;
+      int16_t sx, sy;
+      project(el.cx + el.rx * cos(a), el.cy + el.ry * sin(a), el.cz, &sx, &sy);
+      if (i) canvas.drawLine(px, py, sx, sy, kOutline);
+      px = sx;
+      py = sy;
+    }
+  }
+
+  for (int i = 0; i < C3S_BRAIN_POINTS; i++)
+    project(c3s_brain_points[3 * i] / 127.0f, c3s_brain_points[3 * i + 1] / 127.0f,
+            c3s_brain_points[3 * i + 2] / 127.0f, &brainX[i], &brainY[i]);
+
+  const uint32_t x = haveTick ? last.x : 0, path = haveTick ? last.pathways : 0;
+  const bool flash = takeoffMotor >= 0 && phase == Phase::TookOff;
+  for (int c = 0; c < C3S_BRAIN_CELLS; c++) {
+    const c3s_brain_cell &cell = c3s_brain_cells[c];
+    uint32_t col;
+    if (cell.type == 0) {
+      col = flash ? rgb(210, 255, 225) : ((path & 1) ? rgb(123, 224, 168) : rgb(85, 96, 110));
+    } else {
+      const uint32_t field = cell.type == 1 ? (cell.side == 0 ? (x >> 4) & 15 : (x >> 12) & 15)
+                                            : (cell.side == 0 ? x & 15 : (x >> 8) & 15);
+      const uint32_t off = cell.type == 1 ? rgb(74, 85, 104) : rgb(83, 86, 106);
+      const uint32_t on = cell.type == 1 ? rgb(255, 138, 101) : rgb(255, 196, 84);
+      col = field ? mix(off, on, 0.35f + 0.65f * field / 15.0f) : off;
+    }
+    const int end = (cell.first_segment + cell.segments) * 2;
+    for (int j = cell.first_segment * 2; j < end; j += 2) {
+      const uint16_t a = c3s_brain_segments[j], b = c3s_brain_segments[j + 1];
+      canvas.drawLine(brainX[a], brainY[a], brainX[b], brainY[b], col);
+    }
+  }
+
+  char buf[48];
+  text(4, 3, kText, "FLY BRAIN");
+  text(64, 3, kMuted, "26 real cells");
+  if (haveTick) {
+    snprintf(buf, sizeof buf, "%s", c3s_motor_names[last.motor & 3]);
+    text(236 - 6 * (int)strlen(buf), 3, motorColor((int)last.motor), buf);
+  }
+  snprintf(buf, sizeof buf, "L %lu/%lu  R %lu/%lu  GF %s", (unsigned long)((x >> 4) & 15), (unsigned long)(x & 15),
+           (unsigned long)((x >> 12) & 15), (unsigned long)((x >> 8) & 15), (path & 1) ? "on" : "off");
+  text(4, 114, kMuted, buf);
+  text(4, 125, kDim, "MaleCNS v1.0 CC-BY  ENT loom  ` menu");
+
+  brainMsSum += millis() - t0;
+  if (++brainFrames == 60) {
+    Serial.printf("brain view: %lu ms per frame over 60 frames\n", (unsigned long)(brainMsSum / 60));
+  }
+}
+
 // ---- menu -------------------------------------------------------------------------
 
 struct MenuEntry {
@@ -606,11 +696,12 @@ struct MenuEntry {
 };
 const MenuEntry kMenu[] = {
     {'1', "Fly escape reflex", "the circuit decides takeoff, live", Page::Main},
-    {'2', "Agent confirm key", "approve what the boundary held back", Page::Agent},
-    {'3', "Gate lattice", "173 NAND gates, each lit by its value", Page::Lattice},
-    {'4', "Whole-domain digest", "8,388,608 rows on this chip, ~10 s", Page::Digest},
-    {'5', "Self-test", "hashes and reference episodes", Page::SelfTest},
-    {'6', "Keys", "every key on every page", Page::Help},
+    {'2', "Fly brain, real cells", "26 published cells lit by the circuit", Page::Brain},
+    {'3', "Agent confirm key", "approve what the boundary held back", Page::Agent},
+    {'4', "Gate lattice", "173 NAND gates, each lit by its value", Page::Lattice},
+    {'5', "Whole-domain digest", "8,388,608 rows on this chip, ~10 s", Page::Digest},
+    {'6', "Self-test", "hashes and reference episodes", Page::SelfTest},
+    {'7', "Keys", "every key on every page", Page::Help},
 };
 const int kMenuCount = sizeof(kMenu) / sizeof(kMenu[0]);
 int menuIndex = 0;
@@ -620,10 +711,10 @@ void drawMenu() {
   text(4, 3, kText, "C3S CIRCUIT AGENT");
   text(206, 3, passed ? kOk : kBad, passed ? "PASS" : "FAIL");
   for (int i = 0; i < kMenuCount; i++) {
-    const int y = 17 + i * 17;
+    const int y = 16 + i * 14;
     if (i == menuIndex) {
-      canvas.fillRect(0, y - 2, 240, 16, kPanel);
-      canvas.fillRect(0, y - 2, 2, 16, kPar);
+      canvas.fillRect(0, y - 2, 240, 13, kPanel);
+      canvas.fillRect(0, y - 2, 2, 13, kPar);
     }
     snprintf(buf, sizeof buf, "%c  %s", kMenu[i].key, kMenu[i].label);
     text(6, y, i == menuIndex ? kText : kMuted, buf);
@@ -647,7 +738,8 @@ void enterPage(Page p) {
     digestRows = 0;
     digestPending = true;
   }
-  if (p == Page::Main) phaseMs = millis();
+  if (p == Page::Main || p == Page::Brain) phaseMs = millis();
+  if (p == Page::Brain) brainFrames = brainMsSum = 0;
   dirty = true;
 }
 
@@ -665,6 +757,8 @@ void draw() {
     drawAgent();
   } else if (page == Page::Menu) {
     drawMenu();
+  } else if (page == Page::Brain) {
+    drawBrain();
   } else {
     drawTopBar();
     drawArena();
@@ -716,6 +810,21 @@ void readInput() {
       }
       if (keys.del) page = Page::Menu;
       dirty = true;
+    }
+    return;
+  }
+  if (page == Page::Brain) {
+    if (M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isPressed()) {
+      auto &keys = M5Cardputer.Keyboard.keysState();
+      if (keys.enter || keys.space) go = true;
+      else page = Page::Menu;
+      dirty = true;
+    }
+    if (go) {
+      autoDemo = false;
+      lvIndex = random(kNumLv);
+      azimuth = (int)random(-9, 10) * 10;
+      launch();
     }
     return;
   }
@@ -840,7 +949,7 @@ void loop() {
       phaseMs = now;
     }
   }
-  if (autoDemo && runnable && page == Page::Main && (phase == Phase::Idle || phase == Phase::Ended) &&
+  if (autoDemo && runnable && (page == Page::Main || page == Page::Brain) && (phase == Phase::Idle || phase == Phase::Ended) &&
       now - phaseMs > 2000) {
     lvIndex = random(kNumLv);
     azimuth = (int)random(-9, 10) * 10;
@@ -851,6 +960,7 @@ void loop() {
     lastDrawMs = now;
     dirty = false;
   }
+  if (page == Page::Brain) dirty = true;  // it sways
   if (page == Page::Lattice) {
     latSpin += 0.03f;
     dirty = true;  // the lattice turns, so it needs a frame even when nothing ticks
