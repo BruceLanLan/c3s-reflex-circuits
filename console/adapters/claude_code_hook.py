@@ -47,6 +47,9 @@ import sys
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from reflex_classes import classify, load_rules  # noqa: E402  (sibling file: which circuit answers)
+
 CONSOLE = os.environ.get("REFLEX_CONSOLE", "http://127.0.0.1:8765").rstrip("/")
 
 # Matched case-insensitively against the raw Bash command and against the describe()
@@ -133,9 +136,12 @@ def main() -> None:
         args = {}
     agent = os.environ.get("REFLEX_AGENT") or f"claude-code:{str(event.get('session_id', ''))[:8]}"
     irreversible = is_irreversible(tool, args, str(event.get("cwd", "")))
-    reason = f"{tool}{' [irreversible]' if irreversible else ''}: {describe(tool, args)}"[:160]
+    # Which circuit answers: one per class of tool (spend / message / exec / files),
+    # decided from the tool's name — framework data, not the model's — and sent along.
+    cls = classify(tool, load_rules(os.environ.get("REFLEX_CLASS_FILE")))
+    reason = f"[{cls}] {tool}{' [irreversible]' if irreversible else ''}: {describe(tool, args)}"[:160]
 
-    body = json.dumps({"agent": agent, "intent": 1, "reason": reason}).encode()
+    body = json.dumps({"agent": agent, "intent": 1, "reason": reason, "class": cls}).encode()
     req = urllib.request.Request(f"{CONSOLE}/api/request", data=body,
                                  headers={"content-type": "application/json"})
     try:

@@ -38,13 +38,24 @@ def console(path: str, payload=None) -> dict:
 
 @pytest.fixture(scope="module", autouse=True)
 def test_policy():
+    """`echo` lands in `exec` and `delete_everything` in `files` (built-in class rules),
+    so the test policy goes into both; whatever was there comes back afterwards."""
     try:
-        before = console("/api/state")["policy"]["settings"]
+        state = console("/api/state")
     except (urllib.error.URLError, OSError) as e:
         pytest.skip(f"console not running at {CONSOLE}: {e}")
-    console("/api/policy", TEST_POLICY)
+    before = {c: (state.get("policies") or {}).get(c) for c in ("exec", "files")}
+    for cls in ("exec", "files"):
+        console("/api/policy", dict(TEST_POLICY, **{"class": cls}))
     yield
-    console("/api/policy", before)
+    for cls, summary in before.items():
+        if summary is None:
+            if cls != "exec":
+                console("/api/policy", {"class": cls, "remove": True})
+        elif summary.get("deny_all"):
+            console("/api/policy", {"class": cls, "deny_all": True})
+        else:
+            console("/api/policy", dict(summary["settings"], **{"class": cls}))
 
 
 class Client:
@@ -152,9 +163,45 @@ def test_gated_call_granted_then_refused_in_cooldown(client):
     assert text_of(c.tool("echo", text="still here")) == "still here"
     c.close()
 
-    # the console's own record agrees: two ticks on this agent, one grant
+    # the console's own record agrees: two ticks on this agent's files circuit, one grant
     mine = [a for a in console("/api/state")["agents"] if a["agent"] == agent]
-    assert mine and mine[0]["ticks"] == 2 and mine[0]["grants"] == 1, mine
+    assert mine and mine[0]["ticks"] == 2, mine
+    files = mine[0]["by_class"]["files"]
+    assert files["ticks"] == 2 and files["grants"] == 1, files
+    assert mine[0]["by_class"]["exec"]["ticks"] == 0  # the class was decided from the name
+
+
+def test_class_is_decided_from_the_tool_name_and_sent(client):
+    agent = fresh_agent()
+    c = client("--agent", agent)
+    c.tool("echo", text="one")             # exec by default
+    c.tool("delete_everything")            # files by the built-in delete_* rule
+    c.close()
+    rows = [e for e in console("/api/state")["transcript"] if e.get("agent") == agent and e["kind"] == "request"]
+    assert sorted(e["class"] for e in rows) == ["exec", "files"]
+    assert all(e["reason"].startswith(f"[{e['class']}] ") for e in rows)
+
+
+def test_fixed_class_overrides_the_rules(client):
+    agent = fresh_agent()
+    c = client("--agent", agent, "--class", "files")
+    assert text_of(c.tool("echo", text="one")) == "one"
+    assert "cooldown" in text_of(c.tool("echo", text="two"))  # the files circuit, not exec
+    c.close()
+    mine = [a for a in console("/api/state")["agents"] if a["agent"] == agent][0]
+    assert mine["by_class"]["files"]["ticks"] == 2 and mine["by_class"]["exec"]["ticks"] == 0
+
+
+def test_uninstalled_class_is_not_gated(client):
+    """`message` has no circuit in this test setup, so a call classed there is granted
+    and the decision says the class is not installed."""
+    agent = fresh_agent()
+    c = client("--agent", agent, "--class", "message")
+    for _ in range(3):
+        assert text_of(c.tool("echo", text="free")) == "free"
+    c.close()
+    rows = [e for e in console("/api/state")["transcript"] if e.get("agent") == agent and e["kind"] == "request"]
+    assert rows and all(e["granted"] and e["class_installed"] is False for e in rows)
 
 
 def test_gate_all_is_the_default(client):

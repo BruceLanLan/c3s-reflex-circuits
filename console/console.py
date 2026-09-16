@@ -1,4 +1,4 @@
-"""Boundary console: rules compiled to a circuit, and every decision made by it.
+"""Boundary console: rules compiled to circuits, and every decision made by them.
 
     C3S_REPO=~/work/c3s-reflex python console.py        # http://127.0.0.1:8765
 
@@ -8,14 +8,22 @@ then proven by visiting every state the circuit can reach from reset. Agents mak
 requests against that circuit; it decides; optionally a public BNB Smart Chain node
 re-evaluates the deciding row read-only, with nothing deployed.
 
-The default rules are the ones the fruit-fly escape circuit was already proven to obey
-(docs/PROPERTIES.md): at most one grant in any 8 ticks, four ticks of commitment before
-one, nothing while blocked. That is where they come from; everything after that is the
-user's to set.
+One agent, one circuit per class of tool. Rules for spending money, sending messages,
+running commands and touching files are different rules, so they are different
+circuits: `spend`, `message`, `exec`, `files`. Each is compiled and checked on its own
+small domain — rows add rather than multiply — and a class with no circuit installed is
+simply not gated (the decision says so). A fifth circuit, `halt`, is shared: it is
+ticked first on every request with the same tool-layer bits, and when it refuses, every
+class sees `blocked` high. Nothing here verifies a rule that spans two classes.
+
+The default `exec` rules are the ones the fruit-fly escape circuit was already proven
+to obey (docs/PROPERTIES.md): at most one grant in any 8 ticks, four ticks of
+commitment before one, nothing while blocked. That is where they come from; everything
+after that is the user's to set.
 
 Two endpoints on purpose, because the separation is the whole point:
 
-    POST /api/request   request, intent                       — what an agent may write
+    POST /api/request   request, intent, class                — what an agent may write
     POST /api/tool      blocked, confirm, irreversible, failed,
                         heartbeat, confirm_b                  — what only the layer above it may write
 
@@ -35,6 +43,7 @@ import threading
 import time
 import urllib.request
 from collections import deque
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -58,21 +67,56 @@ from c3s.policy import AGENT_WRITABLE, MUST_COME_FROM_THE_TOOL_LAYER, Policy  # 
 # is one beat; `failed` reports the outcome of the previous action to the next tick.
 CONSUMED_BY_A_TICK = ("confirm", "confirm_b", "irreversible", "heartbeat", "failed")
 
+# The classes of tool an agent's calls fall into, each with its own circuit, plus the
+# one circuit every class shares. `exec` is where an unclassified call lands, so it
+# always has a circuit.
+TOOL_CLASSES = ("spend", "message", "exec", "files")
+HALT = "halt"
+CLASSES = TOOL_CLASSES + (HALT,)
+DEFAULT_CLASS = "exec"
+
 # The rules the escape circuit itself was proven to obey; the starting point, not a law.
 FLY_DEFAULT = Policy(min_gap_ticks=8, commit_ticks=4, forbid_when_blocked=True)
 TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
 STARTED_AT = time.time()
 
 
-class Boundary:
-    """One compiled policy, its proofs, and one circuit state per agent."""
+def _settings(policy: Policy) -> dict:
+    return {
+        "min_gap_ticks": policy.min_gap_ticks,
+        "commit_ticks": policy.commit_ticks,
+        "forbid_when_blocked": policy.forbid_when_blocked,
+        "max_grants": policy.max_grants,
+        "confirm_window_ticks": policy.confirm_window_ticks,
+        "sticky_block": policy.sticky_block,
+        "heartbeat_ticks": policy.heartbeat_ticks,
+        "confirm_per_irreversible": policy.confirm_per_irreversible,
+        "trip_after_failures": policy.trip_after_failures,
+        "two_key": policy.two_key,
+    }
 
-    def __init__(self, policy: Policy) -> None:
-        self.lock = threading.Lock()
-        self.install(policy)
 
-    def install(self, policy: Policy) -> dict:
-        """Compile, check on every row, prove every rule, then switch to it."""
+@dataclass
+class Compiled:
+    """One class's circuit: the policy, its step table, its bytes, and what was checked.
+
+    `deny_all` is the one case with no circuit: the class refuses everything outright.
+    It exists because `max_grants=0` means *unlimited* in c3s, so "never" needs saying
+    some other way, and a rule that can be stated as "no circuit grants here" does not
+    need a circuit to prove it."""
+
+    policy: Policy | None
+    outs: object
+    nxt: object
+    netlist: bytes
+    n_in: int
+    state_bits: int
+    summary: dict
+    deny_all: bool = False
+
+    @staticmethod
+    def build(policy: Policy) -> "Compiled":
+        """Compile, check on every row, prove every rule."""
         t0 = time.time()
         circuit = policy.build()
         verify = policy.verify(circuit)
@@ -81,18 +125,7 @@ class Boundary:
         netlist = to_bytes(circuit)
         summary = {
             "rules": policy.describe(),
-            "settings": {
-                "min_gap_ticks": policy.min_gap_ticks,
-                "commit_ticks": policy.commit_ticks,
-                "forbid_when_blocked": policy.forbid_when_blocked,
-                "max_grants": policy.max_grants,
-                "confirm_window_ticks": policy.confirm_window_ticks,
-                "sticky_block": policy.sticky_block,
-                "heartbeat_ticks": policy.heartbeat_ticks,
-                "confirm_per_irreversible": policy.confirm_per_irreversible,
-                "trip_after_failures": policy.trip_after_failures,
-                "two_key": policy.two_key,
-            },
+            "settings": _settings(policy),
             "circuit": {
                 "nand": verify["metrics"]["nand"],
                 "latch": verify["metrics"]["latch"],
@@ -114,25 +147,80 @@ class Boundary:
                 "every_rule_holds": proofs["holds"],
                 "violations": proofs["violations"],
             },
+            "deny_all": False,
             "compiled_in_ms": round((time.time() - t0) * 1000),
         }
+        return Compiled(policy, outs, nxt, netlist, len(policy.input_names()), policy.state_bits, summary)
+
+    @staticmethod
+    def denied() -> "Compiled":
+        # Shaped like a real summary so a page written for one does not have to care.
+        summary = {
+            "rules": ["nothing is ever granted"],
+            "settings": _settings(Policy()),
+            "circuit": {"nand": 0, "latch": 0, "bytes": 0, "depth": 0, "netlist": "0x", "inputs": [],
+                        "agent_writable": list(AGENT_WRITABLE), "tool_layer_only": list(MUST_COME_FROM_THE_TOOL_LAYER)},
+            "checked": {"rows": 0, "domain_bits": 0, "matches_reference": True, "reachable_states": 0,
+                        "states_possible": 0, "configurations_visited": 0, "rows_proven": 0,
+                        "every_rule_holds": True, "violations": {}},
+            "deny_all": True,
+            "compiled_in_ms": 0,
+        }
+        return Compiled(None, None, None, b"", 0, 0, summary, deny_all=True)
+
+
+def _fresh_class_state() -> dict:
+    return {"state": 0, "ticks": 0, "grants": 0, "last_grant_tick": None}
+
+
+class Boundary:
+    """Up to five compiled policies, one per class, and per-agent circuit state per class."""
+
+    def __init__(self, default_exec: Policy) -> None:
+        self.lock = threading.Lock()
+        self.policies: dict[str, Compiled | None] = {c: None for c in CLASSES}
+        self.agents: dict[str, dict] = {}
+        self.install(DEFAULT_CLASS, default_exec)
+
+    # -- what is installed ---------------------------------------------------
+
+    def install(self, cls: str, policy: Policy) -> dict:
+        compiled = Compiled.build(policy)  # the slow part, outside the lock
+        return self._switch(cls, compiled)
+
+    def deny_all(self, cls: str) -> dict:
+        return self._switch(cls, Compiled.denied())
+
+    def remove(self, cls: str) -> dict:
+        if cls == DEFAULT_CLASS:
+            raise ValueError(f"{DEFAULT_CLASS} always has a circuit: every unclassified call lands there; install other rules instead")
+        self._switch(cls, None)
+        return {"class": cls, "installed": False}
+
+    def _switch(self, cls: str, compiled: Compiled | None) -> dict:
+        if cls not in CLASSES:
+            raise ValueError(f"no such class: {cls!r}; one of {', '.join(CLASSES)}")
         with self.lock:
-            self.policy, self.circuit, self.outs, self.nxt = policy, circuit, outs, nxt
-            self.netlist, self.summary = netlist, summary
-            self.agents: dict[str, dict] = {}
+            self.policies[cls] = compiled
+            for a in self.agents.values():  # a new circuit starts every agent from reset
+                a["classes"][cls] = _fresh_class_state()
+        summary = dict(compiled.summary) if compiled else {"installed": False}
+        summary["class"] = cls
         return summary
+
+    # -- agents ----------------------------------------------------------------
 
     def agent(self, name: str) -> dict:
         return self.agents.setdefault(
             name,
-            {"state": 0, "ticks": 0, "grants": 0, "last_grant_tick": None,
-             "armed": {bit: 0 for bit in MUST_COME_FROM_THE_TOOL_LAYER}},
+            {"ticks": 0, "armed": {bit: 0 for bit in MUST_COME_FROM_THE_TOOL_LAYER},
+             "classes": {c: _fresh_class_state() for c in CLASSES}},
         )
 
     def arm(self, name: str, bits: dict) -> dict:
-        """The tool layer's bits, held until the agent's next request reads them. Bits
-        the installed policy does not read are stored all the same: they describe the
-        agent, and a later policy may read them."""
+        """The tool layer's bits, held until the agent's next request reads them. Bits no
+        installed policy reads are stored all the same: they describe the agent, and a
+        later policy may read them. Armed bits are per agent, shared by its classes."""
         unknown = [k for k in bits if k not in MUST_COME_FROM_THE_TOOL_LAYER]
         if unknown:
             raise ValueError(f"not a tool-layer bit: {', '.join(unknown)}")
@@ -151,75 +239,147 @@ class Boundary:
             TRANSCRIPTS.appendleft(entry)
             return entry
 
-    def request(self, name: str, intent: int, reason: str) -> dict:
-        """One tick: the agent asks, the circuit answers."""
+    @staticmethod
+    def _tick(compiled: Compiled, cs: dict, armed: dict, intent: int, blocked: int) -> tuple[int, dict, list, tuple]:
+        """One tick of one circuit. Returns (grant, inputs read, reasons, decisive row)."""
+        p = compiled.policy
+        names = p.input_names()
+        inp = {"request": 1, "intent": intent}
+        for bit in names[2:]:
+            inp[bit] = blocked if bit == "blocked" else armed[bit]
+        inputs = sum(inp[bit] << i for i, bit in enumerate(names))
+        state_before = cs["state"]
+        row = inputs | (state_before << compiled.n_in)
+        grant = int(compiled.outs[row])
+        cs["state"] = int(compiled.nxt[row])
+        cs["ticks"] += 1
+        gap = None
+        if grant:
+            if cs["last_grant_tick"] is not None:
+                gap = cs["ticks"] - cs["last_grant_tick"]
+            cs["last_grant_tick"] = cs["ticks"]
+            cs["grants"] += 1
+        # Descriptive only: the verdict is the circuit's; this reads the same counters
+        # it reads and says which rule, in the policy's own words.
+        why = p.reasons(inp, state_before)
+        decisive = (inputs, state_before, grant, cs["state"], compiled.netlist, compiled.n_in, compiled.state_bits)
+        return grant, inp, why, decisive, gap
+
+    def request(self, name: str, intent: int, reason: str, cls: str = DEFAULT_CLASS) -> dict:
+        """One tick: the agent asks, the shared halt circuit answers first, then the
+        class's circuit. Both verdicts are recorded; the class's is the decision."""
+        if cls not in TOOL_CLASSES:
+            raise ValueError(f"no such class: {cls!r}; one of {', '.join(TOOL_CLASSES)}")
+        intent = int(bool(intent))
         with self.lock:
-            p = self.policy
-            names = p.input_names()
-            n_in = len(names)
             a = self.agent(name)
-            inp = {"request": 1, "intent": int(bool(intent))}
-            for bit in names[2:]:
-                inp[bit] = a["armed"][bit]
-            inputs = sum(inp[bit] << i for i, bit in enumerate(names))
-            state_before = a["state"]
-            row = inputs | (state_before << n_in)
-            grant = int(self.outs[row])
-            a["state"] = int(self.nxt[row])
             a["ticks"] += 1
+            armed = a["armed"]
+            decisive: dict[str, tuple] = {}
+
+            halt_entry = None
+            halt_ok = 1
+            halt_c = self.policies[HALT]
+            if halt_c is not None and not halt_c.deny_all:
+                h_grant, h_inp, h_why, h_dec, _ = self._tick(halt_c, a["classes"][HALT], armed, 1, armed["blocked"])
+                halt_ok = h_grant
+                halt_entry = {"granted": bool(h_grant), "why": h_why, "inputs": h_inp}
+                decisive[HALT] = h_dec
+
+            compiled = self.policies[cls]
+            cs = a["classes"][cls]
+            blocked = int(armed["blocked"] or not halt_ok)
             gap = None
-            if grant:
-                if a["last_grant_tick"] is not None:
-                    gap = a["ticks"] - a["last_grant_tick"]
-                a["last_grant_tick"] = a["ticks"]
-                a["grants"] += 1
+            if compiled is None:
+                # Not gated: no circuit for this class, so nothing to refuse with — unless
+                # the shared halt did.
+                grant, inp, why = int(halt_ok), {"request": 1, "intent": intent, "blocked": blocked, "confirm": armed["confirm"]}, []
+                cs["ticks"] += 1
+            elif compiled.deny_all:
+                grant, inp, why = 0, {"request": 1, "intent": intent, "blocked": blocked, "confirm": armed["confirm"]}, [
+                    "class denied outright: no circuit grants here"]
+                cs["ticks"] += 1
+            else:
+                grant, inp, why, dec, gap = self._tick(compiled, a["classes"][cls], armed, intent, blocked)
+                decisive[cls] = dec
+            if halt_entry is not None and not halt_ok:
+                why = [f"halted (shared halt circuit): {'; '.join(halt_entry['why']) or 'no grant'}"] + why
+                grant = 0
+
             for bit in CONSUMED_BY_A_TICK:
-                a["armed"][bit] = 0
+                armed[bit] = 0
             entry = {
                 "at": time.time(),
                 "kind": "request",
                 "agent": name,
+                "class": cls,
+                "class_installed": compiled is not None,
+                "deny_all": bool(compiled is not None and compiled.deny_all),
                 "inputs": inp,
-                "intent": inp["intent"],
-                "blocked": inp["blocked"],
-                "confirm": inp["confirm"],
+                "intent": inp.get("intent", intent),
+                "blocked": inp.get("blocked", blocked),
+                "confirm": inp.get("confirm", 0),
                 "reason": reason,
                 "granted": bool(grant),
                 "tick": a["ticks"],
+                "class_tick": cs["ticks"],
                 "ticks_since_previous_grant": gap,
-                # Descriptive only: the verdict is the circuit's; this reads the same
-                # counters it reads and says which rule, in the policy's own words.
-                "why": p.reasons(inp, state_before),
-                # Carried out of the lock so the chain re-evaluates the circuit that
-                # actually decided, not whichever one is installed by the time it asks.
-                "_decisive": (inputs, state_before, grant, a["state"], self.netlist, n_in, p.state_bits),
+                "why": why,
+                "halt": halt_entry,
+                # Carried out of the lock so the chain re-evaluates the circuits that
+                # actually decided, not whichever are installed by the time it asks.
+                "_decisive": decisive,
             }
             TRANSCRIPTS.appendleft(entry)
             return entry
 
+    # -- reporting ---------------------------------------------------------------
+
+    def _class_view(self, cls: str, cs: dict) -> dict:
+        compiled = self.policies[cls]
+        counters = compiled.policy.fields(cs["state"]) if compiled and compiled.policy else {
+            "gap": 0, "streak": 0, "spent": 0, "window": 0}
+        return {
+            "installed": compiled is not None,
+            "deny_all": bool(compiled and compiled.deny_all),
+            "ticks": cs["ticks"],
+            "grants": cs["grants"],
+            "cooldown_left": counters.get("gap", 0),
+            "intent_streak": counters.get("streak", 0),
+            "grants_used": counters.get("spent", 0),
+            "confirm_window_left": counters.get("window", 0),
+            "counters": counters,
+        }
+
     def status(self) -> dict:
         with self.lock:
-            p = self.policy
             agents = []
             for name, a in sorted(self.agents.items()):
-                counters = p.fields(a["state"])
+                by_class = {c: self._class_view(c, a["classes"][c]) for c in CLASSES}
+                flat = by_class[DEFAULT_CLASS]
                 agents.append(
                     {
                         "agent": name,
                         "ticks": a["ticks"],
-                        "grants": a["grants"],
-                        "cooldown_left": counters["gap"],
-                        "intent_streak": counters["streak"],
-                        "grants_used": counters["spent"],
-                        "confirm_window_left": counters["window"],
-                        "counters": counters,
+                        "grants": flat["grants"],
+                        "cooldown_left": flat["cooldown_left"],
+                        "intent_streak": flat["intent_streak"],
+                        "grants_used": flat["grants_used"],
+                        "confirm_window_left": flat["confirm_window_left"],
+                        "counters": flat["counters"],
+                        "by_class": by_class,
                         "armed": dict(a["armed"]),
                         "armed_blocked": a["armed"]["blocked"],
                         "armed_confirm": a["armed"]["confirm"],
                     }
                 )
+            policies = {c: (dict(p.summary, **{"class": c}) if p else None) for c, p in self.policies.items()}
             return {
-                "policy": self.summary,
+                "policy": policies[DEFAULT_CLASS],
+                "policies": policies,
+                "classes": list(TOOL_CLASSES),
+                "halt_class": HALT,
+                "default_class": DEFAULT_CLASS,
                 "agents": agents,
                 "transcript": [{k: v for k, v in e.items() if not k.startswith("_")} for e in list(TRANSCRIPTS)[:60]],
                 "chain": {
@@ -313,6 +473,13 @@ def policy_from(payload: dict) -> Policy:
     )
 
 
+def class_from(payload: dict, allowed: tuple[str, ...]) -> str:
+    cls = payload.get("class", DEFAULT_CLASS)
+    if not isinstance(cls, str) or cls not in allowed:
+        raise ValueError(f"class must be one of {', '.join(allowed)}")
+    return cls
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "reflex-console"
 
@@ -356,14 +523,25 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/api/policy":
             try:
-                summary = BOUNDARY.install(policy_from(payload))
+                cls = class_from(payload, CLASSES)
+                if payload.get("remove") is True:
+                    summary = BOUNDARY.remove(cls)
+                elif payload.get("deny_all") is True:
+                    summary = BOUNDARY.deny_all(cls)
+                else:
+                    summary = BOUNDARY.install(cls, policy_from(payload))
             except Exception as e:
                 self._json(400, {"error": str(e)})
                 return
-            TRANSCRIPTS.appendleft({"at": time.time(), "kind": "policy", "rules": summary["rules"],
-                                    "circuit": {k: summary["circuit"][k] for k in ("nand", "latch")},
-                                    "rows": summary["checked"]["rows"],
-                                    "every_rule_holds": summary["checked"]["every_rule_holds"]})
+            note = {"at": time.time(), "kind": "policy", "class": cls}
+            if summary.get("installed") is False:
+                note["rules"] = ["no circuit: not gated"]
+            else:
+                note.update({"rules": summary["rules"],
+                             "circuit": {k: summary["circuit"][k] for k in ("nand", "latch")},
+                             "rows": summary["checked"]["rows"],
+                             "every_rule_holds": summary["checked"]["every_rule_holds"]})
+            TRANSCRIPTS.appendleft(note)
             self._json(200, summary)
         elif self.path == "/api/tool":
             bits = {k: v for k, v in payload.items() if k != "agent"}
@@ -372,20 +550,35 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 self._json(400, {"error": str(e)})
         elif self.path == "/api/request":
-            entry = BOUNDARY.request(name, payload.get("intent", 0), str(payload.get("reason", ""))[:160])
-            decisive = entry.pop("_decisive", None)
-            if CHAIN is not None and decisive is not None:
-                inputs, state, grant, next_state, netlist, n_in, state_bits = decisive
-                try:
-                    got, got_state = CHAIN.evaluate(netlist, n_in, 1, state_bits, inputs, state)
+            try:
+                cls = class_from(payload, TOOL_CLASSES)
+                entry = BOUNDARY.request(name, payload.get("intent", 0), str(payload.get("reason", ""))[:160], cls)
+            except ValueError as e:
+                self._json(400, {"error": str(e)})
+                return
+            decisive = entry.pop("_decisive", None) or {}
+            if CHAIN is not None and decisive:
+                circuits, agrees_all, error = {}, True, None
+                for label, (inputs, state, grant, next_state, netlist, n_in, state_bits) in decisive.items():
+                    try:
+                        got, got_state = CHAIN.evaluate(netlist, n_in, 1, state_bits, inputs, state)
+                        ok = (got, got_state) == (grant, next_state)
+                        circuits[label] = {"grant": got, "agrees": ok}
+                        agrees_all = agrees_all and ok
+                    except Exception as e:
+                        error = str(e)[:120]
+                        break
+                if error is not None:
+                    entry["chain"] = {"error": error}
+                else:
+                    decided = circuits.get(cls) or circuits.get(HALT) or {}
                     entry["chain"] = {
                         "chain_id": CHAIN.chain(),
-                        "grant": got,
-                        "agrees": (got, got_state) == (grant, next_state),
+                        "grant": decided.get("grant"),
+                        "agrees": agrees_all,
+                        "circuits": circuits,
                         "deployed": False,
                     }
-                except Exception as e:
-                    entry["chain"] = {"error": str(e)[:120]}
             self._json(200, entry)
         else:
             self._json(404, {"error": "no such path"})
@@ -394,10 +587,11 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"compiling the default rules (the ones the fly circuit obeys) from {REPO} …", flush=True)
     BOUNDARY = Boundary(FLY_DEFAULT)
-    s = BOUNDARY.summary
-    print(f"  {'; '.join(s['rules'])}")
+    s = BOUNDARY.policies[DEFAULT_CLASS].summary
+    print(f"  {DEFAULT_CLASS}: {'; '.join(s['rules'])}")
     print(f"  {s['circuit']['nand']} NAND + {s['circuit']['latch']} LATCH · {s['checked']['rows']} rows checked · "
           f"every rule holds: {s['checked']['every_rule_holds']}", flush=True)
+    print(f"  other classes ({', '.join(c for c in TOOL_CLASSES if c != DEFAULT_CLASS)}, {HALT}): no circuit until one is installed", flush=True)
     CHAIN = None
     if VERIFY_ON_CHAIN:
         try:
