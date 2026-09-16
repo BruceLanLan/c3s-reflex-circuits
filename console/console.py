@@ -848,11 +848,22 @@ class Boundary:
 
         `blocked` is a level, so this latches — it stays where it was put until a person
         lowers it deliberately. An agent first seen *after* the button was pressed is not
-        blocked by it, which is why the page counts how many of how many are blocked."""
+        blocked by it, which is why the page counts how many of how many are blocked.
+
+        Resuming also resets every agent's shared-halt state. A sticky halt circuit waits
+        for "a confirm" to lift; but resume-all *is* the person lifting it (token, and the
+        typed word on the page), and the confirm bit belongs to the calls in the classes —
+        arming one here could approve an irreversible call that was waiting. Resetting the
+        halt's state is what installing a halt circuit does to every agent anyway."""
         with self.lock:
             names = sorted(self.agents)
         for name in names:
             self.arm(name, {"blocked": 1 if stop else 0}, note=note)["source"] = source
+        if not stop and names:
+            with self.lock:
+                for name in names:
+                    self.agents[name]["classes"][HALT] = _fresh_class_state()
+            self._save()
         return names
 
     def status(self) -> dict:

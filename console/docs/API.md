@@ -172,6 +172,13 @@ where the stop came from. It **latches**: resuming is a second, deliberate act �
 the person type the word, and a refusal of `"blocked is high"` offers no confirm, because no
 confirm can lift a block.
 
+`resume-all` also resets every agent's **shared halt** state. A `halt` circuit installed with
+`sticky_block` waits for "a confirm" to lift; the person's resume is that act, and arming a
+confirm bit here could approve an irreversible call waiting in a class, so the halt's state is
+reset instead — the same thing installing a halt circuit does to every agent (wrap-up,
+2026-09-16). An agent first seen *after* the button was pressed is not blocked by it (the page
+counts *n of m*); pressing again catches up with it.
+
 ## Tool classes · `GET /api/classes` / `POST /api/classes`
 
 `GET` returns the tool→class map the adapters use: the built-in rules, the override files, and

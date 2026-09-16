@@ -193,10 +193,12 @@ def handle(chat_id, text: str) -> None:
             call("/api/tool", {"agent": rest[0], "blocked": int(command == "/block")})
             say(chat_id, f"{rest[0]} {'blocked' if command == '/block' else 'unblocked'}")
         else:
-            value = int(command == "/stop")
-            for name in agents:
-                call("/api/tool", {"agent": name, "blocked": value})
-            say(chat_id, f"{'blocked' if value else 'unblocked'} {len(agents)} agent(s)")
+            # The same big red button as the page and the CLI, so it does the same thing:
+            # one `blocked` entry per agent carrying where the press came from, and the
+            # way back also resets the shared halt latch (see docs/API.md, stop-all).
+            stop = command == "/stop"
+            d = call("/api/stop-all" if stop else "/api/resume-all", {"source": "telegram"})
+            say(chat_id, f"{'blocked' if stop else 'unblocked'} {d.get('count', len(agents))} agent(s)")
     else:
         say(chat_id, HELP_AGENT + (HELP_PERSON if person else ""))
 

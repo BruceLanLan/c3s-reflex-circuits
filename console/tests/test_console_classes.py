@@ -128,6 +128,16 @@ def test_uninstalled_class_is_not_gated():
 
 
 def test_shared_halt_blocks_every_class_until_a_confirm():
+    # The halt circuit is persisted with the rest; a run that dies half-way must not leave
+    # it installed on the developer's console (it once did, and every later resume-all
+    # test on this machine failed until someone looked).
+    try:
+        _shared_halt_scenario()
+    finally:
+        api("/api/policy", {"class": "halt", "remove": True})
+
+
+def _shared_halt_scenario():
     api("/api/policy", {"class": "halt", "sticky_block": True, "forbid_when_blocked": True})
     api("/api/policy", {"class": "spend", "min_gap_ticks": 0, "forbid_when_blocked": True})
     a = agent_name()

@@ -264,6 +264,22 @@ Tests run against the live console with a fake inner wallet — no key, nothing 
 nothing broadcast — in the SDK's own venv:
 `~/work/c3s-cache/bnbagent-venv/bin/python -m pytest tests/test_bnbagent_boundary.py`.
 
+## Environment variables the adapters read
+
+| Variable | Read by | Meaning |
+|---|---|---|
+| `REFLEX_CONSOLE` | all | Console URL (default `http://127.0.0.1:8765`); the proxy also takes `--console`. |
+| `REFLEX_AGENT` | all | The name the agent appears under. The hook falls back to Claude Code's session id, the proxy to `mcp:<server>`. |
+| `REFLEX_AGENT_TOKEN` | all | The agent's own token once a person bound its name (`c3s token bind --agent NAME`, I-3). Sent as `X-Reflex-Agent-Token`. Never the operator token — the console refuses one where the other belongs. |
+| `REFLEX_REQUIRE_AGENT_TOKEN` | console | `1`: the console answers only bound names. Off by default; over the LAN a name must be bound regardless. |
+| `REFLEX_WORKSPACE` | docker compose | The one project directory mounted into the agent's container at `/work` (`docs/ISOLATION.md`). The hook itself treats its working directory as "inside". |
+| `REFLEX_CLASS_FILE`, `REFLEX_IRREVERSIBLE_TOOLS_FILE` | hook, proxy | Override files for tool→class and the irreversible list. Default `$REFLEX_CONFIG_DIR/tool-classes.txt` and `irreversible-tools.txt` when present — the page's Connect view writes those. |
+| `REFLEX_FAIL_OPEN` | hook, proxy | `1` forwards gated calls when the console is unreachable. Default refuses (fail closed). |
+| `REFLEX_CONFIG_DIR` | console, adapters | Where the console keeps its files (default `~/.c3s-circuit-agent`). |
+| `REFLEX_HOST_IP` | docker compose | The host's address as seen from the container when it is not `host-gateway` (colima / Lima: `192.168.5.2`; `docs/ISOLATION.md` has the check). |
+
+`.env.example` at the repository root carries the same list with the console's own variables.
+
 ## Not here yet
 
 Guardrail shims for the OpenAI Agents SDK, Vercel AI SDK and LangGraph are the next
