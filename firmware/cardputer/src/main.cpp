@@ -60,6 +60,7 @@ bool dirty = true;
 uint32_t hostSeenMs = 0;
 bool hostEver = false;
 int waitingCount = 0;
+int blockedCount = 0;  // agents the console reports blocked
 bool hostLive() { return hostEver && millis() - hostSeenMs < 4000; }
 
 uint32_t rgb(uint8_t r, uint8_t g, uint8_t b) { return (uint32_t)r << 16 | (uint32_t)g << 8 | b; }
@@ -327,7 +328,7 @@ void drawHelp() {
       "1-4   speed 1x 4x 10x 40x slower",
       "p pause   n one tick when paused",
       "a auto  m sound  t self-test  d digest",
-      "w lattice  g agent  ` or DEL: menu",
+      "g agent  s STOP all  ` or DEL: menu",
       "any key: menu",
   };
   for (int i = 0; i < 9; i++) text(4, 4 + i * 14, i == 0 ? kText : kMuted, lines[i]);
@@ -487,14 +488,15 @@ void copyField(char *dst, size_t size, const char *src) {
 }
 
 void onHostLine(char *line) {
-  char *f[9];
-  int n = fields(line, f, 9);
+  char *f[10];
+  int n = fields(line, f, 10);
   hostSeenMs = millis();
   if (f[0][0] == 'S' && n >= 5) {
     copyField(summary, sizeof summary, f[1]);
     nGranted = atoi(f[2]);
     nRefused = atoi(f[3]);
     copyField(chainState, sizeof chainState, f[4]);
+    blockedCount = n >= 6 ? atoi(f[5]) : 0;
     itemsInCount = 0;
     frameOpen = true;
   } else if (f[0][0] == 'I' && n >= 8 && itemsInCount < kMaxItems) {
@@ -548,6 +550,18 @@ void sendKey(const char *action) {
   if (sound) M5Cardputer.Speaker.tone(strcmp(action, "block") == 0 ? 700 : 2600, 50);
 }
 
+// `s` from any page: block every agent the console knows. `r` on the agent page lifts
+// the block (a sticky halt still needs a confirm per agent — that is the rule's point).
+void sendAll(const char *action) {
+  static uint32_t lastMs = 0;
+  const uint32_t now = millis();
+  if (now - lastMs < 600) return;
+  lastMs = now;
+  Serial.printf("K|%s|*\n", action);
+  if (sound) M5Cardputer.Speaker.tone(strcmp(action, "stop_all") == 0 ? 520 : 2200, 160);
+  dirty = true;
+}
+
 void drawAgent() {
   char buf[72];
   const bool live = hostEver && millis() - hostSeenMs < 4000;
@@ -565,6 +579,12 @@ void drawAgent() {
   text(4, 15, kMuted, summary);
   snprintf(buf, sizeof buf, "granted %d  refused %d  chain %s", nGranted, nRefused, chainState);
   text(4, 26, kMuted, buf);
+  if (blockedCount) {
+    snprintf(buf, sizeof buf, "%d BLOCKED", blockedCount);
+    canvas.fillRect(166, 25, 72, 10, kBad);
+    canvas.setTextColor(kBg);
+    canvas.drawString(buf, 170, 26);
+  }
   canvas.drawFastHLine(0, 37, 240, kDim);
 
   if (itemCount == 0) {
@@ -594,7 +614,7 @@ void drawAgent() {
   canvas.drawFastHLine(0, 110, 240, kDim);
   snprintf(buf, sizeof buf, "%c %.37s", lastGranted ? '+' : 'x', lastLine);
   text(4, 113, lastGranted ? kOk : kBad, buf);
-  text(4, 125, kMuted, "ENT confirm  b block  u unblock  ` menu");
+  text(4, 125, kMuted, "ENT ok b/u block s STOP r resume ` menu");
 }
 
 // ---- fly brain: the published cells, lit by the circuit ---------------------------
@@ -719,7 +739,10 @@ void drawMenu() {
     snprintf(buf, sizeof buf, "%c  %s", kMenu[i].key, kMenu[i].label);
     text(6, y, i == menuIndex ? kText : kMuted, buf);
     if (kMenu[i].page == Page::Agent) {
-      if (hostLive() && waitingCount) {
+      if (hostLive() && blockedCount) {
+        snprintf(buf, sizeof buf, "%d blocked", blockedCount);
+        text(172, y, kBad, buf);
+      } else if (hostLive() && waitingCount) {
         snprintf(buf, sizeof buf, "%d waiting", waitingCount);
         text(172, y, kPar, buf);
       } else {
@@ -727,7 +750,7 @@ void drawMenu() {
       }
     }
   }
-  text(4, 120, kMuted, kMenu[menuIndex].note);
+  text(4, 120, kMuted, hostLive() ? "s: STOP every agent" : kMenu[menuIndex].note);
   canvas.fillRect(0, 130, 240, 1, kDim);
 }
 
@@ -786,6 +809,7 @@ void onKey(char c) {
     case 't': page = Page::SelfTest; pageUntil = 0; break;
     case 'h': page = Page::Help; break;
     case 'g': page = Page::Agent; break;
+    case 's': if (hostLive()) sendAll("stop_all"); break;
     default: break;
   }
   dirty = true;
@@ -806,6 +830,8 @@ void readInput() {
         else if (c == '.' && selected + 1 < itemCount) selected++;
         else if (c == 'b') sendKey("block");
         else if (c == 'u') sendKey("unblock");
+        else if (c == 's') sendAll("stop_all");
+        else if (c == 'r') sendAll("resume_all");
         else if (c == '`' || c == 'h') page = Page::Menu;
       }
       if (keys.del) page = Page::Menu;
@@ -816,7 +842,10 @@ void readInput() {
   if (page == Page::Brain) {
     if (M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isPressed()) {
       auto &keys = M5Cardputer.Keyboard.keysState();
-      if (keys.enter || keys.space) go = true;
+      bool stop = false;
+      for (char c : keys.word) stop = stop || c == 's';
+      if (stop && hostLive()) sendAll("stop_all");
+      else if (keys.enter || keys.space) go = true;
       else page = Page::Menu;
       dirty = true;
     }
@@ -834,6 +863,7 @@ void readInput() {
       auto &keys = M5Cardputer.Keyboard.keysState();
       if (keys.enter || keys.space) enterPage(kMenu[menuIndex].page);
       for (char c : keys.word) {
+        if (c == 's' && hostLive()) sendAll("stop_all");
         if (c == ';' && menuIndex > 0) menuIndex--;
         else if (c == '.' && menuIndex + 1 < kMenuCount) menuIndex++;
         for (int i = 0; i < kMenuCount; i++)
@@ -924,6 +954,13 @@ void loop() {
     }
   }
   uint32_t now = millis();
+  // While a console is listening, say this device is present. A halt policy with a
+  // heartbeat rule then stops every agent when the device is unplugged or goes quiet.
+  static uint32_t lastBeatMs = 0;
+  if (hostEver && now - lastBeatMs >= 2000) {
+    Serial.print("H|\n");
+    lastBeatMs = now;
+  }
   // The host status line has to notice silence even when no frame arrives.
   static bool wasLive = false;
   const bool live = hostLive();
