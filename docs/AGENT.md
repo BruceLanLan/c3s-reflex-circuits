@@ -58,6 +58,26 @@ layer the agent cannot write (the tool runner, a human, a signed feed); rules re
 on those are **boundaries**. `min_gap_ticks` and `max_grants` bind whatever the agent
 does, because they count grants rather than inputs.
 
+With one condition that took three separate findings in one night to state properly:
+**they count one identity's grants.** A counter lives in the latches of one agent's
+circuit, so it bounds whoever the surrounding system decides is that agent, and an
+agent able to present itself as somebody new starts again from reset. This is not
+hypothetical in either direction:
+
+- On chain, `ReflexModule.act` keyed everything by `msg.sender` with no allowlist, so
+  every address was a fresh agent granted on its first tick. A real transaction on a
+  local fork asserted the hole open; a supervisor-written `agents` map and `NotAgent`
+  closed it (`docs/ONCHAIN-LOCAL-FORK.md`).
+- In the console, the big red button wrote `blocked` for the agents it knew, and an
+  agent that renamed itself was measured being granted four ticks later. The answer
+  there is the same shape: stop a condition, not a list of names, and require a bound
+  token per name.
+
+So the honest form of the claim is that these two rules cannot be satisfied by anything
+the agent writes — they are boundaries in the sense this section means — and that what
+they bound is an identity. Who gets to mint an identity is the deployment's question,
+and it is the one worth asking before trusting a budget.
+
 Nothing in the module can enforce that separation — it is a property of how the thing
 is wired up. So it is named in the code (`AGENT_WRITABLE`,
 `MUST_COME_FROM_THE_TOOL_LAYER`), asserted in the tests, and written here: a
