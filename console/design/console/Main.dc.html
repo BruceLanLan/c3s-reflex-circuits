@@ -66,7 +66,7 @@
       <!-- stat row -->
       <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
         <div class="card"><div style="font-size: 11px; color: #5E646C; letter-spacing: .04em;">已接入模型</div><div class="num" style="font-size: 22px; margin-top: 4px;">1</div><div style="font-size: 12.5px; color: #979CA3; margin-top: 2px;">Claude Code（钩子）</div></div>
-        <div class="card"><div style="font-size: 11px; color: #5E646C; letter-spacing: .04em;">电路</div><div class="num" style="font-size: 22px; margin-top: 4px;">4 <span style="font-size: 13px; color: #979CA3;">张</span></div><div style="font-size: 12.5px; color: #46C878; margin-top: 2px;">全部规则成立 · 全域已核</div></div>
+        <div class="card"><div style="font-size: 11px; color: #5E646C; letter-spacing: .04em;">电路</div><div class="num" style="font-size: 22px; margin-top: 4px;">3 <span style="font-size: 13px; color: #979CA3;">张已装</span></div><div style="font-size: 12.5px; color: #46C878; margin-top: 2px;">全部规则成立 · 全域已核 · message 未装</div></div>
         <div class="card"><div style="font-size: 11px; color: #5E646C; letter-spacing: .04em;">今日决策</div><div class="num" style="font-size: 22px; margin-top: 4px;">27</div><div style="font-size: 12.5px; color: #979CA3; margin-top: 2px;">放行 <span class="num" style="font-size: 12.5px;">9</span> · 拒绝 <span class="num" style="font-size: 12.5px;">18</span></div></div>
         <div class="card" style="border-color: rgba(242,165,65,.45);"><div style="font-size: 11px; color: #5E646C; letter-spacing: .04em;">待确认</div><div class="num" style="font-size: 22px; margin-top: 4px; color: #F2A541;">2</div><div style="font-size: 12.5px; color: #979CA3; margin-top: 2px;">等一个人来点，模型点不了</div></div>
       </div>
@@ -75,7 +75,7 @@
 
         <!-- four circuits -->
         <div class="card" style="display: flex; flex-direction: column;">
-          <div class="h2">四张电路 <span class="sub">一类工具一张，行数相加不相乘</span></div>
+          <div class="h2">四类工具的电路 <span class="sub">一类一张，行数相加不相乘</span></div>
           <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; flex: 1;">
             <div style="background: #202529; border: 1px solid #2B3037; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
               <div style="display: flex; gap: 8px; align-items: baseline;"><span style="color: #ECE7DC; font-weight: 600;">spend</span><span style="color: #5E646C; font-size: 12px;">花钱</span></div>
@@ -85,20 +85,20 @@
             </div>
             <div style="background: #202529; border: 1px solid #2B3037; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
               <div style="display: flex; gap: 8px; align-items: baseline;"><span style="color: #ECE7DC; font-weight: 600;">message</span><span style="color: #5E646C; font-size: 12px;">发消息</span></div>
-              <div style="font-size: 12px; color: #979CA3;">封锁即停机直到有人确认；8 拍无心跳停机。<span style="color: #5E646C;">（共享 halt）</span></div>
-              <div class="mono" style="color: #ECE7DC; margin-top: auto;">56 NAND + 4 LATCH · 512 行</div>
-              <div style="font-size: 12px; color: #46C878;">✓ 每条规则成立 · 全域已核</div>
+              <div style="font-size: 12px; color: #979CA3;">尚未装电路 · 不设限。<span style="color: #5E646C;">共享 halt 仍对它生效</span></div>
+              <div class="mono" style="color: #5E646C; margin-top: auto;">—</div>
+              <div style="font-size: 12px; color: #5E646C;">去 Boundaries 装一张</div>
             </div>
             <div style="background: #202529; border: 1px solid #2B3037; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
               <div style="display: flex; gap: 8px; align-items: baseline;"><span style="color: #ECE7DC; font-weight: 600;">exec</span><span style="color: #5E646C; font-size: 12px;">执行</span></div>
-              <div style="font-size: 12px; color: #979CA3;">4 拍至多一次；连续 4 拍表明意图；不可逆要确认；连续 3 次失败熔断。</div>
-              <div class="mono" style="color: #ECE7DC; margin-top: auto;">123 NAND + 9 LATCH · 32,768 行</div>
+              <div style="font-size: 12px; color: #979CA3;">2 拍至多一次；不可逆要确认；连续 3 次失败熔断；blocked 时不放。</div>
+              <div class="mono" style="color: #ECE7DC; margin-top: auto;">69 NAND + 5 LATCH · 2,048 行</div>
               <div style="font-size: 12px; color: #46C878;">✓ 每条规则成立 · 全域已核</div>
             </div>
             <div style="background: #202529; border: 1px solid #2B3037; border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
               <div style="display: flex; gap: 8px; align-items: baseline;"><span style="color: #ECE7DC; font-weight: 600;">files</span><span style="color: #5E646C; font-size: 12px;">文件</span></div>
-              <div style="font-size: 12px; color: #979CA3;">8 拍至多一次；连续 4 拍表明意图；blocked 时不放。<span style="color: #5E646C;">（果蝇默认）</span></div>
-              <div class="mono" style="color: #ECE7DC; margin-top: auto;">81 NAND + 6 LATCH · 1,024 行</div>
+              <div style="font-size: 12px; color: #979CA3;">3 拍至多一次；blocked 时不放。<span style="color: #5E646C;">（演示策略）</span></div>
+              <div class="mono" style="color: #ECE7DC; margin-top: auto;">28 NAND + 2 LATCH · 64 行</div>
               <div style="font-size: 12px; color: #46C878;">✓ 每条规则成立 · 全域已核</div>
             </div>
           </div>
