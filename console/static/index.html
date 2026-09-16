@@ -1,0 +1,94 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Reflex console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #15181C; --panel: #1C2025; --line: #2B3037; --text: #ECE7DC; --dim: #979CA3;
+          --faint: #5E646C; --ok: #46C878; --bad: #E36A52; --amber: #F2A541;
+          --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--dim); font: 14px/1.5 system-ui, -apple-system, "PingFang SC", sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 22px 16px 40px; display: grid; gap: 20px; }
+  h1 { margin: 0; font-size: 16px; color: var(--text); font-weight: 600; }
+  h2 { margin: 0 0 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  .sub { font-size: 12.5px; color: var(--faint); }
+  .card { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--faint); font-weight: 500; padding: 4px 8px 4px 0; }
+  td { padding: 4px 8px 4px 0; color: var(--text); }
+  code, .mono { font-family: var(--mono); font-size: 12px; }
+  form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  input { background: none; border: 1px solid var(--line); color: inherit; padding: 6px 8px; font: inherit; font-size: 13px; border-radius: 6px; }
+  input[type=number] { width: 8.5em; }
+  #reason { flex: 1; min-width: 12em; }
+  button { background: var(--amber); color: #121417; border: 0; border-radius: 8px; padding: 7px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  li { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 9px; align-items: baseline; font-size: 13px; }
+  li i { width: 8px; height: 8px; border-radius: 2px; background: var(--faint); margin-top: 6px; }
+  li.ok i { background: var(--ok); } li.no i { background: var(--faint); } li.err i { background: var(--bad); }
+  .muted { color: var(--faint); }
+</style>
+<main>
+  <div>
+    <h1>Reflex console</h1>
+    <div class="sub" id="circuit">loading…</div>
+    <div class="sub">A model proposes; the circuit decides. Nothing here holds a wallet or a key, and an authorisation is a verdict, not an action.</div>
+  </div>
+
+  <div class="card">
+    <h2>Propose</h2>
+    <form id="form">
+      <input id="agent" value="console" aria-label="agent" size="10">
+      <input id="lv" type="number" value="40" min="5" max="400" step="1" aria-label="l/v in ms">
+      <input id="az" type="number" value="-60" min="-90" max="90" step="5" aria-label="azimuth in degrees">
+      <input id="reason" placeholder="why this one" value="closing in">
+      <button type="submit">Ask the circuit</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Agents</h2>
+    <table id="agents"><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Transcript</h2>
+    <ul id="log"></ul>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+
+function render(s) {
+  const c = s.circuit;
+  $("circuit").textContent = `${c.name} · ${c.nand} NAND + ${c.latch} LATCH · sha256 ${c.sha256.slice(0, 16)}… · refractory ${s.refractory_ticks} ticks (proven)`;
+  $("agents").querySelector("tbody").innerHTML = s.agents.length
+    ? "<tr><th>agent</th><th>ticks</th><th>authorised</th><th>since last</th><th>refractory left</th></tr>" +
+      s.agents.map((a) => `<tr><td>${a.agent}</td><td class="mono">${a.ticks}</td><td class="mono">${a.authorisations}</td>` +
+        `<td class="mono">${a.ticks_since_authorisation ?? "—"}</td>` +
+        `<td class="mono">${a.refractory_ticks_left ?? "—"}</td></tr>`).join("")
+    : `<tr><td class="muted">no proposals yet</td></tr>`;
+  $("log").innerHTML = s.transcript.map((e) => {
+    const cls = e.error ? "err" : e.authorised ? "ok" : "no";
+    const when = new Date(e.at * 1000).toLocaleTimeString();
+    const gap = e.ticks_since_previous_authorisation != null ? `, ${e.ticks_since_previous_authorisation} ticks after the last` : "";
+    const head = e.error ? `refused: ${e.error}` : `${e.authorised ? "AUTHORISED" : "refused"} — ${e.action}${gap}`;
+    return `<li class="${cls}"><i></i><span><span class="mono">${when}</span> ${e.agent} · l/v ${e.l_over_v_ms} ms · az ${e.azimuth_deg}° — ${head}` +
+           `${e.reason ? ` <span class="muted">(${e.reason})</span>` : ""}</span></li>`;
+  }).join("");
+}
+
+async function refresh() {
+  try { render(await (await fetch("/api/state")).json()); } catch (e) { /* the service may be restarting */ }
+}
+
+$("form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const body = { agent: $("agent").value, l_over_v_ms: Number($("lv").value), azimuth_deg: Number($("az").value), reason: $("reason").value };
+  await fetch("/api/propose", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  refresh();
+});
+
+refresh();
+setInterval(refresh, 2000);
+</script>
