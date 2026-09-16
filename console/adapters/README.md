@@ -20,6 +20,32 @@ refused by the boundary at tick 6: cooldown: 7 ticks left of 8.
 refused by the boundary at tick 9: blocked is high. The tool layer has blocked this agent; only it can lift that.
 ```
 
+The hook is also the tool layer for two bits, which is what makes two of the rules
+usable with a real agent at all:
+
+* **`irreversible`** — before asking, the PreToolUse hook looks at the call the
+  framework is about to make (tool name and arguments — not anything the model says
+  about itself) and, if it matches a pattern for something that cannot be undone, arms
+  `irreversible` for this tick. Under `confirm_per_irreversible` the circuit then
+  refuses unless a person has left an unspent confirm, and the reason tells the model
+  not to retry until one is given. Built-in patterns: `rm` in any form, `git push`,
+  `git reset --hard`, `git clean`, `git branch -D`, `--force`/`--hard`, `sudo`,
+  `curl … | sh`, `chmod -R`/`chown -R`, `drop table/database`, `truncate`,
+  `delete from`, `mkfs`, `dd if=`, redirects into `/dev/`, and any Write or Edit to a
+  path outside the working directory. `REFLEX_IRREVERSIBLE_FILE=<path>` replaces the
+  list with one fnmatch glob per line (`#` comments); a line `!default` keeps the
+  built-ins as well.
+* **`failed`** — the PostToolUse hook reads the framework's report of the result
+  (`is_error`, a non-zero `exit_code`, `success: false`, an `error`, or the
+  `PostToolUseFailure` event itself) and arms `failed` when the call failed. Under
+  `trip_after_failures=k`, k such ticks in a row trip the breaker until a person
+  confirms. It prints nothing and never blocks: the tool has already run.
+
+Both are heuristics and are named as such. The circuit proves "irreversible and no
+confirm ⇒ no grant" and "k failures ⇒ no grant"; whether a given `rm` was recognised,
+or a given failure surfaced, is this layer's promise, and a miss here is this layer's
+miss. `confirm`, `confirm_b` and `blocked` are never written by either hook.
+
 Add to `~/.claude/settings.json` (all projects) or `.claude/settings.json` (one
 project). Put it in a file the agent cannot edit: an agent that can rewrite its own
 hook configuration has no boundary, only a habit.
@@ -38,6 +64,30 @@ hook configuration has no boundary, only a habit.
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Write|Edit|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /absolute/path/to/reflex-console/adapters/claude_code_post_hook.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash|Write|Edit|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /absolute/path/to/reflex-console/adapters/claude_code_post_hook.py",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }
@@ -48,6 +98,8 @@ Try it without installing anything:
 ```sh
 echo '{"session_id":"demo","tool_name":"Bash","tool_input":{"command":"ls","description":"list files"}}' \
   | python3 adapters/claude_code_hook.py; echo "exit $?"
+echo '{"session_id":"demo","tool_name":"Bash","tool_input":{"command":"rm -rf build"}}' \
+  | python3 adapters/claude_code_hook.py; echo "exit $?"     # arms irreversible first
 ```
 
 If the console is down the hook refuses (exit 2) and says why; set
