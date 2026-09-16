@@ -320,10 +320,22 @@ $ tail -1 /tmp/console.log
 127.0.0.1 "POST /api/request HTTP/1.1" 200 -
 ```
 
-On a Linux docker host the peer address is usually the bridge instead, and then the LAN
-rule *does* apply: the container's name must be bound and send its token, or every request
-is refused. Either way the two steps above are what you should be doing; do not rely on
-which side of that line your container happens to fall.
+What decides it is *which address the client dials*, not the operating system. Measured
+against one console (bound to `0.0.0.0`, as the pairing flow needs), from a container:
+
+```
+via the docker host-gateway (192.168.5.2:8765, the forwarder):
+  http=200        console log:  127.0.0.1 "GET /api/state HTTP/1.1" 200 -
+via this machine's LAN address (192.168.1.23:8765, only a wildcard bind answers it):
+  {"error": "reading the console over the network needs a token: …"}
+                  console log:  192.168.1.23 "GET /api/state HTTP/1.1" 403 -
+```
+
+So a container that goes through the forwarder is local as far as the console is concerned,
+and one that reaches it by a real network address of this machine — which is possible only
+when the console is bound past loopback — gets the network treatment: the name must already
+be bound and send its token. Both are the same rule; only the route differs. Do the two
+steps above and it stops mattering which route your container takes.
 
 ## What this does not do
 
