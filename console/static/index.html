@@ -77,6 +77,10 @@
   button.pre:hover { color: var(--text); border-color: var(--faint); }
   button.pre.tool { border-color: rgba(242,165,65,.5); color: var(--tool); }
   button.pre.tool:hover { border-color: var(--tool); }
+  button.pre.tool[data-off] { opacity: .35; cursor: not-allowed; border-style: dashed; }
+  .inputs { font-size: 12px; color: var(--faint); margin-bottom: 10px; overflow-wrap: anywhere; }
+  .inputs code { color: var(--dim); }
+  .inputs code.c-tool { color: var(--tool); } .inputs code.c-agent { color: var(--agent); }
   .msg { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel2); border: 1px solid var(--line); overflow-wrap: anywhere; }
   .msg:empty { display: none; }
 
@@ -174,7 +178,7 @@
 
   /* notes */
   .notes { display: grid; gap: 8px; font-size: 12.5px; }
-  .notes div { display: grid; grid-template-columns: 14px 1fr; gap: 8px; }
+  .notes div { display: grid; grid-template-columns: 14px 1fr; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
   .notes div::before { content: "—"; color: var(--faint); }
   .notes div.key { padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; grid-template-columns: 1fr; color: var(--text); }
   .notes div.key::before { content: none; }
@@ -224,11 +228,39 @@
           <div><div class="name"><span data-i18n="r.confirm"></span><code>confirm_window_ticks</code><span class="badge boundary" data-i18n="b.boundary"></span></div>
             <div class="hint" data-i18n="r.confirm.hint"></div><div class="chan boundary" data-i18n="r.confirm.chan"></div></div>
         </div>
+        <div class="rule">
+          <div class="tog"><input id="r-sticky" type="checkbox"></div>
+          <div><div class="name"><span data-i18n="r.sticky"></span><code>sticky_block</code><span class="badge boundary" data-i18n="b.boundary"></span></div>
+            <div class="hint" data-i18n="r.sticky.hint"></div><div class="chan boundary" data-i18n="r.sticky.chan"></div></div>
+        </div>
+        <div class="rule">
+          <input id="r-heartbeat" type="number" min="0" max="255" step="1" required>
+          <div><div class="name"><span data-i18n="r.heartbeat"></span><code>heartbeat_ticks</code><span class="badge boundary" data-i18n="b.boundary"></span></div>
+            <div class="hint" data-i18n="r.heartbeat.hint"></div><div class="chan boundary" data-i18n="r.heartbeat.chan"></div></div>
+        </div>
+        <div class="rule">
+          <div class="tog"><input id="r-irrev" type="checkbox"></div>
+          <div><div class="name"><span data-i18n="r.irrev"></span><code>confirm_per_irreversible</code><span class="badge boundary" data-i18n="b.boundary"></span></div>
+            <div class="hint" data-i18n="r.irrev.hint"></div><div class="chan boundary" data-i18n="r.irrev.chan"></div></div>
+        </div>
+        <div class="rule">
+          <input id="r-trip" type="number" min="0" max="255" step="1" required>
+          <div><div class="name"><span data-i18n="r.trip"></span><code>trip_after_failures</code><span class="badge boundary" data-i18n="b.boundary"></span></div>
+            <div class="hint" data-i18n="r.trip.hint"></div><div class="chan boundary" data-i18n="r.trip.chan"></div></div>
+        </div>
+        <div class="rule">
+          <div class="tog"><input id="r-twokey" type="checkbox"></div>
+          <div><div class="name"><span data-i18n="r.twokey"></span><code>two_key</code><span class="badge boundary" data-i18n="b.boundary"></span></div>
+            <div class="hint" data-i18n="r.twokey.hint"></div><div class="chan boundary" data-i18n="r.twokey.chan"></div></div>
+        </div>
         <div class="presets">
           <span class="muted" data-i18n="r.presets"></span>
-          <button class="pre" type="button" data-preset="8,4,1,0,0" data-i18n="p.fly"></button>
-          <button class="pre" type="button" data-preset="4,0,1,3,6" data-i18n="p.confirm"></button>
-          <button class="pre" type="button" data-preset="0,0,0,0,0" data-i18n="p.open"></button>
+          <button class="pre" type="button" data-preset='{"min_gap_ticks":8,"commit_ticks":4,"forbid_when_blocked":true}' data-i18n="p.fly"></button>
+          <button class="pre" type="button" data-preset='{"min_gap_ticks":4,"forbid_when_blocked":true,"max_grants":3,"confirm_window_ticks":6}' data-i18n="p.confirm"></button>
+          <button class="pre" type="button" data-preset='{"min_gap_ticks":8,"forbid_when_blocked":true,"max_grants":7,"confirm_per_irreversible":true,"two_key":true}' data-i18n="p.spend"></button>
+          <button class="pre" type="button" data-preset='{"min_gap_ticks":4,"commit_ticks":4,"forbid_when_blocked":true,"confirm_per_irreversible":true,"trip_after_failures":3}' data-i18n="p.exec"></button>
+          <button class="pre" type="button" data-preset='{"forbid_when_blocked":true,"sticky_block":true,"heartbeat_ticks":8}' data-i18n="p.halt"></button>
+          <button class="pre" type="button" data-preset='{}' data-i18n="p.open"></button>
           <button class="pre" type="button" id="r-reload" data-i18n="p.current"></button>
         </div>
         <div class="domain" id="domain"></div>
@@ -243,6 +275,7 @@
     <section>
       <h2><span data-i18n="h.evidence"></span><span class="sub" data-i18n="h.evidence.sub"></span></h2>
       <ul class="words" id="words"></ul>
+      <div class="inputs" id="inputs"></div>
       <div class="verdicts" id="verdicts"></div>
       <div class="tiles" id="tiles"></div>
       <div class="viol" id="viol"></div>
@@ -275,6 +308,12 @@
           <button class="pre tool" type="button" data-tool="blocked,1" data-i18n="t.block"></button>
           <button class="pre tool" type="button" data-tool="blocked,0" data-i18n="t.unblock"></button>
           <button class="pre tool" type="button" data-tool="confirm,1" data-i18n="t.confirm"></button>
+        </div>
+        <div class="row">
+          <button class="pre tool" type="button" data-tool="irreversible,1" data-i18n="t.irrev"></button>
+          <button class="pre tool" type="button" data-tool="failed,1" data-i18n="t.failed"></button>
+          <button class="pre tool" type="button" data-tool="heartbeat,1" data-i18n="t.heartbeat"></button>
+          <button class="pre tool" type="button" data-tool="confirm_b,1" data-i18n="t.confirm_b"></button>
         </div>
         <div class="note" data-i18n="t.hint"></div>
       </div>
@@ -315,7 +354,7 @@ const N = (v) => Number(v) || 0;
 // ---------- text ----------
 const T = {
   zh: {
-    "h.rules": "规则", "h.rules.sub": "五条设置，各自落在哪个通道上",
+    "h.rules": "规则", "h.rules.sub": "十条设置，各自落在哪个通道上",
     "h.evidence": "当前规则的证据", "h.evidence.sub": "编译 · 逐行核对 · 遍历证明",
     "h.channels": "两个通道", "h.channels.sub": "谁能写这一位，决定了规则值多少",
     "h.agents": "接入的 agent", "h.agents.sub": "每个名字一份独立的电路状态；一拍 = 该 agent 的一次请求",
@@ -330,8 +369,15 @@ const T = {
     "r.blocked": "blocked 为高时一律不放", "r.blocked.hint": "只要 blocked 位为高，请求一律拒绝。", "r.blocked.chan": "落在 <code>blocked</code> 上——这一位必须来自 agent 写不到的工具层。所以这是边界。",
     "r.max": "总放行上限", "r.max.hint": "累计放行到这个数之后再也不放。0 = 不限。", "r.max.chan": "只数放行次数：无论 agent 怎么做都约束它。",
     "r.confirm": "确认窗口（拍）", "r.confirm.hint": "放行需要最近这么多拍内有一次 confirm。0 = 不要求。", "r.confirm.chan": "落在 <code>confirm</code> 上——这一位必须来自工具层。所以这是边界。",
-    "r.presets": "预设：", "p.fly": "果蝇电路遵守的规则（8 / 4 / blocked）", "p.confirm": "带确认窗口（4 拍间隔 · 最多 3 次 · 6 拍内需 confirm）", "p.open": "全放（无规则，对照用）", "p.current": "读回当前安装",
-    "r.domain": "编译后 {state} 位状态 · 需逐行核对 2^{bits} = {rows} 行", "r.domain.warn": "超过 26 位的穷举上限，服务端会拒绝这组规则。",
+    "r.sticky": "封锁后停机，直到有人确认", "r.sticky.hint": "blocked 一旦为高就停机；放下 blocked 也不恢复，只有一次 confirm 才解除（解除那一拍本身不放行）。", "r.sticky.chan": "落在 <code>blocked</code> 与 <code>confirm</code> 上——都来自工具层。所以这是边界；上面那条 blocked 禁放是无记忆的，这条有。",
+    "r.heartbeat": "连续 N 拍没有心跳就停机", "r.heartbeat.hint": "连续这么多拍 heartbeat 都为低，就同样停机，直到一次 confirm。0 = 不要求。", "r.heartbeat.chan": "落在 <code>heartbeat</code> 上——只能由工具层打。所以这是边界。",
+    "r.irrev": "不可逆动作消耗一次确认", "r.irrev.hint": "irreversible 为高的请求，必须有一次尚未用掉的 confirm 才放行，放行即用掉；可逆请求不需要也不消耗。", "r.irrev.chan": "落在 <code>irreversible</code> 与 <code>confirm</code> 上——由工具层标注哪次动作不可逆。所以这是边界。",
+    "r.trip": "熔断：连续 N 次失败", "r.trip.hint": "连续这么多拍 failed 为高就跳闸，之后一律不放，直到一次 confirm 复位。0 = 不要求。", "r.trip.chan": "落在 <code>failed</code> 上——由工具层上报上一次动作的结果。所以这是边界。",
+    "r.twokey": "双钥：confirm 与 confirm_b 都要", "r.twokey.hint": "每次放行都需要两把钥匙都到过（或当拍到），放行即同时用掉。", "r.twokey.chan": "落在 <code>confirm</code> 与 <code>confirm_b</code> 上——两个人各一把。所以这是边界。",
+    "r.presets": "预设：", "p.fly": "果蝇电路遵守的规则（8 / 4 / blocked）", "p.confirm": "带确认窗口（4 拍间隔 · 最多 3 次 · 6 拍内需 confirm）",
+    "p.spend": "花钱类（8 拍间隔 · 最多 7 次 · 不可逆需确认 · 双钥）", "p.exec": "执行类（4 拍间隔 · 4 拍承诺 · 不可逆需确认 · 3 次失败熔断）", "p.halt": "停机（粘滞封锁 · 8 拍无心跳）",
+    "p.open": "全放（无规则，对照用）", "p.current": "读回当前安装",
+    "r.domain": "编译后 {inputs} 个输入 + {state} 位状态 · 需逐行核对 2^{bits} = {rows} 行", "r.domain.warn": "超过 26 位的穷举上限，服务端会拒绝这组规则。",
     "r.install": "编译并安装", "r.install.note": "重编译、重核对、重证明；所有 agent 的计数归零。",
     "r.installing": "编译中…", "r.installed": "已安装：{nand} NAND + {latch} LATCH，核对 {rows} 行，{holds}，用时 {ms} ms。所有 agent 已归零。",
     "r.refused": "未安装（HTTP {code}）：{err}", "r.neterr": "发不出去：{e}",
@@ -342,6 +388,8 @@ const T = {
     "ev.holds.body": "从复位出发，穷尽每个可达状态下的每种输入：可达 <b>{reach}</b> / {poss} 个状态，配合独立计数器共 <b>{conf}</b> 个配置、<b>{proven}</b> 行，逐条规则计违规数。",
     "tl.nand": "NAND", "tl.latch": "LATCH", "tl.bytes": "字节", "tl.depth": "深度", "tl.ms": "编译+两项检查",
     "viol.head": "违规计数：", "viol.rate_limit": "限速", "viol.commitment": "承诺", "viol.forbidden": "禁放", "viol.budget": "上限", "viol.confirm_window": "确认窗口",
+    "viol.halted": "停机", "viol.one_shot": "一次性确认", "viol.breaker": "熔断", "viol.two_key": "双钥",
+    "ev.inputs": "电路读取的输入位：", "ev.inputs.agent": "（agent 写）", "ev.inputs.tool": "（工具层写）",
     "netlist": "网表（{bytes} 字节，链上复核送的就是这段）",
     "prov": "默认规则 <code>{rules}</code> 是果蝇逃逸电路本身被证明遵守的规则。这是来源，不是法律：之后的每一条都由你来定。",
     "ch.lead": "左栏的位由 <b>agent</b> 写；右栏的位只能由 agent 写不到的一层写——工具运行器、人、签过名的数据源。落在左栏上的规则是代价，落在右栏上的规则才是边界。软件里没有任何东西能强制这个区分：它是部署方式的属性。在这一页上两栏都是你在按，所以这里只是演示。",
@@ -349,34 +397,37 @@ const T = {
     "a.title": "Agent 通道", "a.writer": "写入者：<b>agent 自己</b>。每次请求 request=1，并推进该 agent 一拍。",
     "a.intent": "intent 为高（表明意图）", "a.reason": "理由", "a.reason.hint": "记在案，不参与裁决。", "a.send": "发出请求（1 拍）", "a.send.hint": "电路当场裁决。",
     "t.title": "工具层通道", "t.writer": "写入者：<b>agent 写不到的一层</b>。这里的位在下一次请求时被读取。",
-    "t.armed": "{agent} 当前已备位：blocked = <b class=\"{bc}\">{b}</b> · confirm = <b class=\"{cc}\">{c}</b>", "t.armed.none": "{agent} 还没有任何状态；两位均为 0。",
+    "t.armed": "{agent} 当前已备位：{bits}", "t.armed.none": "{agent} 还没有任何状态；各位均为 0。",
     "t.block": "拉高 blocked", "t.unblock": "放下 blocked", "t.confirm": "给一次 confirm",
-    "t.hint": "blocked 保持到你放下为止；confirm 只对下一次请求有效，用掉即清。",
-    "t.done": "工具层已写 {agent}：blocked = {b} · confirm = {c}",
+    "t.irrev": "下一次动作不可逆", "t.failed": "上报一次失败", "t.heartbeat": "打一次心跳", "t.confirm_b": "给一次 confirm_b",
+    "t.unread": "当前规则不读 {bit}；电路会忽略这一位。", "t.unread.short": "当前规则不读此位",
+    "t.hint": "blocked 是电平，保持到你放下为止；其余各位是事件，只对下一次请求有效，用掉即清。变灰的按钮对应当前电路不读的位。",
+    "t.done": "工具层已写 {agent}：{bits}",
     "l.sending": "已发出，等电路…", "l.neterr": "发不出去：{e}",
-    "ag.name": "agent", "ag.ticks": "已走拍数", "ag.grants": "放行次数", "ag.cool": "冷却剩余", "ag.streak": "intent 连续", "ag.used": "上限已用", "ag.window": "确认窗口剩余", "ag.armed": "已备位",
+    "ag.name": "agent", "ag.ticks": "已走拍数", "ag.grants": "放行次数", "ag.cool": "冷却剩余", "ag.streak": "intent 连续", "ag.used": "上限已用", "ag.window": "确认窗口剩余", "ag.state": "锁存状态", "ag.armed": "已备位",
     "ag.none": "还没有任何请求。用上面的两栏，或按「接入方式」发一条。",
     "ag.ready": "可放行", "ag.left": "{n} 拍", "ag.norule": "— 无此规则", "ag.of": "{a} / {b}", "ag.streak.sat": "≥ {b}（够）", "ag.window.armed": "本拍已 confirm",
-    "ag.armed.v": "blocked {b} · confirm {c}",
+    "ag.halted": "已停机", "ag.silence": "无心跳 {n} 拍", "ag.token": "有一次未用确认", "ag.tripped": "熔断已跳", "ag.fails": "连续失败 {n}", "ag.keys": "钥匙 A {a} · B {b}", "ag.clear": "正常",
     "log.sub": "最近 {n} 条 · 放行 {g} · 拒绝 {r}", "log.none": "还没有记录。",
     "v.grant": "放行", "v.refuse": "拒绝", "v.tool": "工具层", "v.policy": "规则",
-    "e.tick": "第 {n} 拍", "e.gap": "距上次放行 {n} 拍", "e.bits": "intent {i} · blocked {b} · confirm {c}",
-    "e.why": "拒绝原因（策略原话）：", "e.granted": "五条检查全过，电路输出 grant = 1。",
+    "e.tick": "第 {n} 拍", "e.gap": "距上次放行 {n} 拍",
+    "e.why": "拒绝原因（策略原话）：", "e.granted": "每条检查都过，电路输出 grant = 1。",
     "e.chain.ok": "BSC（链 {id}）只读复核一致 · 未部署，无钱包", "e.chain.dis": "BSC（链 {id}）复核不一致：节点算出 grant = {g}", "e.chain.err": "链上复核不可用：{err}（裁决不受影响）",
-    "e.tool": "写入 blocked = {b} · confirm = {c}",
+    "e.tool": "写入 {bits}",
     "e.policy": "已安装：{rules}", "e.policy.s": "{nand} NAND + {latch} LATCH · 核对 {rows} 行 · {holds}",
-    "n.key": "落在 <code>request</code>／<code>intent</code> 上的规则（承诺拍数）是<b>代价</b>：这两位是 agent 自己写的，它随时可以选择付。落在 <code>blocked</code>／<code>confirm</code> 上的规则（blocked 禁放、确认窗口）是<b>边界</b>：这两位必须来自 agent 写不到的一层。最小间隔与总上限只数放行次数，所以无论 agent 怎么做都约束它。软件里没有任何东西能强制这个分离——它取决于部署时谁接哪根线。",
+    "n.key": "落在 <code>request</code>／<code>intent</code> 上的规则（承诺拍数）是<b>代价</b>：这两位是 agent 自己写的，它随时可以选择付。落在 <code>blocked</code>／<code>confirm</code>／<code>irreversible</code>／<code>failed</code>／<code>heartbeat</code>／<code>confirm_b</code> 上的规则（禁放、确认窗口、粘滞停机、一次性确认、熔断、双钥）是<b>边界</b>：这些位必须来自 agent 写不到的一层。最小间隔与总上限只数放行次数，所以无论 agent 怎么做都约束它。软件里没有任何东西能强制这个分离——它取决于部署时谁接哪根线。",
     "n1": "没有钱包，没有私钥，不签任何东西，不广播任何东西，什么都没部署。",
     "n2": "链上复核是一次只读 eth_call，把当前网表和裁决那一行送给公共节点重算；不花 gas，不出现任何地址。",
     "n3": "「放行」是对一个请求的裁决，不是动作本身。动作是什么、谁去做，都在这个程序之外。",
     "n4": "这个台子自己不加任何规则：每一次拒绝都是电路的输出；「原因」一栏只是读同一组计数器给出的说明。",
     "n5": "拍不是钟：一拍就是该 agent 的一次请求。规则不约束墙上时间，也不能让输入位真的等于它的名字所指的东西。",
+    "n6": "不同类别的动作（花钱、执行、发消息）应各编译一张电路，行数相加而不是相乘；代价是跨类别的约束（「花钱后三拍内别发消息」）这里没有任何东西去验。",
     "c.intro": "规则、工具层、agent 三个写入口，加一个只读状态：",
-    "c.policy": "安装一组规则（会重编译、重证明，所有 agent 归零）", "c.tool": "工具层：拉高 blocked / 给一次 confirm", "c.request": "agent：发出一次请求（一拍）", "c.state": "全部状态",
+    "c.policy": "安装一组规则（会重编译、重证明，所有 agent 归零）", "c.tool": "工具层：拉高 blocked / 给一次 confirm / 标注下一次动作不可逆 / 上报失败 / 心跳 / 第二把钥匙", "c.request": "agent：发出一次请求（一拍）", "c.state": "全部状态",
     "foot": "本机服务 · stdlib HTTP · 单文件静态页 · 无外部依赖。语言选择只存在这个浏览器里。",
   },
   en: {
-    "h.rules": "Rules", "h.rules.sub": "five settings, and which channel each one rests on",
+    "h.rules": "Rules", "h.rules.sub": "ten settings, and which channel each one rests on",
     "h.evidence": "Evidence for the rules installed", "h.evidence.sub": "compiled · checked row by row · proven by search",
     "h.channels": "Two channels", "h.channels.sub": "who can write a bit decides what a rule resting on it is worth",
     "h.agents": "Connected agents", "h.agents.sub": "one independent circuit state per name; a tick is one request from that agent",
@@ -391,8 +442,15 @@ const T = {
     "r.blocked": "nothing while blocked", "r.blocked.hint": "While the blocked bit is high, every request is refused.", "r.blocked.chan": "Rests on <code>blocked</code> — a bit that must come from the tool layer, which the agent cannot write. So this is a boundary.",
     "r.max": "total grants", "r.max.hint": "After this many grants, nothing more is ever granted. 0 = unlimited.", "r.max.chan": "Counts grants: binds whatever the agent does.",
     "r.confirm": "confirmation window (ticks)", "r.confirm.hint": "A grant needs a confirm within the last this-many ticks. 0 = off.", "r.confirm.chan": "Rests on <code>confirm</code> — a bit that must come from the tool layer. So this is a boundary.",
-    "r.presets": "presets:", "p.fly": "the rules the fly circuit obeys (8 / 4 / blocked)", "p.confirm": "with a confirmation window (gap 4 · at most 3 · confirm within 6)", "p.open": "everything granted (no rules, as a control)", "p.current": "reload what is installed",
-    "r.domain": "compiles to {state} state bits · 2^{bits} = {rows} rows to check", "r.domain.warn": "over the 26-bit exhaustive limit; the service will refuse this set.",
+    "r.sticky": "halt stays until a confirm", "r.sticky.hint": "A tick with blocked high halts the agent; lowering blocked does not lift it, only a confirm does (and that tick grants nothing).", "r.sticky.chan": "Rests on <code>blocked</code> and <code>confirm</code> — both from the tool layer. So this is a boundary; nothing-while-blocked above is stateless, this one remembers.",
+    "r.heartbeat": "halt after N ticks without a heartbeat", "r.heartbeat.hint": "This many consecutive ticks with heartbeat low halt the agent the same way, until a confirm. 0 = off.", "r.heartbeat.chan": "Rests on <code>heartbeat</code> — only the tool layer can beat it. So this is a boundary.",
+    "r.irrev": "an irreversible action spends its confirm", "r.irrev.hint": "A request with irreversible high is granted only if an unspent confirm exists, and the grant spends it; reversible requests neither need nor spend one.", "r.irrev.chan": "Rests on <code>irreversible</code> and <code>confirm</code> — the tool layer marks which action is irreversible. So this is a boundary.",
+    "r.trip": "breaker: N consecutive failures", "r.trip.hint": "This many consecutive ticks with failed high trip the breaker; nothing is granted until a confirm resets it. 0 = off.", "r.trip.chan": "Rests on <code>failed</code> — the tool layer reports the previous action's outcome. So this is a boundary.",
+    "r.twokey": "two keys: confirm and confirm_b", "r.twokey.hint": "Every grant needs both keys to have arrived (or arrive now), and the grant spends both.", "r.twokey.chan": "Rests on <code>confirm</code> and <code>confirm_b</code> — one key per person. So this is a boundary.",
+    "r.presets": "presets:", "p.fly": "the rules the fly circuit obeys (8 / 4 / blocked)", "p.confirm": "with a confirmation window (gap 4 · at most 3 · confirm within 6)",
+    "p.spend": "spend class (gap 8 · at most 7 · irreversible needs confirm · two keys)", "p.exec": "exec class (gap 4 · commit 4 · irreversible needs confirm · breaker at 3)", "p.halt": "halt (sticky block · 8 ticks without a heartbeat)",
+    "p.open": "everything granted (no rules, as a control)", "p.current": "reload what is installed",
+    "r.domain": "compiles to {inputs} inputs + {state} state bits · 2^{bits} = {rows} rows to check", "r.domain.warn": "over the 26-bit exhaustive limit; the service will refuse this set.",
     "r.install": "Compile and install", "r.install.note": "recompiles, rechecks, reproves; every agent's counters reset.",
     "r.installing": "compiling…", "r.installed": "Installed: {nand} NAND + {latch} LATCH, {rows} rows checked, {holds}, in {ms} ms. All agents reset.",
     "r.refused": "Not installed (HTTP {code}): {err}", "r.neterr": "could not send: {e}",
@@ -403,6 +461,8 @@ const T = {
     "ev.holds.body": "From reset, every input in every reachable state: <b>{reach}</b> of {poss} states reachable, <b>{conf}</b> configurations with independent monitors, <b>{proven}</b> rows, violations counted per rule.",
     "tl.nand": "NAND", "tl.latch": "LATCH", "tl.bytes": "bytes", "tl.depth": "depth", "tl.ms": "compile + both checks",
     "viol.head": "violations:", "viol.rate_limit": "rate limit", "viol.commitment": "commitment", "viol.forbidden": "forbidden", "viol.budget": "budget", "viol.confirm_window": "confirm window",
+    "viol.halted": "halt", "viol.one_shot": "one-shot confirm", "viol.breaker": "breaker", "viol.two_key": "two keys",
+    "ev.inputs": "inputs the circuit reads:", "ev.inputs.agent": "(agent-written)", "ev.inputs.tool": "(tool layer)",
     "netlist": "netlist ({bytes} bytes; this is what the chain check is sent)",
     "prov": "The default rules <code>{rules}</code> are the ones the fruit-fly escape circuit was itself proven to obey. That is where they come from — provenance, not a law; everything after is yours to set.",
     "ch.lead": "The bits on the left are written by the <b>agent</b>. The bits on the right may only be written by a layer the agent cannot reach — the tool runner, a person, a signed feed. A rule resting on the left is a cost; a rule resting on the right is a boundary. Nothing in the software can enforce that distinction: it is a property of how this is deployed. On this page you press both panels, so here it is a demonstration.",
@@ -410,30 +470,33 @@ const T = {
     "a.title": "Agent channel", "a.writer": "Written by: <b>the agent itself</b>. Each request sets request=1 and advances that agent one tick.",
     "a.intent": "intent high (declares intent)", "a.reason": "reason", "a.reason.hint": "recorded, never weighed.", "a.send": "Send request (1 tick)", "a.send.hint": "the circuit decides on the spot.",
     "t.title": "Tool-layer channel", "t.writer": "Written by: <b>a layer the agent cannot write</b>. These bits are read by the next request.",
-    "t.armed": "armed for {agent}: blocked = <b class=\"{bc}\">{b}</b> · confirm = <b class=\"{cc}\">{c}</b>", "t.armed.none": "{agent} has no state yet; both bits are 0.",
+    "t.armed": "armed for {agent}: {bits}", "t.armed.none": "{agent} has no state yet; every bit is 0.",
     "t.block": "raise blocked", "t.unblock": "lower blocked", "t.confirm": "give one confirm",
-    "t.hint": "blocked stays until lowered; a confirm applies to the next request only and is consumed by it.",
-    "t.done": "tool layer wrote {agent}: blocked = {b} · confirm = {c}",
+    "t.irrev": "next action is irreversible", "t.failed": "report a failure", "t.heartbeat": "beat once", "t.confirm_b": "give one confirm_b",
+    "t.unread": "the installed rules do not read {bit}; the circuit ignores it.", "t.unread.short": "not read by these rules",
+    "t.hint": "blocked is a level and stays until lowered; every other bit is an event, applies to the next request only and is consumed by it. A greyed button is a bit the installed circuit does not read.",
+    "t.done": "tool layer wrote {agent}: {bits}",
     "l.sending": "sent, waiting for the circuit…", "l.neterr": "could not send: {e}",
-    "ag.name": "agent", "ag.ticks": "ticks", "ag.grants": "grants", "ag.cool": "cooldown left", "ag.streak": "intent streak", "ag.used": "budget used", "ag.window": "confirm window left", "ag.armed": "armed",
+    "ag.name": "agent", "ag.ticks": "ticks", "ag.grants": "grants", "ag.cool": "cooldown left", "ag.streak": "intent streak", "ag.used": "budget used", "ag.window": "confirm window left", "ag.state": "latches", "ag.armed": "armed",
     "ag.none": "No requests yet. Use the two panels above, or follow \"How to connect\".",
     "ag.ready": "ready", "ag.left": "{n} ticks", "ag.norule": "— no such rule", "ag.of": "{a} of {b}", "ag.streak.sat": "≥ {b} (enough)", "ag.window.armed": "confirmed this tick",
-    "ag.armed.v": "blocked {b} · confirm {c}",
+    "ag.halted": "halted", "ag.silence": "{n} ticks without a heartbeat", "ag.token": "one unspent confirm", "ag.tripped": "breaker tripped", "ag.fails": "{n} consecutive failures", "ag.keys": "key A {a} · B {b}", "ag.clear": "clear",
     "log.sub": "last {n} entries · {g} granted · {r} refused", "log.none": "No entries yet.",
     "v.grant": "GRANTED", "v.refuse": "REFUSED", "v.tool": "TOOL LAYER", "v.policy": "RULES",
-    "e.tick": "tick {n}", "e.gap": "{n} ticks since the previous grant", "e.bits": "intent {i} · blocked {b} · confirm {c}",
-    "e.why": "refused because (the policy's own words):", "e.granted": "all five checks passed; the circuit output grant = 1.",
+    "e.tick": "tick {n}", "e.gap": "{n} ticks since the previous grant",
+    "e.why": "refused because (the policy's own words):", "e.granted": "every check passed; the circuit output grant = 1.",
     "e.chain.ok": "BSC (chain {id}) read-only re-check agrees · nothing deployed, no wallet", "e.chain.dis": "BSC (chain {id}) DISAGREES: node computed grant = {g}", "e.chain.err": "chain check unavailable: {err} (verdict unaffected)",
-    "e.tool": "wrote blocked = {b} · confirm = {c}",
+    "e.tool": "wrote {bits}",
     "e.policy": "installed: {rules}", "e.policy.s": "{nand} NAND + {latch} LATCH · {rows} rows checked · {holds}",
-    "n.key": "A rule resting on <code>request</code>/<code>intent</code> (commitment) is a <b>cost</b>: the agent writes those bits, so it can always choose to pay. A rule resting on <code>blocked</code>/<code>confirm</code> (nothing-while-blocked, the confirmation window) is a <b>boundary</b>: those bits must come from a layer the agent cannot write. Minimum gap and total grants count grants, so they bind whatever the agent does. Nothing in the software can enforce that separation — it is decided by who is wired to which input when this is deployed.",
+    "n.key": "A rule resting on <code>request</code>/<code>intent</code> (commitment) is a <b>cost</b>: the agent writes those bits, so it can always choose to pay. A rule resting on <code>blocked</code>/<code>confirm</code>/<code>irreversible</code>/<code>failed</code>/<code>heartbeat</code>/<code>confirm_b</code> (nothing-while-blocked, the confirmation window, the sticky halt, the one-shot confirm, the breaker, two keys) is a <b>boundary</b>: those bits must come from a layer the agent cannot write. Minimum gap and total grants count grants, so they bind whatever the agent does. Nothing in the software can enforce that separation — it is decided by who is wired to which input when this is deployed.",
     "n1": "No wallet, no private key; nothing is signed, nothing is broadcast, nothing is deployed.",
     "n2": "The chain check is one read-only eth_call: the current netlist and the deciding row go to a public node to be recomputed. No gas, no address of anyone's.",
     "n3": "A grant is a verdict about a request, not an action. What the action is and who carries it out lie outside this program.",
     "n4": "The console adds no rule of its own: every refusal is the circuit's output; the \"because\" line only reads the same counters and says which rule.",
     "n5": "A tick is not a clock: it is one request from that agent. The rules bind nothing about wall-clock time, and cannot make an input mean what its name says.",
+    "n6": "Rules for different kinds of action (spending, executing, messaging) should be compiled as separate circuits, so rows add rather than multiply; the cost is that an invariant across classes (\"no message within three ticks of a payment\") is verified by nothing here.",
     "c.intro": "Three writers — rules, tool layer, agent — and one read-only state:",
-    "c.policy": "install rules (recompiles, reproves, resets every agent)", "c.tool": "tool layer: raise blocked / give one confirm", "c.request": "agent: one request, one tick", "c.state": "everything",
+    "c.policy": "install rules (recompiles, reproves, resets every agent)", "c.tool": "tool layer: raise blocked / give one confirm / mark the next action irreversible / report a failure / beat / second key", "c.request": "agent: one request, one tick", "c.state": "everything",
     "foot": "Local service · stdlib HTTP · one static file · no external dependencies. Language choice is kept in this browser only.",
   },
 };
@@ -441,7 +504,8 @@ const T = {
 let lang = "zh";
 try { lang = localStorage.getItem("reflex.lang") || (navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en"); } catch (e) { /* storage unavailable */ }
 // HTML is allowed in these keys only; every variable interpolated into them is escaped first.
-const HTML_KEYS = new Set(["r.commit.chan", "r.blocked.chan", "r.confirm.chan", "ev.match.body", "ev.holds.body", "prov", "ch.lead", "a.writer", "t.writer", "t.armed", "n.key"]);
+const HTML_KEYS = new Set(["r.commit.chan", "r.blocked.chan", "r.confirm.chan", "r.sticky.chan", "r.heartbeat.chan", "r.irrev.chan", "r.trip.chan", "r.twokey.chan",
+                           "ev.match.body", "ev.holds.body", "prov", "ch.lead", "a.writer", "t.writer", "t.armed", "t.done", "e.tool", "n.key"]);
 function t(key, vars) {
   let s = (T[lang] && T[lang][key]) ?? T.en[key] ?? key;
   if (vars) for (const k in vars) s = s.split(`{${k}}`).join(vars[k]);
@@ -476,8 +540,20 @@ const ruleWordsZh = (s) => {
   if (s.forbid_when_blocked) out.push("blocked 为高时一律不放");
   if (N(s.max_grants)) out.push(`累计最多放行 ${num(s.max_grants)} 次`);
   if (N(s.confirm_window_ticks)) out.push(`放行前 ${num(s.confirm_window_ticks)} 拍内需有一次 confirm`);
+  if (s.sticky_block) out.push("blocked 一拉高就停机，直到一次 confirm 解除");
+  if (N(s.heartbeat_ticks)) out.push(`连续 ${num(s.heartbeat_ticks)} 拍无心跳就停机，直到一次 confirm 解除`);
+  if (s.confirm_per_irreversible) out.push("不可逆动作需要专属的一次 confirm，放行即用掉");
+  if (N(s.trip_after_failures)) out.push(`连续 ${num(s.trip_after_failures)} 次失败跳闸，直到一次 confirm 复位`);
+  if (s.two_key) out.push("放行需要 confirm 与 confirm_b 两把钥匙，放行即同时用掉");
   return out.length ? out : ["每个请求都放行"];
 };
+// Which tool-layer bits a request row shows, and how an armed set is written out.
+const TOOL_BITS = ["blocked", "confirm", "irreversible", "failed", "heartbeat", "confirm_b"];
+const bitsHtml = (bits, names) => names.map((n) => `<span class="${N(bits[n]) ? "t1" : ""}">${esc(n)} ${N(bits[n])}</span>`).join(" · ");
+const armedHtml = (armed, names) => names.map((n) => `${esc(n)} = <b class="${N(armed[n]) ? "hi" : ""}">${N(armed[n])}</b>`).join(" · ");
+// The tool-layer bits worth writing out for a set: those the installed circuit reads, plus any that are high.
+const shownBits = (armed) => TOOL_BITS.filter((n) => readInputs().includes(n) || N(armed && armed[n]));
+const readInputs = () => (STATE && STATE.policy.circuit.inputs) || ["request", "intent", "blocked", "confirm"];
 
 // ---------- static blocks ----------
 function renderStatic() {
@@ -489,39 +565,57 @@ curl -s ${o}/api/policy ${H} \\
 <span class="c"># ${t("c.tool")}</span>
 curl -s ${o}/api/tool ${H} -d '{"agent":"my-model","blocked":1}'
 curl -s ${o}/api/tool ${H} -d '{"agent":"my-model","confirm":1}'
+curl -s ${o}/api/tool ${H} -d '{"agent":"my-model","irreversible":1}'
+curl -s ${o}/api/tool ${H} -d '{"agent":"my-model","failed":1}'
+curl -s ${o}/api/tool ${H} -d '{"agent":"my-model","heartbeat":1}'
+curl -s ${o}/api/tool ${H} -d '{"agent":"my-model","confirm_b":1}'
 <span class="c"># ${t("c.request")}</span>
 curl -s ${o}/api/request ${H} -d '{"agent":"my-model","intent":1,"reason":"closing in"}'
 <span class="c"># ${t("c.state")}</span>
 curl -s ${o}/api/state`;
-  $("notes").innerHTML = `<div class="key"><span>${t("n.key")}</span></div>` + ["n1", "n2", "n3", "n4", "n5"].map((k) => `<div><span>${t(k)}</span></div>`).join("");
+  $("notes").innerHTML = `<div class="key"><span>${t("n.key")}</span></div>` + ["n1", "n2", "n3", "n4", "n5", "n6"].map((k) => `<div><span>${t(k)}</span></div>`).join("");
   $("foot").textContent = t("foot");
 }
 
 // ---------- rule editor ----------
-const R = { gap: $("r-gap"), commit: $("r-commit"), blocked: $("r-blocked"), max: $("r-max"), confirm: $("r-confirm") };
+const R = { gap: $("r-gap"), commit: $("r-commit"), blocked: $("r-blocked"), max: $("r-max"), confirm: $("r-confirm"),
+            sticky: $("r-sticky"), heartbeat: $("r-heartbeat"), irrev: $("r-irrev"), trip: $("r-trip"), twokey: $("r-twokey") };
 const bitlen = (v) => { let n = 0; for (let x = Math.floor(v); x > 0; x >>= 1) n++; return n; };
 const width = (limit) => Math.max(1, bitlen(limit));
 function editorSettings() {
   return { min_gap_ticks: N(R.gap.value), commit_ticks: N(R.commit.value), forbid_when_blocked: R.blocked.checked,
-           max_grants: N(R.max.value), confirm_window_ticks: N(R.confirm.value) };
+           max_grants: N(R.max.value), confirm_window_ticks: N(R.confirm.value),
+           sticky_block: R.sticky.checked, heartbeat_ticks: N(R.heartbeat.value), confirm_per_irreversible: R.irrev.checked,
+           trip_after_failures: N(R.trip.value), two_key: R.twokey.checked };
+}
+// Mirrors Policy.layout() and Policy.input_names() so the row count is known before compiling.
+function domainOf(s) {
+  const state = (s.min_gap_ticks > 1 ? width(s.min_gap_ticks - 1) : 0) + (s.commit_ticks ? width(s.commit_ticks) : 0)
+              + (s.max_grants ? width(s.max_grants) : 0) + (s.confirm_window_ticks > 1 ? width(s.confirm_window_ticks - 1) : 0)
+              + ((s.sticky_block || s.heartbeat_ticks) ? 1 : 0) + (s.heartbeat_ticks > 1 ? width(s.heartbeat_ticks - 1) : 0)
+              + (s.confirm_per_irreversible ? 1 : 0) + (s.trip_after_failures > 1 ? width(s.trip_after_failures - 1) : 0)
+              + (s.trip_after_failures ? 1 : 0) + (s.two_key ? 2 : 0);
+  const inputs = 4 + (s.confirm_per_irreversible ? 1 : 0) + (s.trip_after_failures ? 1 : 0) + (s.heartbeat_ticks ? 1 : 0) + (s.two_key ? 1 : 0);
+  return { state, inputs };
 }
 function domainPreview() {
-  const s = editorSettings();
-  const state = (s.min_gap_ticks > 1 ? width(s.min_gap_ticks - 1) : 0) + (s.commit_ticks ? width(s.commit_ticks) : 0)
-              + (s.max_grants ? width(s.max_grants) : 0) + (s.confirm_window_ticks > 1 ? width(s.confirm_window_ticks - 1) : 0);
-  const bits = 4 + state, over = bits > 26;
+  const { state, inputs } = domainOf(editorSettings());
+  const bits = inputs + state, over = bits > 26;
   $("domain").className = `domain${over ? " warn" : ""}`;
-  $("domain").textContent = t("r.domain", { state, bits, rows: over ? "—" : num(2 ** bits) }) + (over ? ` ${t("r.domain.warn")}` : "");
+  $("domain").textContent = t("r.domain", { inputs, state, bits, rows: over ? "—" : num(2 ** bits) }) + (over ? ` ${t("r.domain.warn")}` : "");
 }
 function fillEditor(s) {
   R.gap.value = N(s.min_gap_ticks); R.commit.value = N(s.commit_ticks); R.blocked.checked = !!s.forbid_when_blocked;
   R.max.value = N(s.max_grants); R.confirm.value = N(s.confirm_window_ticks);
+  R.sticky.checked = !!s.sticky_block; R.heartbeat.value = N(s.heartbeat_ticks); R.irrev.checked = !!s.confirm_per_irreversible;
+  R.trip.value = N(s.trip_after_failures); R.twokey.checked = !!s.two_key;
   domainPreview();
 }
 Object.values(R).forEach((el) => el.addEventListener("input", domainPreview));
 document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
-  const [g, c, bl, m, w] = b.dataset.preset.split(",").map(Number);
-  fillEditor({ min_gap_ticks: g, commit_ticks: c, forbid_when_blocked: !!bl, max_grants: m, confirm_window_ticks: w });
+  let p = {};
+  try { p = JSON.parse(b.dataset.preset); } catch (e) { /* a preset is authored here, never user input */ }
+  fillEditor(p);
   INSTALL = null; $("install-msg").textContent = "";
 }));
 $("r-reload").addEventListener("click", () => { if (STATE) fillEditor(STATE.policy.settings); });
@@ -569,7 +663,8 @@ function render(s) {
   if (!editorFilled) { fillEditor(st); editorFilled = true; }
 
   // header
-  const nRules = [N(st.min_gap_ticks), N(st.commit_ticks), st.forbid_when_blocked, N(st.max_grants), N(st.confirm_window_ticks)].filter(Boolean).length;
+  const nRules = [N(st.min_gap_ticks), N(st.commit_ticks), st.forbid_when_blocked, N(st.max_grants), N(st.confirm_window_ticks),
+                  st.sticky_block, N(st.heartbeat_ticks), st.confirm_per_irreversible, N(st.trip_after_failures), st.two_key].filter(Boolean).length;
   $("circuit").textContent = t("hdr", { nand: num(c.nand), latch: num(c.latch), n: nRules, holds: t(k.every_rule_holds ? "hdr.holds" : "hdr.fails") });
   const [cc, ck] = chainStatus(s);
   $("chain-dot").className = `dot ${cc}`; $("chain").textContent = t(ck);
@@ -577,6 +672,9 @@ function render(s) {
   // evidence
   const zh = lang === "zh", words = zh ? ruleWordsZh(st) : p.rules.map(esc);
   $("words").innerHTML = words.map((w, i) => `<li><span>${zh ? esc(w) : w}${zh && p.rules[i] ? `<span class="en">${esc(p.rules[i])}</span>` : ""}</span></li>`).join("");
+  const agentW = c.agent_writable || [];
+  $("inputs").innerHTML = `${t("ev.inputs")} ` + (c.inputs || []).map((n) => `<code class="${agentW.includes(n) ? "c-agent" : "c-tool"}">${esc(n)}</code>`).join(" · ")
+    + ` <span class="muted"><code class="c-agent">■</code>${t("ev.inputs.agent")} <code class="c-tool">■</code>${t("ev.inputs.tool")}</span>`;
   const vrow = (ok, head, headNo, body) => `<div class="verdict-row ${ok ? "ok" : "bad"}"><span class="mark">${ok ? "✓" : "✗"}</span><div><div class="head">${t(ok ? head : headNo)}</div><div class="body">${body}</div></div></div>`;
   $("verdicts").innerHTML =
     vrow(k.matches_reference, "ev.match", "ev.match.no", t("ev.match.body", { rows: num(k.rows), inputs: N(c.inputs && c.inputs.length) || 4, state: N(k.domain_bits) - (N(c.inputs && c.inputs.length) || 4), bits: N(k.domain_bits) })) +
@@ -594,7 +692,14 @@ function render(s) {
   // channels
   $("channels-lead").innerHTML = t("ch.lead");
   $("a-inputs").textContent = (c.agent_writable || []).join(" · ");
-  $("t-inputs").textContent = (c.tool_layer_only || []).join(" · ");
+  $("t-inputs").textContent = (c.inputs || []).filter((n) => !(c.agent_writable || []).includes(n)).join(" · ");
+  // A button for a bit the installed circuit does not read is left in place but greyed
+  // out, so the panel never suggests a bit that would be ignored.
+  document.querySelectorAll("[data-tool]").forEach((b) => {
+    const bit = b.dataset.tool.split(",")[0], read = (c.inputs || []).includes(bit);
+    if (read) { delete b.dataset.off; b.disabled = false; b.title = ""; }
+    else { b.dataset.off = "1"; b.disabled = true; b.title = t("t.unread", { bit }); }
+  });
   renderArmed();
 
   // agents
@@ -602,16 +707,26 @@ function render(s) {
   if (!s.agents.length) tb.innerHTML = `<tr><td class="muted">${t("ag.none")}</td></tr>`;
   else {
     const L = (kk) => `data-l="${esc(t(kk))}"`;
-    tb.innerHTML = `<tr>${["ag.name", "ag.ticks", "ag.grants", "ag.cool", "ag.streak", "ag.used", "ag.window", "ag.armed"].map((kk) => `<th>${t(kk)}</th>`).join("")}</tr>` +
+    const latchWords = (a) => {
+      const f = a.counters || {}, out = [];
+      if (st.sticky_block || N(st.heartbeat_ticks)) out.push(N(f.halted) ? `<span class="bad">${t("ag.halted")}</span>` : (N(st.heartbeat_ticks) && N(f.silence) ? `<span class="amber">${t("ag.silence", { n: num(f.silence) })}</span>` : ""));
+      if (st.confirm_per_irreversible && N(f.token)) out.push(`<span class="ok">${t("ag.token")}</span>`);
+      if (N(st.trip_after_failures)) out.push(N(f.tripped) ? `<span class="bad">${t("ag.tripped")}</span>` : (N(f.fails) ? `<span class="amber">${t("ag.fails", { n: num(f.fails) })}</span>` : ""));
+      if (st.two_key) out.push(`<span class="${N(f.key_a) && N(f.key_b) ? "ok" : ""}">${t("ag.keys", { a: N(f.key_a), b: N(f.key_b) })}</span>`);
+      const shown = out.filter(Boolean);
+      return shown.length ? shown.join(" · ") : `<span class="muted">${(st.sticky_block || N(st.heartbeat_ticks) || st.confirm_per_irreversible || N(st.trip_after_failures) || st.two_key) ? t("ag.clear") : t("ag.norule")}</span>`;
+    };
+    tb.innerHTML = `<tr>${["ag.name", "ag.ticks", "ag.grants", "ag.cool", "ag.streak", "ag.used", "ag.window", "ag.state", "ag.armed"].map((kk) => `<th>${t(kk)}</th>`).join("")}</tr>` +
       s.agents.map((a) => {
         const cool = N(st.min_gap_ticks) > 1 ? (N(a.cooldown_left) ? `<span class="amber">${t("ag.left", { n: num(a.cooldown_left) })}</span>` : `<span class="ok">${t("ag.ready")}</span>`) : `<span class="muted">${t("ag.norule")}</span>`;
         const streak = N(st.commit_ticks) ? (N(a.intent_streak) >= N(st.commit_ticks) ? `<span class="ok">${t("ag.streak.sat", { b: num(st.commit_ticks) })}</span>` : t("ag.of", { a: num(a.intent_streak), b: num(st.commit_ticks) })) : `<span class="muted">${t("ag.norule")}</span>`;
         const used = N(st.max_grants) ? `<span class="${N(a.grants_used) >= N(st.max_grants) ? "bad" : ""}">${t("ag.of", { a: num(a.grants_used), b: num(st.max_grants) })}</span>` : `<span class="muted">${t("ag.norule")}</span>`;
         const win = N(st.confirm_window_ticks) ? (N(a.armed_confirm) ? `<span class="ok">${t("ag.window.armed")}</span>` : N(a.confirm_window_left) ? `<span class="ok">${t("ag.left", { n: num(a.confirm_window_left) })}</span>` : `<span class="amber">0</span>`) : `<span class="muted">${t("ag.norule")}</span>`;
-        const armed = `<span class="mono"><span class="${N(a.armed_blocked) ? "c-tool" : ""}">blocked ${N(a.armed_blocked)}</span> · <span class="${N(a.armed_confirm) ? "c-tool" : ""}">confirm ${N(a.armed_confirm)}</span></span>`;
+        const ar = a.armed || {};
+        const armed = `<span class="mono">${shownBits(ar).map((n) => `<span class="${N(ar[n]) ? "c-tool" : ""}">${esc(n)} ${N(ar[n])}</span>`).join(" · ")}</span>`;
         return `<tr><td class="name">${esc(a.agent)}</td><td class="num" ${L("ag.ticks")}>${num(a.ticks)}</td><td class="num" ${L("ag.grants")}>${num(a.grants)}</td>` +
           `<td class="num" ${L("ag.cool")}>${cool}</td><td class="num" ${L("ag.streak")}>${streak}</td><td class="num" ${L("ag.used")}>${used}</td>` +
-          `<td class="num" ${L("ag.window")}>${win}</td><td ${L("ag.armed")}>${armed}</td></tr>`;
+          `<td class="num" ${L("ag.window")}>${win}</td><td ${L("ag.state")}>${latchWords(a)}</td><td ${L("ag.armed")}>${armed}</td></tr>`;
       }).join("");
   }
 
@@ -626,7 +741,7 @@ function renderArmed() {
   const name = $("agent").value || "console";
   const a = STATE && STATE.agents.find((x) => x.agent === name);
   $("armed").innerHTML = a
-    ? t("t.armed", { agent: esc(name), b: N(a.armed_blocked), c: N(a.armed_confirm), bc: N(a.armed_blocked) ? "hi" : "", cc: N(a.armed_confirm) ? "hi" : "" })
+    ? t("t.armed", { agent: esc(name), bits: armedHtml(a.armed || {}, shownBits(a.armed)) })
     : `<span class="muted">${t("t.armed.none", { agent: esc(name) })}</span>`;
 }
 $("agent").addEventListener("input", renderArmed);
@@ -634,8 +749,9 @@ $("agent").addEventListener("input", renderArmed);
 function entryHtml(e) {
   const at = `<div class="t">${clock(e.at)}</div>`;
   if (e.kind === "tool") {
+    const ar = e.armed || { blocked: e.blocked, confirm: e.confirm };
     return `<div class="e tool">${at}<div><div class="h"><span class="verdict">${t("v.tool")}</span><span class="agent">${esc(e.agent)}</span></div>` +
-      `<div class="d">${t("e.tool", { b: N(e.blocked), c: N(e.confirm) })}</div></div></div>`;
+      `<div class="d">${t("e.tool", { bits: armedHtml(ar, shownBits(ar)) })}</div></div></div>`;
   }
   if (e.kind === "policy") {
     const cz = e.circuit || {};
@@ -646,7 +762,10 @@ function entryHtml(e) {
     return `<div class="e err">${at}<div><div class="h"><span class="verdict">400</span></div><div class="d">${esc(e.error)}</div></div></div>`;
   }
   const ok = !!e.granted;
-  const bits = t("e.bits", { i: N(e.intent), b: `<span class="${N(e.blocked) ? "t1" : ""}">${N(e.blocked)}</span>`, c: `<span class="${N(e.confirm) ? "t1" : ""}">${N(e.confirm)}</span>` });
+  // Whichever bits the deciding circuit read, as recorded on the entry (an older entry
+  // without the dict shows the fixed four).
+  const inp = e.inputs || { request: 1, intent: e.intent, blocked: e.blocked, confirm: e.confirm };
+  const bits = `intent ${N(inp.intent)} · ` + bitsHtml(inp, Object.keys(inp).filter((n) => n !== "request" && n !== "intent"));
   const lines = [`<b>${t("e.tick", { n: num(e.tick) })}</b>`];
   if (e.ticks_since_previous_grant != null) lines.push(t("e.gap", { n: num(e.ticks_since_previous_grant) }));
   let why = "";
@@ -664,8 +783,9 @@ function entryHtml(e) {
 
 function showLast(e) {
   LAST = e;
+  if (e.error) { $("last").innerHTML = `<span class="bad">${esc(e.error)}</span>`; return; }
   $("last").innerHTML = e.kind === "tool"
-    ? `<span class="c-tool">${t("t.done", { agent: esc(e.agent), b: N(e.blocked), c: N(e.confirm) })}</span>`
+    ? `<span class="c-tool">${t("t.done", { agent: esc(e.agent), bits: armedHtml(e.armed || {}, shownBits(e.armed)) })}</span>`
     : entryHtml(e).replace(/^<div class="e/, '<div style="padding:0;border:0;background:none" class="e');
 }
 
@@ -706,7 +826,7 @@ document.querySelectorAll("[data-tool]").forEach((b) => b.addEventListener("clic
   b.disabled = true;
   try { showLast(await post("/api/tool", { agent: $("agent").value || "console", [bit]: Number(v) })); }
   catch (err) { $("last").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
-  b.disabled = false;
+  if (!b.dataset.off) b.disabled = false;
   refresh();
 }));
 

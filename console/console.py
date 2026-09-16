@@ -15,8 +15,9 @@ user's to set.
 
 Two endpoints on purpose, because the separation is the whole point:
 
-    POST /api/request   request, intent   — what an agent may write
-    POST /api/tool      blocked, confirm  — what only the layer above it may write
+    POST /api/request   request, intent                       — what an agent may write
+    POST /api/tool      blocked, confirm, irreversible, failed,
+                        heartbeat, confirm_b                  — what only the layer above it may write
 
 A rule resting on the agent's own bits is a cost it can choose to pay; a rule resting
 on the tool layer's bits is a boundary. Nothing here can enforce which caller is which:
@@ -49,7 +50,13 @@ TRANSCRIPT = 200
 sys.path.insert(0, str(REPO))
 from c3s import exhaust  # noqa: E402
 from c3s.netlist import to_bytes  # noqa: E402
-from c3s.policy import AGENT_WRITABLE, INPUT_NAMES, MUST_COME_FROM_THE_TOOL_LAYER, Policy  # noqa: E402
+from c3s.policy import AGENT_WRITABLE, MUST_COME_FROM_THE_TOOL_LAYER, Policy  # noqa: E402
+
+# Of the tool layer's bits, only `blocked` is a level that stays where it was put. The
+# rest are events, each consumed by the one tick it applies to: a confirm (either key)
+# authorises the next request; `irreversible` describes the next request; a heartbeat
+# is one beat; `failed` reports the outcome of the previous action to the next tick.
+CONSUMED_BY_A_TICK = ("confirm", "confirm_b", "irreversible", "heartbeat", "failed")
 
 # The rules the escape circuit itself was proven to obey; the starting point, not a law.
 FLY_DEFAULT = Policy(min_gap_ticks=8, commit_ticks=4, forbid_when_blocked=True)
@@ -80,6 +87,11 @@ class Boundary:
                 "forbid_when_blocked": policy.forbid_when_blocked,
                 "max_grants": policy.max_grants,
                 "confirm_window_ticks": policy.confirm_window_ticks,
+                "sticky_block": policy.sticky_block,
+                "heartbeat_ticks": policy.heartbeat_ticks,
+                "confirm_per_irreversible": policy.confirm_per_irreversible,
+                "trip_after_failures": policy.trip_after_failures,
+                "two_key": policy.two_key,
             },
             "circuit": {
                 "nand": verify["metrics"]["nand"],
@@ -87,7 +99,7 @@ class Boundary:
                 "bytes": len(netlist),
                 "depth": verify["metrics"]["depth"],
                 "netlist": "0x" + netlist.hex(),
-                "inputs": list(INPUT_NAMES),
+                "inputs": list(policy.input_names()),
                 "agent_writable": list(AGENT_WRITABLE),
                 "tool_layer_only": list(MUST_COME_FROM_THE_TOOL_LAYER),
             },
@@ -112,33 +124,44 @@ class Boundary:
 
     def agent(self, name: str) -> dict:
         return self.agents.setdefault(
-            name, {"state": 0, "ticks": 0, "grants": 0, "blocked": 0, "confirm": 0, "last_grant_tick": None}
+            name,
+            {"state": 0, "ticks": 0, "grants": 0, "last_grant_tick": None,
+             "armed": {bit: 0 for bit in MUST_COME_FROM_THE_TOOL_LAYER}},
         )
 
-    def arm(self, name: str, blocked: int | None, confirm: int | None) -> dict:
-        """The tool layer's bits, held until the agent's next request consumes them."""
+    def arm(self, name: str, bits: dict) -> dict:
+        """The tool layer's bits, held until the agent's next request reads them. Bits
+        the installed policy does not read are stored all the same: they describe the
+        agent, and a later policy may read them."""
+        unknown = [k for k in bits if k not in MUST_COME_FROM_THE_TOOL_LAYER]
+        if unknown:
+            raise ValueError(f"not a tool-layer bit: {', '.join(unknown)}")
         with self.lock:
             a = self.agent(name)
-            if blocked is not None:
-                a["blocked"] = int(bool(blocked))
-            if confirm is not None:
-                a["confirm"] = int(bool(confirm))
+            for bit, value in bits.items():
+                a["armed"][bit] = int(bool(value))
             entry = {
                 "at": time.time(),
                 "kind": "tool",
                 "agent": name,
-                "blocked": a["blocked"],
-                "confirm": a["confirm"],
+                "armed": dict(a["armed"]),
+                "blocked": a["armed"]["blocked"],
+                "confirm": a["armed"]["confirm"],
             }
             TRANSCRIPTS.appendleft(entry)
             return entry
 
     def request(self, name: str, intent: int, reason: str) -> dict:
         """One tick: the agent asks, the circuit answers."""
-        n_in = len(INPUT_NAMES)
         with self.lock:
+            p = self.policy
+            names = p.input_names()
+            n_in = len(names)
             a = self.agent(name)
-            inputs = 1 | (int(bool(intent)) << 1) | (a["blocked"] << 2) | (a["confirm"] << 3)
+            inp = {"request": 1, "intent": int(bool(intent))}
+            for bit in names[2:]:
+                inp[bit] = a["armed"][bit]
+            inputs = sum(inp[bit] << i for i, bit in enumerate(names))
             state_before = a["state"]
             row = inputs | (state_before << n_in)
             grant = int(self.outs[row])
@@ -150,64 +173,49 @@ class Boundary:
                     gap = a["ticks"] - a["last_grant_tick"]
                 a["last_grant_tick"] = a["ticks"]
                 a["grants"] += 1
-            a["confirm"] = 0  # a confirmation is consumed by the tick it applies to
+            for bit in CONSUMED_BY_A_TICK:
+                a["armed"][bit] = 0
             entry = {
                 "at": time.time(),
                 "kind": "request",
                 "agent": name,
-                "intent": int(bool(intent)),
-                "blocked": (inputs >> 2) & 1,
-                "confirm": (inputs >> 3) & 1,
+                "inputs": inp,
+                "intent": inp["intent"],
+                "blocked": inp["blocked"],
+                "confirm": inp["confirm"],
                 "reason": reason,
                 "granted": bool(grant),
                 "tick": a["ticks"],
                 "ticks_since_previous_grant": gap,
-                "why": self.why(name, inputs, state_before, grant),
+                # Descriptive only: the verdict is the circuit's; this reads the same
+                # counters it reads and says which rule, in the policy's own words.
+                "why": p.reasons(inp, state_before),
                 # Carried out of the lock so the chain re-evaluates the circuit that
                 # actually decided, not whichever one is installed by the time it asks.
-                "_decisive": (inputs, state_before, grant, a["state"], self.netlist, self.policy.state_bits),
+                "_decisive": (inputs, state_before, grant, a["state"], self.netlist, n_in, p.state_bits),
             }
             TRANSCRIPTS.appendleft(entry)
             return entry
-
-    def why(self, name: str, inputs: int, state: int, grant: int) -> list[str]:
-        """Which rule refused, in the policy's own words. Descriptive only: the verdict
-        is the circuit's, and this reads the same counters it reads."""
-        if grant:
-            return []
-        p = self.policy
-        gap, streak, spent, window = p.split_state(state)
-        blocked, confirm = (inputs >> 2) & 1, (inputs >> 3) & 1
-        out = []
-        if p.forbid_when_blocked and blocked:
-            out.append("blocked is high")
-        if p.gap_bits and gap:
-            out.append(f"cooldown: {gap} tick{'s' if gap != 1 else ''} left of {p.min_gap_ticks}")
-        if p.commit_ticks and streak < p.commit_ticks:
-            out.append(f"commitment: {streak} of {p.commit_ticks} consecutive intent ticks")
-        if p.max_grants and spent >= p.max_grants:
-            out.append(f"budget: {spent} of {p.max_grants} grants used")
-        if p.confirm_window_ticks and not (confirm or window):
-            out.append(f"no confirmation inside the last {p.confirm_window_ticks} ticks")
-        return out
 
     def status(self) -> dict:
         with self.lock:
             p = self.policy
             agents = []
             for name, a in sorted(self.agents.items()):
-                gap, streak, spent, window = p.split_state(a["state"])
+                counters = p.fields(a["state"])
                 agents.append(
                     {
                         "agent": name,
                         "ticks": a["ticks"],
                         "grants": a["grants"],
-                        "cooldown_left": gap,
-                        "intent_streak": streak,
-                        "grants_used": spent,
-                        "confirm_window_left": window,
-                        "armed_blocked": a["blocked"],
-                        "armed_confirm": a["confirm"],
+                        "cooldown_left": counters["gap"],
+                        "intent_streak": counters["streak"],
+                        "grants_used": counters["spent"],
+                        "confirm_window_left": counters["window"],
+                        "counters": counters,
+                        "armed": dict(a["armed"]),
+                        "armed_blocked": a["armed"]["blocked"],
+                        "armed_confirm": a["armed"]["confirm"],
                     }
                 )
             return {
@@ -283,10 +291,10 @@ def policy_from(payload: dict) -> Policy:
             raise ValueError(f"{key}={value} outside 0..{limit}")
         return value
 
-    def flag(key: str) -> bool:
-        """Not bool(): the string "false" is truthy, and this one decides whether a
-        rule that only the tool layer can satisfy is installed at all."""
-        value = payload.get(key, True)
+    def flag(key: str, default: bool) -> bool:
+        """Not bool(): the string "false" is truthy, and these decide whether a rule
+        that only the tool layer can satisfy is installed at all."""
+        value = payload.get(key, default)
         if not isinstance(value, bool):
             raise ValueError(f"{key} must be true or false")
         return value
@@ -294,9 +302,14 @@ def policy_from(payload: dict) -> Policy:
     return Policy(
         min_gap_ticks=whole("min_gap_ticks", 255),
         commit_ticks=whole("commit_ticks", 255),
-        forbid_when_blocked=flag("forbid_when_blocked"),
+        forbid_when_blocked=flag("forbid_when_blocked", True),
         max_grants=whole("max_grants", 255),
         confirm_window_ticks=whole("confirm_window_ticks", 255),
+        sticky_block=flag("sticky_block", False),
+        heartbeat_ticks=whole("heartbeat_ticks", 255),
+        confirm_per_irreversible=flag("confirm_per_irreversible", False),
+        trip_after_failures=whole("trip_after_failures", 255),
+        two_key=flag("two_key", False),
     )
 
 
@@ -353,14 +366,18 @@ class Handler(BaseHTTPRequestHandler):
                                     "every_rule_holds": summary["checked"]["every_rule_holds"]})
             self._json(200, summary)
         elif self.path == "/api/tool":
-            self._json(200, BOUNDARY.arm(name, payload.get("blocked"), payload.get("confirm")))
+            bits = {k: v for k, v in payload.items() if k != "agent"}
+            try:
+                self._json(200, BOUNDARY.arm(name, bits))
+            except ValueError as e:
+                self._json(400, {"error": str(e)})
         elif self.path == "/api/request":
             entry = BOUNDARY.request(name, payload.get("intent", 0), str(payload.get("reason", ""))[:160])
             decisive = entry.pop("_decisive", None)
             if CHAIN is not None and decisive is not None:
-                inputs, state, grant, next_state, netlist, state_bits = decisive
+                inputs, state, grant, next_state, netlist, n_in, state_bits = decisive
                 try:
-                    got, got_state = CHAIN.evaluate(netlist, len(INPUT_NAMES), 1, state_bits, inputs, state)
+                    got, got_state = CHAIN.evaluate(netlist, n_in, 1, state_bits, inputs, state)
                     entry["chain"] = {
                         "chain_id": CHAIN.chain(),
                         "grant": got,
