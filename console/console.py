@@ -349,6 +349,9 @@ class Boundary:
                 "class_tick": cs["ticks"],
                 "ticks_since_previous_grant": gap,
                 "why": why,
+                # A person approved a different version of this agent's call; saying which
+                # lets the agent resend exactly that instead of rewording it again.
+                "confirm_waiting_for": [a["bound"][b] for b in held if b in a["bound"]] if not grant else [],
                 "halt": halt_entry,
                 # Carried out of the lock so the chain re-evaluates the circuits that
                 # actually decided, not whichever are installed by the time it asks.

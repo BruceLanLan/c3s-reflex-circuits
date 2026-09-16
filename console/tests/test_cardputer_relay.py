@@ -132,3 +132,15 @@ def test_a_device_confirm_binds_to_the_item_it_had_selected(boundary):
     r._key(f"K|confirm|mail|{idx}")
     agent = next(a for a in boundary.status()["agents"] if a["agent"] == "mail")
     assert agent["bound"]["confirm"] == "[files] trash_email [irreversible]: id=m3"
+
+
+def test_a_refused_call_says_which_version_a_person_approved(boundary):
+    boundary.install("message", Policy(confirm_per_irreversible=True, forbid_when_blocked=True))
+    approved = "[message] reply_email [irreversible]: id=m1, body=Hi Lena, 15:00 works."
+    boundary.arm("mail", {"confirm": 1}, bind_to=approved)
+    boundary.arm("mail", {"irreversible": 1})
+    reworded = boundary.request("mail", 1, "[message] reply_email [irreversible]: id=m1, body=Hello Lena, 15:00 is fine.", "message")
+    assert not reworded["granted"] and reworded["confirm_waiting_for"] == [approved]
+    boundary.arm("mail", {"irreversible": 1})
+    exact = boundary.request("mail", 1, approved, "message")
+    assert exact["granted"] and exact["confirm_waiting_for"] == []

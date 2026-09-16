@@ -211,6 +211,10 @@ class Proxy:
                     " model cannot supply one. Do not retry until it has been given.")
         if any(w.startswith("blocked") or w.startswith("halted") for w in why_list):
             hint = " The tool layer has blocked this agent; only it can lift that."
+        held = verdict.get("confirm_waiting_for") or []
+        if held and not verdict.get("granted"):
+            hint += (f" A person has approved one specific call, and this is not it: {held[0]!r}. If that is what you"
+                     " meant, send exactly that call; any other call needs its own approval.")
         return f"refused by the boundary at tick {verdict.get('tick')}: {why}.{hint}"
 
 
