@@ -127,6 +127,24 @@ def test_policy_truth_table_equals_the_python_engine_on_all_rows(evaluator, tmp_
     assert not got[:, 1].any()
 
 
+def test_simulator_wiring_data_matches_the_connectome_subgraph():
+    """docs/sim/wiring.json feeds the page's wiring view. Every number in it must come
+    from the committed subgraph, and it must name that file's real digest."""
+    doc = json.loads((SIM / "wiring.json").read_text())
+    raw = (ROOT / "data" / doc["source"]["file"]).read_bytes()
+    assert doc["source"]["sha256"] == hashlib.sha256(raw).hexdigest()
+    sub = json.loads(raw)
+    assert len(doc["giant_fibers"]) == len(sub["giant_fibers"])
+    for got, want in zip(doc["giant_fibers"], sub["giant_fibers"]):
+        assert got["instance"] == want["instance"]
+        assert got["visual_projection_input_synapses"] == want["visual_projection_input_synapses"]
+        for t in ("LC4", "LPLC2"):
+            counts = sorted((int(n) for _, n in want["inputs"][t]["per_cell_synapses"]), reverse=True)
+            assert got[t]["synapses_per_cell"] == counts
+            assert got[t]["cells"] == want["inputs"][t]["cells"] == len(counts)
+            assert got[t]["synapses"] == sum(counts)
+
+
 def test_simulator_onchain_data_matches_the_artifact_and_the_manifest():
     """docs/sim/onchain.json lets the page have a public node evaluate the core through an
     eth_call state override. Its bytecode, selector and netlist must be the committed ones."""

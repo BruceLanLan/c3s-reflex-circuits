@@ -119,6 +119,10 @@
   .bench-facts b { color: #33383E; font-weight: 600; }
   .bench h2 { color: #6A7078; }  /* the rail's heading colour is tuned for its dark background */
   .bench-log { width: 100%; max-width: 780px; min-width: 0; margin-top: 20px; }
+  .bench-wiring { width: 100%; max-width: 780px; min-width: 0; margin-top: 22px; }
+  #wiring { display: block; width: 100%; max-width: 100%; min-width: 0; height: auto; aspect-ratio: 13 / 5;
+            background: #0C0E12; border: 1px solid var(--line); }
+  @media (max-width: 560px) { #wiring { aspect-ratio: 5 / 4; } }  /* 13:5 is only 142 px tall on a phone */
   .bench-facts code { font-family: var(--mono); font-size: 11.5px; }
   .chain-fields { display: grid; gap: 6px; margin: 0; }
   .chain-field { width: 100%; background: none; border: 1px solid var(--line); color: inherit; padding: 4px 6px; font: inherit; font-size: 12.5px; }
@@ -211,6 +215,13 @@
         <span><b data-i18n="bfDeviceH">Measured, not claimed.</b> <span data-i18n="bfDevice">The device digests all 8,388,608 rows in 10,218 ms; this page's boot self-test takes about 50 ms.</span></span>
         <span><b data-i18n="bfProofsH">Five temporal properties proven.</b> <span data-i18n="bfProofs">No takeoff for seven ticks after one, four consecutive raising ticks before a long-mode takeoff, and three more, each proven twice by two independent engines.</span></span>
       </div>
+
+      <section class="bench-wiring">
+        <h2 data-i18n="wiringTitle">Measured wiring</h2>
+        <canvas id="wiring" width="1560" height="600" role="img"
+                aria-label="Measured LC4 and LPLC2 input wiring of the two giant fibers"></canvas>
+        <p class="bench-note" data-i18n="wiringNote">Every LC4 and LPLC2 cell that synapses onto the two giant fibers in MaleCNS v1.0, each line as thick as that cell's measured synapse count: 55 LC4 and 91 LPLC2 cells onto the right fiber, 71 and 94 onto the left. The layout is not anatomy — the release's positions are not used — and the lamps follow the policy's two pathways, never individual cells, because the circuit only ever sees 16 sensory bits.</p>
+      </section>
 
       <section class="bench-log">
         <h2 data-i18n="logTitle">Serial log</h2>
@@ -334,6 +345,8 @@ const I18N = {
     bfDevice: "真机把全部 8,388,608 行算成摘要用了 10,218 ms；本页的开机自检约 50 ms。",
     bfProofsH: "五条时序性质已证明。",
     bfProofs: "起飞后七拍内不会再起飞、长模式起飞前必有连续四拍抬翅，另外还有三条——每条都用两套独立引擎各证一次。",
+    wiringTitle: "实测连线",
+    wiringNote: "MaleCNS v1.0 里所有与两根巨纤维成突触的 LC4 与 LPLC2 细胞，每条线的粗细就是该细胞的实测突触数：右侧巨纤维收 55 个 LC4、91 个 LPLC2，左侧收 71 与 94。这个排布不是解剖形态——发布数据里的坐标没有被用到——而且点亮只跟随策略的两条通路，绝不按单个细胞，因为电路看到的只有 16 位感觉输入。",
   },
 };
 Object.assign(I18N.en, {
@@ -818,6 +831,7 @@ function frame() {
     launch();
   }
   if (dirty) { draw(); dirty = false; }
+  drawWiring(now);
   requestAnimationFrame(frame);
 }
 
@@ -921,6 +935,108 @@ for (const b of document.querySelectorAll("#chain-mode button")) {
 }
 document.getElementById("chain-run").addEventListener("click", runChainCheck);
 
+// ---------------------------------------------------------------- measured wiring
+
+// The committed subgraph gives, per giant fiber, every presynaptic LC4/LPLC2 cell
+// and how many synapses it makes. It gives no positions, so the ring layout below
+// is a drawing of connectivity, not of anatomy. The circuit sees 16 sensory bits,
+// so highlights follow the two pathways only: lighting single cells would invent
+// resolution the circuit does not have.
+let wiringNodes = null, wiringEdges = null, wiringLabels = [], wiringSpin = 0, wiringDrawMs = 0;
+
+// Synapse count is encoded only as line thickness and dot size. Position carries no
+// meaning at all: the two rings per fiber are just a readable arrangement, and the
+// release's coordinates are deliberately not used.
+async function loadWiring() {
+  const w = await (await fetch("wiring.json")).json();
+  const nodes = [], edges = [], labels = [];
+  w.giant_fibers.forEach((f, fi) => {
+    const sx = fi === 0 ? 1 : -1;
+    const gf = { x: sx * 0.62, y: 0, z: 0, kind: "gf", r: 0.020 };
+    nodes.push(gf);
+    labels.push({ side: f.side, sx, text: `${f.LC4.cells} LC4 · ${f.LPLC2.cells} LPLC2 → ${f.instance}` });
+    for (const [type, ring, ringX] of [["LC4", 0.30, 0.16], ["LPLC2", 0.45, 0.30]]) {
+      const counts = f[type].synapses_per_cell, max = counts[0] || 1;
+      counts.forEach((n, i) => {
+        const a = (i / counts.length) * Math.PI * 2 + (type === "LC4" ? 0 : 0.35);
+        const node = { x: sx * ringX, y: Math.sin(a) * ring, z: Math.cos(a) * ring, kind: type, w: n / max, r: 0.004 + 0.007 * (n / max) };
+        nodes.push(node);
+        edges.push({ a: node, b: gf, w: n / max, kind: type });
+      });
+    }
+  });
+  wiringNodes = nodes;
+  wiringEdges = edges;
+  wiringLabels = labels;
+}
+
+function drawWiring(now) {
+  const c = document.getElementById("wiring");
+  if (!c || !wiringEdges || now - wiringDrawMs < 33) return;
+  wiringDrawMs = now;
+  wiringSpin += 0.005;
+  const ctx = c.getContext("2d"), W = c.width, H = c.height, R = Math.min(W, H);
+  ctx.fillStyle = "#0C0E12";
+  ctx.fillRect(0, 0, W, H);
+  const cos = Math.cos(wiringSpin), sin = Math.sin(wiringSpin);
+  const proj = (p) => {
+    const x = p.x * cos - p.z * sin, z = p.x * sin + p.z * cos;
+    const s = 1 / (1.8 - z * 0.7);
+    return [W / 2 + x * W * 0.60 * s, H / 2 + p.y * R * 1.5 * s, s];
+  };
+  const path = haveTick ? last.pathways : 0;
+  const hot = { LC4: (path & 1) === 1, LPLC2: (path >> 1 & 1) === 1 };
+  const tint = { LC4: [255, 138, 101], LPLC2: [255, 196, 84] };
+
+  for (const e of wiringEdges) {
+    const [x1, y1, s1] = proj(e.a), [x2, y2] = proj(e.b);
+    const [r, g, b] = tint[e.kind];
+    ctx.strokeStyle = hot[e.kind]
+      ? `rgba(${r},${g},${b},${0.22 + 0.55 * e.w})`
+      : `rgba(150,164,182,${0.10 + 0.34 * e.w})`;
+    ctx.lineWidth = Math.max(0.8, 0.004 * R * (0.35 + e.w) * s1 * 2);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  for (const n of [...wiringNodes].sort((p, q) => proj(p)[2] - proj(q)[2])) {
+    const [x, y, s] = proj(n);
+    if (n.kind === "gf") {
+      ctx.fillStyle = path ? "#7BE0A8" : "#6E7A88";
+      ctx.beginPath();
+      ctx.arc(x, y, n.r * R * s * 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      if (path) {
+        ctx.strokeStyle = "rgba(123,224,168,0.45)";
+        ctx.lineWidth = 0.003 * R;
+        ctx.beginPath();
+        ctx.arc(x, y, n.r * R * s * 3.2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    } else {
+      const [r, g, b] = tint[n.kind];
+      ctx.fillStyle = hot[n.kind] ? `rgb(${r},${g},${b})` : (n.kind === "LC4" ? "#78899B" : "#8A8F9C");
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(1.2, n.r * R * s * 1.8), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.font = `${Math.round(0.030 * R)}px ${getComputedStyle(c).fontFamily || "monospace"}`;
+  ctx.fillStyle = "#8A93A0";
+  for (const l of wiringLabels) {
+    ctx.textAlign = l.sx > 0 ? "right" : "left";
+    ctx.fillText(l.text, l.sx > 0 ? W - 0.02 * W : 0.02 * W, H - 0.04 * H);
+  }
+  ctx.textAlign = "left";
+  ctx.fillStyle = hot.LC4 ? `rgb(${tint.LC4.join(",")})` : "#78899B";
+  ctx.fillText("LC4 · velocity", 0.02 * W, 0.07 * H);
+  ctx.fillStyle = hot.LPLC2 ? `rgb(${tint.LPLC2.join(",")})` : "#8A8F9C";
+  ctx.fillText("LPLC2 · size", 0.02 * W, 0.07 * H + 0.04 * R);
+}
+
 function splash(lines, color) {
   fillRect(0, 0, 240, 135, kBg);
   lines.forEach((l, i) => text(4, 4 + i * 16, i === 0 ? kText : color, l));
@@ -928,6 +1044,7 @@ function splash(lines, color) {
 
 applyLang();
 splash(["SELF-TEST", "hashing and replaying the netlists..."], kMuted);
+loadWiring().catch(() => { /* the 3D wiring view is decoration; the page works without it */ });
 loadModule().then(
   () => { renderFacts(); setTimeout(() => { boot(); requestAnimationFrame(frame); }, 60); },
   () => { loadError = true; renderChecks(); splash(["SELF-TEST", "could not load c3s_core.wasm"], kBad); },
