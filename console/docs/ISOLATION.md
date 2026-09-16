@@ -75,6 +75,12 @@ which bound the name on the way through and spent the confirm a person had left 
 Authenticating a name and creating one are different powers, and only a person holds the
 second.
 
+**So the agent needs a fixed name.** Left to itself the Claude Code hook calls itself
+`claude-code:<session id>`, a new name every session — and in this mode every one of those
+is a name nobody has bound, which is a `403`. `REFLEX_AGENT` in `docker-compose.yml` is
+what makes the name stable (`claude-code:container` by default), and it is the name to
+bind. Same for the MCP proxy (`--agent` / `REFLEX_AGENT`) and the wallet (`agent=`).
+
 Inside the container, point the hooks at `/opt/reflex/adapters/claude_code_hook.py` and
 `claude_code_post_hook.py` exactly as `adapters/README.md` says; `REFLEX_CONSOLE` and
 `REFLEX_AGENT_TOKEN` are already in the environment. The first request binds the agent name
