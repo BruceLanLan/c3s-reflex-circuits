@@ -18,6 +18,7 @@ import os
 import sys
 import threading
 import time
+import urllib.request
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -25,6 +26,13 @@ from pathlib import Path
 REPO = Path(os.environ.get("C3S_REPO", Path.home() / "work" / "c3s-reflex")).expanduser()
 HOST = os.environ.get("CONSOLE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("CONSOLE_PORT", "8765"))
+# Optional second opinion: a public BNB Smart Chain node re-evaluates the decisive
+# tick through a read-only eth_call whose state override installs the compiled
+# evaluator for the duration of that one call. Nothing is deployed, no wallet or key
+# is involved, and no gas is spent. Set VERIFY_ON_CHAIN=0 to keep everything local.
+VERIFY_ON_CHAIN = os.environ.get("VERIFY_ON_CHAIN", "1") not in ("0", "", "no")
+BSC_RPC = os.environ.get("BSC_RPC", "https://bsc-rpc.publicnode.com")
+CHAIN_ADDRESS = "0x000000000000000000000000000000000000c3f5"
 STATIC = Path(__file__).resolve().parent / "static"
 REFRACTORY_TICKS = 7  # P1, proven; reported here, enforced by the circuit itself
 TRANSCRIPT = 200
@@ -66,11 +74,14 @@ class Circuit:
         with self.lock:
             a = self.agent(name)
             samples = loom.stimulus_samples(loom.Stimulus(lv, az), self.params)
-            motor, ticks, authorised_at, gaps = loom.CORE_HOLD, 0, [], []
+            motor, ticks, authorised_at, gaps, actions = loom.CORE_HOLD, 0, [], [], []
+            decisive: list[tuple[int, int, int, int]] = []
             first_gap = None
             while True:
                 theta, dtheta = samples[min(ticks, len(samples) - 1)]
-                row = loom.encode_features(theta, dtheta, az, self.enc) | (1 << nf) | (a["state"] << (nf + 1))
+                x = loom.encode_features(theta, dtheta, az, self.enc) | (1 << nf)
+                state_before = a["state"]
+                row = x | (state_before << (nf + 1))
                 motor = int(self.outs[row])
                 a["state"] = int(self.nxt[row])
                 a["tick"] += 1
@@ -84,6 +95,8 @@ class Circuit:
                     a["last_authorised_tick"] = a["tick"]
                     a["authorisations"] += 1
                     authorised_at.append(a["tick"])
+                    actions.append(loom.CORE_ACTION_NAMES[motor])
+                    decisive.append((x, state_before, motor, a["state"]))
                     if hold is None:
                         break
                 if hold is not None and ticks >= hold:
@@ -99,12 +112,16 @@ class Circuit:
                 "held_ticks": hold,
                 "ticks_used": ticks,
                 "motor": motor,
-                "action": loom.CORE_ACTION_NAMES[motor],
+                # what was authorised, not what the last tick happened to be doing
+                "action": actions[-1] if actions else loom.CORE_ACTION_NAMES[motor],
+                "authorised_actions": sorted(set(actions)),
                 "authorised": bool(authorised_at),
                 "authorisations": len(authorised_at),
                 "smallest_gap": min(gaps) if gaps else None,
                 "ticks_since_previous_authorisation": first_gap,
                 "agent_tick": a["tick"],
+                # the tick a public node is asked to re-evaluate, once the lock is free
+                "_decisive": decisive[0] if decisive else None,
             }
             TRANSCRIPTS.appendleft(entry)
             return entry
@@ -132,6 +149,57 @@ class Circuit:
 
 
 TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
+
+
+class Chain:
+    """A public BNB Smart Chain node asked for a second opinion on one tick.
+
+    Read-only: an eth_call whose state override installs the compiled evaluator at a
+    throwaway address for the duration of that single call. Nothing is deployed, no
+    address of yours appears, no wallet or key is involved and no gas is spent. The
+    bytecode, the selector and the netlist all come from the circuits repository's
+    docs/sim/onchain.json, which its tests check against the Foundry artifact."""
+
+    def __init__(self, rpc: str) -> None:
+        self.rpc = rpc
+        doc = json.loads((REPO / "docs" / "sim" / "onchain.json").read_text())
+        self.code = doc["evaluator"]["runtime_bytecode"]
+        self.selector = doc["evaluator"]["selector"].removeprefix("0x")
+        self.core = doc["core"]
+        self.netlist = self.core["netlist"].removeprefix("0x")
+        self.chain_id: int | None = None
+
+    def _call(self, method: str, params: list, timeout: int = 20):
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
+        last: Exception | None = None
+        for attempt in range(2):  # a public endpoint drops a connection now and then
+            try:
+                req = urllib.request.Request(
+                    self.rpc, data=body, headers={"content-type": "application/json", "user-agent": "reflex-console"}
+                )
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    out = json.loads(resp.read())
+                if "error" in out:
+                    raise RuntimeError(out["error"].get("message", "rpc error"))
+                return out["result"]
+            except Exception as e:
+                last = e
+                if attempt == 0:
+                    time.sleep(0.6)
+        raise last  # type: ignore[misc]
+
+    def chain(self) -> int:
+        if self.chain_id is None:
+            self.chain_id = int(self._call("eth_chainId", []), 16)
+        return self.chain_id
+
+    def evaluate(self, inputs: int, state: int) -> tuple[int, int]:
+        word = lambda v: f"{v:064x}"  # noqa: E731
+        size = len(self.netlist) // 2
+        head = word(6 * 32) + "".join(word(v) for v in (self.core["n_inputs"], self.core["n_outputs"], self.core["n_state"], inputs, state))
+        data = "0x" + self.selector + head + word(size) + self.netlist + "00" * ((32 - size % 32) % 32)
+        raw = self._call("eth_call", [{"to": CHAIN_ADDRESS, "data": data}, "latest", {CHAIN_ADDRESS: {"code": self.code}}])[2:]
+        return int(raw[:64], 16), int(raw[64:128], 16)
 
 
 def validated(payload: dict) -> tuple[str, float, float, str, int | None]:
@@ -172,6 +240,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         elif self.path == "/api/state":
             self._json(200, CIRCUIT.status())
+        elif self.path == "/favicon.ico":
+            self._send(204, b"", "image/x-icon")
         else:
             self._json(404, {"error": "no such path"})
 
@@ -179,18 +249,56 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/api/propose":
             self._json(404, {"error": "no such path"})
             return
+        payload: dict = {}
         try:
             payload = json.loads(self.rfile.read(int(self.headers.get("content-length", "0"))) or b"{}")
             name, lv, az, reason, hold = validated(payload)
         except Exception as e:
-            self._json(400, {"error": str(e), "authorised": False})
+            # A malformed proposal never reaches the circuit, but it still belongs in
+            # the duty record: who asked for what, and why it was thrown out.
+            refused = {
+                "at": time.time(),
+                "agent": str(payload.get("agent", "anonymous"))[:40] if isinstance(payload, dict) else "anonymous",
+                "l_over_v_ms": (payload or {}).get("l_over_v_ms") if isinstance(payload, dict) else None,
+                "azimuth_deg": (payload or {}).get("azimuth_deg") if isinstance(payload, dict) else None,
+                "reason": str((payload or {}).get("reason", ""))[:160] if isinstance(payload, dict) else "",
+                "error": str(e),
+                "authorised": False,
+            }
+            TRANSCRIPTS.appendleft(refused)
+            self._json(400, refused)
             return
-        self._json(200, CIRCUIT.propose(name, lv, az, reason, hold))
+        entry = CIRCUIT.propose(name, lv, az, reason, hold)
+        decisive = entry.pop("_decisive", None)
+        if CHAIN is not None and decisive is not None:
+            inputs, state, motor, next_state = decisive
+            try:
+                got_motor, got_state = CHAIN.evaluate(inputs, state)
+                entry["chain"] = {
+                    "chain_id": CHAIN.chain(),
+                    "inputs": inputs,
+                    "state": state,
+                    "motor": got_motor,
+                    "agrees": (got_motor, got_state) == (motor, next_state),
+                    "deployed": False,
+                }
+            except Exception as e:  # the console works without a node; it just says so
+                entry["chain"] = {"error": str(e)[:120]}
+        self._json(200, entry)
 
 
 if __name__ == "__main__":
     print(f"loading the circuit from {REPO} …", flush=True)
     CIRCUIT = Circuit()
     print(f"{CIRCUIT.name}: {CIRCUIT.metrics['nand']} NAND + {CIRCUIT.metrics['latch']} LATCH, sha256 {CIRCUIT.sha256[:16]}…")
+    CHAIN = None
+    if VERIFY_ON_CHAIN:
+        try:
+            # No network call here: one bad moment at startup must not switch the
+            # second opinion off for the session. The chain id is fetched on first use.
+            CHAIN = Chain(BSC_RPC)
+            print(f"second opinion: {BSC_RPC} — read-only eth_call, nothing deployed, no wallet", flush=True)
+        except Exception as e:
+            print(f"no second opinion ({e}); the console runs on the local circuit alone", flush=True)
     print(f"duty console on http://{HOST}:{PORT}  (no wallet, no key, nothing signed)", flush=True)
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

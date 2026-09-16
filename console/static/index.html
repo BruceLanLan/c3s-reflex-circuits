@@ -27,6 +27,8 @@
   li i { width: 8px; height: 8px; border-radius: 2px; background: var(--faint); margin-top: 6px; }
   li.ok i { background: var(--ok); } li.no i { background: var(--faint); } li.err i { background: var(--bad); }
   .muted { color: var(--faint); }
+  .chain { color: var(--ok); }
+  .disagree { color: var(--bad); font-weight: 600; }
 </style>
 <main>
   <div>
@@ -72,9 +74,17 @@ function render(s) {
     const cls = e.error ? "err" : e.authorised ? "ok" : "no";
     const when = new Date(e.at * 1000).toLocaleTimeString();
     const gap = e.ticks_since_previous_authorisation != null ? `, ${e.ticks_since_previous_authorisation} ticks after the last` : "";
-    const head = e.error ? `refused: ${e.error}` : `${e.authorised ? "AUTHORISED" : "refused"} — ${e.action}${gap}`;
+    const times = e.authorised && e.authorisations > 1 ? ` ×${e.authorisations}` : "";
+    const held = e.held_ticks ? ` over ${e.held_ticks} ticks` : "";
+    const closest = e.smallest_gap != null ? `, closest ${e.smallest_gap} ticks apart` : gap;
+    const head = e.error ? `refused: ${e.error}`
+      : `${e.authorised ? "AUTHORISED" + times : "refused"} — ${e.action}${held}${e.authorised ? closest : ""}`;
+    const chain = !e.chain ? ""
+      : e.chain.error ? ` <span class="muted">· no chain check (${e.chain.error})</span>`
+      : e.chain.agrees ? ` <span class="chain">· chain ${e.chain.chain_id} agrees, nothing deployed</span>`
+      : ` <span class="disagree">· chain ${e.chain.chain_id} DISAGREES (motor ${e.chain.motor})</span>`;
     return `<li class="${cls}"><i></i><span><span class="mono">${when}</span> ${e.agent} · l/v ${e.l_over_v_ms} ms · az ${e.azimuth_deg}° — ${head}` +
-           `${e.reason ? ` <span class="muted">(${e.reason})</span>` : ""}</span></li>`;
+           `${chain}${e.reason ? ` <span class="muted">(${e.reason})</span>` : ""}</span></li>`;
   }).join("");
 }
 
