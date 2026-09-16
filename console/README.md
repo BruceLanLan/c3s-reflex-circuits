@@ -132,8 +132,7 @@ c3s down
 
 ## The rules you can compile
 
-The circuits library (`c3s/policy.py`) knows eleven rules. This console installs ten of
-them; the last row says why.
+Eleven rules, all of them installable from this console.
 
 | Rule | What it enforces | Rests on |
 | --- | --- | --- |
@@ -147,7 +146,7 @@ them; the last row says why.
 | `min_gap_ticks` | at least *n* ticks between grants | nothing the agent can change |
 | `max_grants` | at most *n* grants, ever | nothing the agent can change |
 | `commit_ticks` | *n* consecutive intent ticks before a grant | **the agent — a cost, not a boundary** |
-| `trip_after_refusals` | *n* refusals in a row halt the agent instead of letting it hammer the boundary | the circuit's own verdict — **compiled in the library, deliberately not installable here**: its safety half is proven, its reset is broken, and no confirm lifts it (found 2026-09-17) |
+| `trip_after_refusals` | *n* refusals in a row halt the agent instead of letting it hammer the boundary | the circuit's own verdict |
 
 "Never" is not a big number: `max_grants=0` means *unlimited*. A class set to **deny all**
 compiles to no circuit at all — there is no path to a grant — and the console says so in

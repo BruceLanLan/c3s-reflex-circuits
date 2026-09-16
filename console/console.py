@@ -1447,15 +1447,16 @@ def policy_from(payload: dict) -> Policy:
         heartbeat_ticks=whole("heartbeat_ticks", 255),
         confirm_per_irreversible=flag("confirm_per_irreversible", False),
         trip_after_failures=whole("trip_after_failures", 255),
-        # The eleventh rule is deliberately NOT installable from here. It compiles and its
-        # safety half is proven — nothing is granted while it is tripped — but its reset
-        # does not work: once tripped, every tick is a refusal, so the tick carrying the
-        # person's confirm re-trips the breaker before the reset can take effect, and no
-        # confirm ever lifts it. Checked against c3s.policy's own reference implementation
-        # on 2026-09-17: ticks 4, 6 and 9 each carried a confirm and `refused_tripped`
-        # stayed 1 throughout. A rule whose refusal says "a confirm resets it" and means
-        # "nothing ever will" is worse than an absent rule, so the console does not offer
-        # it until the circuit is fixed and a liveness monitor covers it.
+        # The eleventh rule, and the only one that reads the circuit's own verdict: an
+        # agent that keeps asking for what it cannot have is halted rather than left to
+        # hammer the boundary. It was held out of this console for part of 2026-09-17,
+        # because its reset did not work — while tripped every tick is a refusal, so the
+        # tick carrying the person's confirm re-tripped the breaker and no confirm ever
+        # lifted it, which a refusal saying "a confirm resets it" made worse than no rule
+        # at all. Fixed in the circuits library the same night, and the half that was
+        # missing is now a monitor of its own (`violations.refusal_reset`), so the reset
+        # is proven and not merely intended.
+        trip_after_refusals=whole("trip_after_refusals", 255),
         two_key=flag("two_key", False),
     )
 
