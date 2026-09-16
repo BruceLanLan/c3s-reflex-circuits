@@ -106,6 +106,19 @@ def test_a_person_sees_what_waits_and_confirms_it(sent):
     assert bot.call("/api/request", {"agent": name, "intent": 1, "reason": "rm", "class": "files"})["granted"]
 
 
+def test_a_typed_confirm_also_carries_the_two_digits(sent, monkeypatch):
+    """The console only checks a code it is given, so a chat channel always giving one is
+    the channel's own promise (docs/API.md, I-2) — and nothing else would catch it."""
+    name = waiting_agent("rm typed.txt")
+    code = item_for(name)["code"]
+    bodies = []
+    real = bot.call
+    monkeypatch.setattr(bot, "call", lambda p, payload=None, **kw: (
+        bodies.append(payload) if p == "/api/tool" else None) or real(p, payload, **kw))
+    bot.handle("person-chat", f"/confirm {name}")
+    assert bodies[-1] == {"agent": name, "confirm": 1, "for_reason": "rm typed.txt", "code": code}
+
+
 def test_stop_blocks_everyone_and_resume_lifts_it(sent):
     name = waiting_agent()
     bot.handle("person-chat", "/stop")
