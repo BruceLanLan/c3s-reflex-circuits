@@ -51,7 +51,10 @@ import urllib.error
 import urllib.request
 from typing import Optional
 
-LAUNCHERS = ("python", "python3", "node", "npx", "uvx", "uv", "bun", "bunx", "deno", "npm", "pnpm", "yarn")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from reflex_classes import CLASSES, classify, load_rules  # noqa: E402  (sibling file: which circuit answers)
+
+LAUNCHERS =("python", "python3", "node", "npx", "uvx", "uv", "bun", "bunx", "deno", "npm", "pnpm", "yarn")
 
 
 def describe(args: dict) -> str:
@@ -85,11 +88,17 @@ def load_gates(args: argparse.Namespace) -> list[str]:
 
 
 class Proxy:
-    def __init__(self, console: str, agent: str, gates: list[str], fail_open: bool) -> None:
+    def __init__(self, console: str, agent: str, gates: list[str], fail_open: bool,
+                 fixed_class: Optional[str] = None, class_file: Optional[str] = None) -> None:
         self.console = console.rstrip("/")
         self.agent = agent
         self.gates = gates
         self.fail_open = fail_open
+        # Which circuit answers a gated call: one class for everything (--class), or by
+        # the tool's name (built-in rules, or --class-file). Decided here, from the name
+        # the server published, never from the model.
+        self.fixed_class = fixed_class
+        self.class_rules = load_rules(class_file)
         self.out_lock = threading.Lock()  # relayed lines and refusals share one stdout
 
     # -- the two directions ---------------------------------------------------------
@@ -148,9 +157,10 @@ class Proxy:
         arguments = params.get("arguments")
         if not isinstance(arguments, dict):
             arguments = {}
-        reason = f"{name}: {describe(arguments)}"[:160]
+        cls = self.fixed_class or classify(name, self.class_rules)
+        reason = f"[{cls}] {name}: {describe(arguments)}"[:160]
 
-        refusal = self.ask(reason)
+        refusal = self.ask(reason, cls)
         if refusal is None:
             return True
         if "id" not in msg:
@@ -166,9 +176,9 @@ class Proxy:
         }, ensure_ascii=False).encode("utf-8") + b"\n")
         return False
 
-    def ask(self, reason: str) -> Optional[str]:
-        """One tick. None if granted, else the refusal text the model will read."""
-        body = json.dumps({"agent": self.agent, "intent": 1, "reason": reason}).encode()
+    def ask(self, reason: str, cls: str) -> Optional[str]:
+        """One tick of the class's circuit. None if granted, else the refusal text."""
+        body = json.dumps({"agent": self.agent, "intent": 1, "reason": reason, "class": cls}).encode()
         req = urllib.request.Request(f"{self.console}/api/request", data=body,
                                      headers={"content-type": "application/json"})
         try:
@@ -207,6 +217,10 @@ def parse(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     p.add_argument("--gate-all", action="store_true", help="gate every tool (the default with no --gate)")
     p.add_argument("--gate-file", metavar="PATH", help="one tool name or glob per line, # comments")
     p.add_argument("--console", default=os.environ.get("REFLEX_CONSOLE", "http://127.0.0.1:8765"))
+    p.add_argument("--class", dest="fixed_class", choices=CLASSES, metavar="CLASS",
+                   help="answer every gated call with this class's circuit (spend|message|exec|files)")
+    p.add_argument("--class-file", metavar="PATH",
+                   help="one `glob class` per line deciding the class by tool name; default: built-in rules")
     args = p.parse_args(ours)
     if not command:
         p.error("no downstream command: put it after `--`")
@@ -216,7 +230,8 @@ def parse(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
 def main() -> None:
     args, command = parse(sys.argv[1:])
     agent = args.agent or os.environ.get("REFLEX_AGENT") or default_agent(command)
-    proxy = Proxy(args.console, agent, load_gates(args), os.environ.get("REFLEX_FAIL_OPEN") == "1")
+    proxy = Proxy(args.console, agent, load_gates(args), os.environ.get("REFLEX_FAIL_OPEN") == "1",
+                  fixed_class=args.fixed_class, class_file=args.class_file)
     try:
         # stderr=None: the server's stderr is ours, so its logs pass straight through.
         proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None)

@@ -8,6 +8,28 @@ client of the console's `POST /api/request`; none of them writes `blocked` or
 | --- | --- | --- |
 | `claude_code_hook.py` | Claude Code and the Claude Agent SDK, including built-in `Bash`/`Write`/`Edit` and every MCP tool, via a `PreToolUse` hook | one file, stdlib only |
 | `mcp_proxy.py` | Any MCP client over stdio (Claude Desktop, Claude Code, Cursor, ...): wraps one MCP server and gates its `tools/call` requests; blind to the client's built-in tools | one file, stdlib only |
+| `reflex_classes.py` | Shared by both: which class of circuit a tool call answers to | one file, stdlib only |
+
+## Which circuit answers
+
+One agent has one circuit per class of tool — `spend`, `message`, `exec`, `files` — and
+the console keeps a fifth, `halt`, that every class shares. Each adapter decides the
+class from the tool's *name* (framework data, never the model's account of itself) and
+sends it with the request: `Write`/`Edit`, `write_*`, `move_*`, `delete_*` → `files`;
+`send_*`, `reply*`, `post_*`, `publish*` → `message`; `*transfer*`, `*pay*`, `*swap*`,
+`*sign*` → `spend`; everything else → `exec`, which always has a circuit. A class with no
+circuit installed is not gated, and the decision says so. Override or extend with a
+file — `REFLEX_CLASS_FILE` for the hook, `--class-file` for the proxy (or `--class NAME`
+to put every gated call of one server in one class):
+
+```
+# glob        class          first match wins; `!default` keeps the built-in rules after yours
+transfer_*    spend
+notify_*      message
+!default
+```
+
+A tool that moves money but is called `helper` is this layer's miss, not the circuit's.
 
 ## Claude Code hook
 
