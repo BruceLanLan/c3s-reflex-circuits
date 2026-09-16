@@ -291,6 +291,8 @@ section[data-view="approvals"] .split.a > div > .card:has(.stopbanner:not([hidde
 .resume button { min-height: 44px; }
 .stopdock { display: none; }
 .stopdock .note { text-align: center; font-size: 11px; margin-top: 4px; }   /* "hold for half a second": the dock says it, the desktop button's title does */
+/* under the latch (or on a phone that may not stop) there is nothing to hold for: the hint goes with the button */
+.stopdock .stopbtn:disabled + .note, .card.warn .actions:has(.stopbtn:disabled) + .note { display: none; }
 .why { margin: 3px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
 .why li { font-family: var(--mono); font-size: 12px; color: var(--text); display: grid; grid-template-columns: 12px 1fr; gap: 4px; overflow-wrap: anywhere; }
 .why li::before { content: "↳"; color: var(--faint); }
@@ -1683,7 +1685,8 @@ function renderActivity(s) {
 // entry is still in the transcript and a click shows them. Open runs are remembered by the
 // first entry's agent and tick, which do not move as new entries arrive.
 const AC_OPEN = new Set();
-const runKey = (e) => (e.kind === "request" && !e.error ? [e.agent, e.class || "exec", e.granted ? 1 : 0, (e.why || []).join("|"), e.task || ""].join(" ") : null);
+// A chain disagreement is never folded away: it is the one entry in a run a person must see.
+const runKey = (e) => (e.kind === "request" && !e.error && !(e.chain && e.chain.agrees === false) ? JSON.stringify([e.agent, e.class || "exec", e.granted ? 1 : 0, e.why || [], e.task || ""]) : null);
 function foldRuns(entries) {
   const out = [];
   for (const e of entries) {
