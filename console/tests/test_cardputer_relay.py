@@ -189,3 +189,21 @@ def test_the_relay_shows_what_the_console_computed_and_derives_nothing_itself(bo
     assert items[0]["why"] == "; ".join(mine["why"])         # flattened for one line of screen
     state["pending"] = []  # nothing computed upstream: nothing shown, whatever the transcript says
     assert pending_items(state) == [] and frame(state)[1] == []
+
+
+def test_the_armed_column_follows_the_console_not_the_relay(boundary):
+    """Column 8 is "a confirm is waiting for *this* call". The console decides that now
+    (pending[].armed); the relay only prints it."""
+    boundary.install("files", Policy(confirm_per_irreversible=True, forbid_when_blocked=True))
+    reason = "[files] trash_email [irreversible]: id=m3"
+    boundary.arm("mail", {"irreversible": 1})
+    boundary.request("mail", 1, reason, "files")
+    item = next(line for line in frame(boundary.status())[0] if line.startswith("I|"))
+    assert item.split("|")[7] == "0"
+    boundary.arm("mail", {"confirm": 1}, bind_to=reason)          # bound to this very call
+    item = next(line for line in frame(boundary.status())[0] if line.startswith("I|"))
+    assert item.split("|")[7] == "1"
+    boundary.arm("mail", {"confirm": 0})
+    boundary.arm("mail", {"confirm": 1}, bind_to="some other call")  # waiting for a different one
+    item = next(line for line in frame(boundary.status())[0] if line.startswith("I|"))
+    assert item.split("|")[7] == "0"
