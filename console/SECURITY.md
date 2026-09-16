@@ -60,7 +60,10 @@ from a browser without a preflight this server never answers).
    `ps eww <pid>` in one command. Anything that can do that can write `confirm` for
    itself. The per-agent token (I-3) does not fix it either — it is in the agent's
    environment, and a sibling process under the same user can read that too. **The answer
-   is not another check in the code; it is `docs/ISOLATION.md`.**
+   is not another check in the code; it is `docs/ISOLATION.md`.** The token is also
+   *printed at startup*, so wherever the console's output goes is as sensitive as the
+   token file: the development command in the workstream document writes it to
+   `/tmp/console.log`, which is world-readable.
 3. **`POST /api/tool` needs no token for the adapter's own bits** (`irreversible`,
    `failed`), and is not gated by the agent token at all, because setting either can only
    make a decision stricter. The honest consequence: anything local can arm `failed` on a
@@ -103,7 +106,12 @@ Run the agent in a container with no route to the console and no sight of
 console is unreachable by address and by name; the configuration directory is not there).
 
 If you will not do that, the next best things, in order: run the agent as a *second OS
-user* that cannot read your home directory; keep `REFLEX_FAIL_OPEN` unset; give each
+user* that cannot read your home directory — and then check where the console's log goes,
+because the token is printed at startup and the documented dev command sends that to
+`/tmp/console.log`, which on this machine is mode 644 and readable by every user on it
+(`ls -l /tmp/console.log` → `-rw-r--r--`; the token is on line 11). A second user only
+helps if the log is mode 600 and somewhere that user cannot read; keep `REFLEX_FAIL_OPEN`
+unset; give each
 adapter its own `REFLEX_AGENT_TOKEN` so a spoofed name is refused and recorded; and put a
 physical key in the loop (the Cardputer's `confirm` never travels over HTTP, so no amount
 of local access forges it).

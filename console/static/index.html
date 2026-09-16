@@ -8,6 +8,7 @@
           --faint: #5E646C; --ok: #46C878; --bad: #E36A52; --amber: #F2A541; --blue: #6FA8DC; --agent: #6FA8DC; --tool: #F2A541;
           --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }  /* a display: rule of ours must not outvote hidden */
   html { color-scheme: dark; }
   body { margin: 0; background: var(--bg); color: var(--dim); font: 14px/1.5 system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif; overflow-x: hidden; }
   a { color: var(--blue); text-decoration: none; }
@@ -143,9 +144,42 @@
   .pend.wait { border-left-color: var(--faint); }
   .pend .who { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; } .pend .who b { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
   .pend .call { font-family: var(--mono); color: var(--text); font-size: 12.5px; overflow-wrap: anywhere; }
-  .pend .btns { display: flex; flex-direction: column; gap: 8px; }
-  .pend .btns button { white-space: nowrap; }
-  @media (max-width: 560px) { .pend { grid-template-columns: 1fr; } .pend .btns { flex-direction: row; flex-wrap: wrap; } }
+  .pend .btns { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
+  .pend .btns button { white-space: nowrap; min-height: 44px; }
+  .pend .btns .notein { width: 100%; min-height: 44px; }
+  @media (max-width: 700px) { .pend { grid-template-columns: 1fr; } .pend .btns { min-width: 0; } }
+
+  /* the effect a person approves on (I-1): what the call would do, before the tool's words */
+  .eff { display: grid; gap: 5px; padding: 9px 11px; border-radius: 8px; background: rgba(242,165,65,.06); border: 1px solid rgba(242,165,65,.3); }
+  .eff .top { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+  .eff .sum { color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+  .eff .meta { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+  .eff .meta b { color: var(--text); font-weight: 600; }
+  .eff .kv { grid-template-columns: minmax(0, 90px) minmax(0, 1fr); border-top-color: rgba(242,165,65,.2); }
+  .kind { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--nav); color: var(--dim); white-space: nowrap; }
+  .kind.pay, .kind.delete { color: var(--bad); border-color: rgba(227,106,82,.5); }
+  .kind.send, .kind.write, .kind.move { color: var(--tool); border-color: rgba(242,165,65,.5); }
+  .kind.read { color: var(--ok); border-color: rgba(70,200,120,.4); }
+  .kind.exec { color: var(--agent); border-color: rgba(111,168,220,.5); }
+  .rev { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .rev.no { color: var(--bad); background: rgba(227,106,82,.14); }
+  .rev.yes { color: var(--ok); background: rgba(70,200,120,.12); }
+  .rev.unk { color: var(--faint); background: rgba(151,156,163,.12); }
+  .code { font-family: var(--mono); font-size: 19px; letter-spacing: .12em; color: var(--tool); background: rgba(242,165,65,.12); border: 1px solid rgba(242,165,65,.45); border-radius: 7px; padding: 0 9px; }
+  .codeline { display: inline-flex; gap: 7px; align-items: center; font-size: 12px; color: var(--faint); }
+
+  /* the big red button, and the deliberate way back */
+  .stopbtn { border: 0; border-radius: 10px; background: var(--bad); color: #190E0B; font-weight: 700; font-size: 15px; min-height: 44px; padding: 9px 18px; }
+  .stopbtn:disabled { background: rgba(227,106,82,.18); color: var(--bad); border: 1px solid rgba(227,106,82,.5); opacity: 1; cursor: default; }
+  .bar .stopbtn { min-height: 32px; padding: 4px 14px; font-size: 13px; }
+  .stopbanner { border: 1px solid rgba(227,106,82,.5); background: rgba(227,106,82,.1); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--text); }
+  .drill { font-size: 12.5px; color: var(--dim); background: var(--panel2); border: 1px dashed var(--faint); border-radius: 8px; padding: 9px 11px; overflow-wrap: anywhere; }
+  .drill:empty { display: none; }
+  .resume { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .resume .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .resume input { flex: 1 1 150px; min-height: 44px; font-size: 16px; }
+  .resume button { min-height: 44px; }
+  .stopdock { display: none; }
   .why { margin: 3px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
   .why li { font-family: var(--mono); font-size: 12px; color: var(--text); display: grid; grid-template-columns: 12px 1fr; gap: 4px; overflow-wrap: anywhere; }
   .why li::before { content: "↳"; color: var(--faint); }
@@ -196,6 +230,26 @@
     .nav-foot { display: none; }
     main, .bar { padding-left: 16px; padding-right: 16px; }
   }
+  /* a real phone: 390x844 (iOS Safari) and 360x800 (Android Chrome). Every tap target is
+     at least 44 px, text inputs are 16 px so Safari does not zoom (a zoom would also
+     change scrollWidth), and the stop button sits where a thumb already is — the bottom
+     of the screen — instead of in a top bar nobody can reach one-handed. */
+  @media (max-width: 600px) {
+    .bar .stopbtn { display: none; }
+    .stopdock { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--nav);
+                border-top: 1px solid var(--line); padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
+    .stopdock .stopbtn { width: 100%; min-height: 50px; font-size: 16px; }
+    main { padding-bottom: 86px; }
+    .pend .btns button, .pend .btns .notein { width: 100%; font-size: 16px; }
+    .pend .btns { flex-direction: column; }
+    input, select { font-size: 16px; min-height: 44px; }
+    /* every target a thumb has to hit on this screen, not only the big ones */
+    .nav-item, .pre, .link, .danger, .go, .tab { min-height: 44px; }
+    .lang button { min-height: 44px; padding: 0 14px; }
+    .togl { padding: 8px 10px; }
+    .tester input[type=text] { width: 100%; }
+    .code { font-size: 22px; }
+  }
 </style>
 
 <div class="shell">
@@ -217,6 +271,7 @@
   <span><i class="dot" id="chain-dot"></i><span id="chain"></span></span>
   <span><i class="dot" id="models-dot"></i><span id="models"></span></span>
   <span class="spacer"></span>
+  <button class="stopbtn" id="stop-all" type="button"></button>
   <span class="mono muted" id="clock"></span>
   <span class="lang"><button data-lang="zh">中文</button><button data-lang="en">EN</button></span>
 </div></header>
@@ -275,6 +330,24 @@
   <p class="lead" id="ap-lead"></p>
   <div class="split a">
     <div style="display:grid;gap:16px;min-width:0">
+      <div class="card warn">
+        <div class="h2"><span data-i18n="ap.stop.title"></span><span class="sub" data-i18n="ap.stop.sub"></span></div>
+        <div class="stopbanner" id="ap-stop-banner" hidden></div>
+        <div class="actions">
+          <button class="stopbtn" id="stop-big" type="button"></button>
+          <button class="pre" id="stop-drill" type="button" data-i18n="ap.drill"></button>
+        </div>
+        <div class="drill" id="ap-drill"></div>
+        <div class="resume" id="ap-resume" hidden>
+          <div class="note" id="ap-resume-hint"></div>
+          <div class="row">
+            <button class="pre" id="resume-open" type="button" data-i18n="ap.resume.open"></button>
+            <input type="text" id="resume-word" autocomplete="off" spellcheck="false" maxlength="24" hidden>
+            <button class="danger" id="resume-go" type="button" disabled hidden data-i18n="ap.resume.go"></button>
+          </div>
+        </div>
+        <div class="msg" id="ap-stop-msg"></div>
+      </div>
       <div class="card"><div class="h2"><span data-i18n="ap.pending"></span><span class="sub" id="ap-pending-sub"></span></div><div id="ap-list" style="display:grid;gap:10px"></div></div>
       <div class="card"><div class="h2"><span data-i18n="ap.handled"></span></div><div class="handled" id="ap-handled"></div></div>
     </div>
@@ -341,6 +414,8 @@
   <div class="foot" data-i18n="cn.foot"></div>
 </section>
 </main>
+<!-- On a phone the stop is where the thumb already is; on a desktop it is in the top bar. -->
+<div class="stopdock"><button class="stopbtn" id="stop-all-2" type="button"></button></div>
 </div>
 </div>
 
@@ -420,6 +495,20 @@ const T = {
     "ap.irrev.note": "工具层把这条标成了不可逆；电路要一次未用掉的确认才放。确认只放这一次。",
     "ap.halt.note": "停机中。一次 confirm 解除，解除那一拍本身不放行。", "ap.break.note": "熔断已跳。一次 confirm 复位。", "ap.win.note": "需要一次当拍的 confirm。", "ap.key.note": "缺第二把钥匙。",
     "ap.handled": "最近已处理", "ap.handled.none": "还没有处理记录。", "ap.h.tool": "人写了 {bits}", "ap.h.then": "之后 tick {n} {v}",
+    "ap.needs.note": "电路要一个人写一位才放行。", "ap.blocked.note": "这个 agent 正被封锁：它的请求一律被拒。先解除封锁（右边开关面板，或下面的「解除全部封锁」），确认才有意义。",
+    "ap.code": "匹配码", "ap.code.hint": "按钮上的两位数要和这里一样——同一块屏幕上读到的才算。聊天里批准必须带它。",
+    "ap.note": "备注（可选）", "ap.h.note": "备注：{note}",
+    "ap.stop.title": "全部停下", "ap.stop.sub": "一下把所有 agent 的 blocked 拉高；要解除得再做一次明确动作",
+    "ap.stop": "全部停下", "ap.stop.all": "已全部封锁 · {m}/{n}", "ap.stop.some": "全部停下（已封锁 {m}/{n}）",
+    "ap.stop.done": "已封锁 {n} 个 agent：它们的下一次请求都会被拒。",
+    "ap.stopped.banner": "封锁生效中：{m}/{n} 个 agent 的下一次请求都会被拒。blocked 是电平，会一直保持，直到有人明确解除。",
+    "ap.drill": "演练 / Test", "ap.drill.none": "现在还没有 agent：按下去不会有封锁对象。（演练，什么都没有改变。）",
+    "ap.drill.out": "演练：按下去会给这 {n} 个 agent 写 blocked = 1 —— {list}。现在什么都没有改变。",
+    "ap.resume.open": "解除全部封锁", "ap.resume.word": "解除", "ap.resume.go": "确认解除",
+    "ap.resume.ask": "解除是第二个动作：先点「解除全部封锁」，再输入 {word}，然后确认。故意麻烦。",
+    "ap.resume.done": "已解除 {n} 个 agent 的封锁。",
+    "eff.read": "读取 read", "eff.send": "发出 send", "eff.delete": "删除 delete", "eff.move": "移动 move", "eff.write": "写入 write", "eff.pay": "付款 pay", "eff.exec": "执行 exec",
+    "eff.rev": "可逆", "eff.irrev": "不可逆", "eff.unknown": "可逆性未知", "eff.more": "其他字段",
     "ap.switches": "工具层的其他开关", "ap.switches.sub": "按 agent",
     "ap.grey": "灰掉的位是这个 agent 的电路都不读取的：面板不会提示一个电路忽略的输入。",
     "ap.cardputer": "Cardputer 插着并用 REFLEX_CARDPUTER=1 启动后台时：设备菜单 3 是这一页，Enter 就是「确认一次」，b/u 封锁/解封，s 让所有 agent 停下。设备拔掉时，装了心跳规则的停机电路会让所有 agent 停下。",
@@ -520,6 +609,20 @@ const T = {
     "ap.irrev.note": "The tool layer marked this call irreversible; the circuit wants one unspent confirm. A confirm grants this once.",
     "ap.halt.note": "Halted. One confirm lifts it; the lifting tick itself grants nothing.", "ap.break.note": "Breaker tripped. One confirm resets it.", "ap.win.note": "Needs a confirm on the same tick.", "ap.key.note": "The second key is missing.",
     "ap.handled": "Recently handled", "ap.handled.none": "Nothing handled yet.", "ap.h.tool": "a person wrote {bits}", "ap.h.then": "then tick {n} {v}",
+    "ap.needs.note": "The circuit wants one bit from a person before it grants this.", "ap.blocked.note": "This agent is blocked: everything it asks is refused. Lift the block first (the switches panel, or \"lift every block\" below) — a confirm cannot help while it stands.",
+    "ap.code": "matching code", "ap.code.hint": "The two digits on the button must be the two digits here — read off the same screen as the request. A chat channel must send them.",
+    "ap.note": "note (optional)", "ap.h.note": "note: {note}",
+    "ap.stop.title": "Stop everything", "ap.stop.sub": "raises blocked for every agent at once; getting back needs a second, deliberate action",
+    "ap.stop": "Stop everything", "ap.stop.all": "everything blocked · {m}/{n}", "ap.stop.some": "Stop everything ({m}/{n} blocked)",
+    "ap.stop.done": "Blocked {n} agent(s): the next thing each one asks is refused.",
+    "ap.stopped.banner": "Block in force: the next request from {m} of {n} agents is refused. blocked is a level — it stays until a person lifts it deliberately.",
+    "ap.drill": "Drill / Test", "ap.drill.none": "No agents yet: there is nothing for the button to block. (A drill: nothing changed.)",
+    "ap.drill.out": "Drill: pressing it writes blocked = 1 for these {n} agent(s) — {list}. Nothing has changed.",
+    "ap.resume.open": "lift every block", "ap.resume.word": "RESUME", "ap.resume.go": "confirm lift",
+    "ap.resume.ask": "Lifting is a second action: press \"lift every block\", type {word}, then confirm. Deliberately awkward.",
+    "ap.resume.done": "Lifted the block on {n} agent(s).",
+    "eff.read": "read", "eff.send": "send", "eff.delete": "delete", "eff.move": "move", "eff.write": "write", "eff.pay": "pay", "eff.exec": "exec",
+    "eff.rev": "reversible", "eff.irrev": "irreversible", "eff.unknown": "reversibility unknown", "eff.more": "other fields",
     "ap.switches": "The tool layer's other switches", "ap.switches.sub": "per agent",
     "ap.grey": "A greyed bit is one none of this agent's circuits read: the panel never suggests an input a circuit ignores.",
     "ap.cardputer": "With a Cardputer plugged in and the console started with REFLEX_CARDPUTER=1: the device's agent page mirrors this one, Enter is \"confirm once\", b/u block and unblock, s stops every agent. Unplug it and a halt circuit with a heartbeat rule stops every agent.",
@@ -631,32 +734,61 @@ function readInputs() {
 const shownBits = (armed) => { const r = readInputs(); return TOOL_BITS.filter((n) => r.has(n) || N(armed && armed[n])); };
 const chipFor = (c) => `<span class="chip ${esc(c)}">${esc(c)}</span>`;
 
-// Which refusals a person can resolve by writing a bit, and which only wait can.
-const RESOLVE = [
-  [/^two keys needed.*confirm_b/, "confirm_b", "ap.key.note"],
-  [/^two keys needed/, "confirm", "ap.key.note"],
-  [/^irreversible/, "confirm", "ap.irrev.note"],
-  [/^no confirmation/, "confirm", "ap.win.note"],
-  [/^breaker tripped/, "confirm", "ap.break.note"],
-  [/^halted/, "confirm", "ap.halt.note"],
-];
-function resolvable(e) {
-  for (const w of e.why || []) for (const [re, bit, note] of RESOLVE) if (re.test(w)) return { bit, note };
-  return null;
-}
-// Newest first: the first entry per (agent, class) decides whether something is still waiting.
+// What waits for a person comes from the console (I-2: `pending` in /api/state) — which
+// entries wait, which bit lifts each one, and its two-digit code. This page used to derive
+// that from the transcript, and so did the device and the chat bot: three copies of one
+// rule, which drifted. What is left here is splitting the list and choosing the words.
 function pendingItems(s) {
-  const seen = new Set(), pending = [], waiting = [];
-  for (const e of s.transcript) {
-    if (e.kind !== "request") continue;
-    const key = `${e.agent} ${e.class || "exec"}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    if (e.granted) continue;
-    const r = resolvable(e);
-    if (r) pending.push({ e, ...r }); else if ((e.why || []).length) waiting.push({ e });
-  }
-  return { pending, waiting };
+  const list = s.pending || [];
+  return { pending: list.filter((p) => p.bit && !p.waiting_on_time), waiting: list.filter((p) => !p.bit || p.waiting_on_time) };
+}
+// Display only: which sentence explains this refusal. The verdict, the bit that lifts it
+// and the code are the console's.
+const NOTE_FOR = [
+  [/^two keys needed/, "ap.key.note"],
+  [/^irreversible/, "ap.irrev.note"],
+  [/^no confirmation/, "ap.win.note"],
+  [/^breaker tripped/, "ap.break.note"],
+  [/^halted/, "ap.halt.note"],
+];
+function itemNote(p) {
+  const why = p.why || [];
+  if (why.some((w) => String(w).startsWith("blocked is high"))) return "ap.blocked.note";
+  for (const w of why) for (const [re, key] of NOTE_FOR) if (re.test(w)) return key;
+  return p.bit && !p.waiting_on_time ? "ap.needs.note" : "ap.wait.note";
+}
+// The effect (I-1) is the agent's own text: every field goes through esc(), and `kind`
+// reaches a class name only through this list.
+const EFFECT_KINDS = ["read", "send", "delete", "move", "write", "pay", "exec"];
+const kindClass = (k) => (EFFECT_KINDS.includes(k) ? k : "other");
+const kindLabel = (k) => (EFFECT_KINDS.includes(k) ? t("eff." + k) : String(k || "?"));
+const revOf = (ef) => (ef.reversible === false ? ["no", "eff.irrev"] : ef.reversible === true ? ["yes", "eff.rev"] : ["unk", "eff.unknown"]);
+function effectCard(ef) {
+  const [cls, key] = revOf(ef);
+  const meta = [];
+  if (ef.amount || ef.asset) meta.push(`<b>${esc(ef.amount || "")}${ef.amount && ef.asset ? " " : ""}${esc(ef.asset || "")}</b>`);
+  if (ef.target) meta.push(`→ ${esc(ef.target)}`);
+  if (ef.path) meta.push(esc(ef.path));
+  const rows = ef.details && typeof ef.details === "object" && !Array.isArray(ef.details)
+    ? Object.keys(ef.details).slice(0, 8).map((k) => {
+        const v = ef.details[k];
+        return `<div class="kv"><b>${esc(k)}</b><span>${esc(v !== null && typeof v === "object" ? JSON.stringify(v) : v)}</span></div>`;
+      }).join("")
+    : "";
+  return `<div class="eff">
+    <div class="top"><span class="kind ${kindClass(ef.kind)}">${esc(kindLabel(ef.kind))}</span><span class="rev ${cls}">${t(key)}</span></div>
+    ${ef.summary ? `<div class="sum">${esc(ef.summary)}</div>` : ""}
+    ${meta.length ? `<div class="meta">${meta.join(" · ")}</div>` : ""}
+    ${rows ? `<details><summary>${t("eff.more")}</summary>${rows}</details>` : ""}</div>`;
+}
+function effectLine(ef) {
+  const out = [`<span class="kind ${kindClass(ef.kind)}">${esc(kindLabel(ef.kind))}</span>`];
+  if (ef.summary) out.push(`<b>${esc(ef.summary)}</b>`);
+  if (ef.target) out.push(`<span class="muted">→ ${esc(ef.target)}</span>`);
+  if (ef.amount || ef.asset) out.push(`<span class="mono">${esc(ef.amount || "")}${ef.amount && ef.asset ? " " : ""}${esc(ef.asset || "")}</span>`);
+  if (ef.path && !ef.summary) out.push(`<span class="mono">${esc(ef.path)}</span>`);
+  if (ef.reversible === false) out.push(`<span class="bad">${t("eff.irrev")}</span>`);
+  return out.join(" ");
 }
 function modelsConnected(s) {
   const set = new Set();
@@ -683,6 +815,7 @@ function render(s) {
   $("models-dot").className = `dot ${models.length ? "ok" : ""}`; $("models").textContent = models.length ? t("models.n", { n: models.length }) : t("models.none");
   const { pending } = pendingItems(s);
   $("nav-pending").textContent = pending.length ? String(pending.length) : "";
+  renderStop(s);  // the stop is on every screen, so its label follows the state everywhere
   if (view === "overview") renderOverview(s, models, pending);
   else if (view === "boundaries") renderBoundaries(s);
   else if (view === "approvals") renderApprovals(s);
@@ -855,24 +988,35 @@ function renderApprovals(s) {
   $("ap-lead").innerHTML = t("ap.lead");
   const { pending, waiting } = pendingItems(s);
   $("ap-pending-sub").textContent = t("ap.pending.sub", { n: num(pending.length + waiting.length) });
-  const item = (x, wait) => {
-    const e = x.e;
-    // Already approved: a confirm bound to this very call is waiting for the agent to send it again.
-    const ag = s.agents.find((a) => a.agent === e.agent) || {};
-    const approved = !wait && N((ag.armed || {})[x.bit]) && ((ag.bound || {})[x.bit] || "") === (e.reason || "");
-    const btns = approved
+  // One card per waiting call. It leads with what the call would *do* (the effect, I-1),
+  // because that is what a person can judge; the circuit's own words are underneath,
+  // unchanged. With no effect the card is exactly what it was before.
+  const item = (p, i) => {
+    const wait = !p.bit || p.waiting_on_time;
+    const bit = p.bit || "confirm";
+    const nid = `ap-note-${i}`;
+    const code = p.code ? `<span class="codeline">${t("ap.code")} <span class="code">${esc(p.code)}</span></span>` : "";
+    const btns = p.armed
       ? `<span class="c-tool mono">${t("ap.approved")}</span>`
       : wait
       ? `<button class="go tool" type="button" disabled>${t("ap.confirm")}</button><button class="danger" type="button" disabled>${t("ap.block")}</button>`
-      : `<button class="go tool" type="button" data-arm="${esc(x.bit)}" data-agent="${esc(e.agent)}" data-for="${esc(e.reason || "")}">${t(x.bit === "confirm_b" ? "ap.confirm_b" : "ap.confirm")}</button><button class="danger" type="button" data-arm="blocked" data-agent="${esc(e.agent)}">${t("ap.block")}</button>`;
-    return `<div class="pend${wait ? " wait" : ""}"><div style="display:grid;gap:4px;min-width:0">
-      <div class="who"><b>${esc(e.agent)}</b>${chipFor(e.class || "exec")}<span class="mono muted">tick ${num(e.tick)} · ${clock(e.at)}</span></div>
-      ${e.reason ? `<div class="call">${esc(e.reason)}</div>` : ""}
-      <ul class="why">${(e.why || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>
-      <div class="note">${t(approved ? "ap.approved.note" : wait ? "ap.wait.note" : x.note)}</div></div><div class="btns">${btns}</div></div>`;
+      : `<input class="notein" type="text" id="${nid}" maxlength="200" placeholder="${esc(t("ap.note"))}">
+         <button class="go tool" type="button" data-arm="${esc(bit)}" data-agent="${esc(p.agent)}" data-for="${esc(p.reason || "")}" data-code="${esc(p.code || "")}" data-note="${nid}">${t(bit === "confirm_b" ? "ap.confirm_b" : "ap.confirm")}${p.code ? ` · ${esc(p.code)}` : ""}</button>
+         <button class="danger" type="button" data-arm="blocked" data-agent="${esc(p.agent)}" data-note="${nid}">${t("ap.block")}</button>`;
+    return `<div class="pend${wait ? " wait" : ""}"><div style="display:grid;gap:5px;min-width:0">
+      ${p.effect ? effectCard(p.effect) : ""}
+      <div class="who"><b>${esc(p.agent)}</b>${chipFor(p.class || "exec")}<span class="mono muted">tick ${num(p.tick)} · ${clock(p.at)}</span>${wait ? "" : code}</div>
+      ${p.reason ? `<div class="call">${esc(p.reason)}</div>` : ""}
+      <ul class="why">${(p.why || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>
+      <div class="note">${t(p.armed ? "ap.approved.note" : itemNote(p))}</div>
+      ${wait || !p.code ? "" : `<div class="note">${t("ap.code.hint")}</div>`}</div><div class="btns">${btns}</div></div>`;
   };
-  $("ap-list").innerHTML = (pending.length + waiting.length) ? pending.map((x) => item(x, false)).join("") + waiting.map((x) => item(x, true)).join("") : `<div class="muted">${t("ap.none")}</div>`;
-  $("ap-list").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => arm(b.dataset.agent, b.dataset.arm, 1, b, b.dataset.for)));
+  const cards = pending.concat(waiting);
+  $("ap-list").innerHTML = cards.length ? cards.map(item).join("") : `<div class="muted">${t("ap.none")}</div>`;
+  $("ap-list").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => {
+    const box = b.dataset.note ? $(b.dataset.note) : null;
+    arm(b.dataset.agent, b.dataset.arm, 1, b, b.dataset.for, b.dataset.code, box ? box.value : "");
+  }));
   // recently handled: tool-layer writes, with what the next request of that agent did
   const tr = s.transcript, handled = [];
   tr.forEach((e, i) => {
@@ -880,12 +1024,12 @@ function renderApprovals(s) {
     const written = TOOL_BITS.filter((n) => N((e.armed || {})[n]));
     let then = null;
     for (let j = i - 1; j >= 0; j--) if (tr[j].kind === "request" && tr[j].agent === e.agent) { then = tr[j]; break; }
-    handled.push(`<div class="e tool"><div class="t">${clock(e.at)}</div><div><div class="h"><span class="agent">${esc(e.agent)}</span><span class="bits">${t("ap.h.tool", { bits: written.length ? written.map(esc).join(", ") : "—" })}</span>${then ? `<span class="chain ${then.granted ? "ok" : "muted"}">${t("ap.h.then", { n: num(then.tick), v: t(then.granted ? "v.grant" : "v.refuse") })}${then.chain && !then.chain.error && !then.chain.pending ? (then.chain.agrees ? " · chain ✓" : " · chain ✗") : ""}</span>` : ""}</div></div></div>`);
+    handled.push(`<div class="e tool"><div class="t">${clock(e.at)}</div><div><div class="h"><span class="agent">${esc(e.agent)}</span><span class="bits">${t("ap.h.tool", { bits: written.length ? written.map(esc).join(", ") : "—" })}</span>${then ? `<span class="chain ${then.granted ? "ok" : "muted"}">${t("ap.h.then", { n: num(then.tick), v: t(then.granted ? "v.grant" : "v.refuse") })}${then.chain && !then.chain.error && !then.chain.pending ? (then.chain.agrees ? " · chain ✓" : " · chain ✗") : ""}</span>` : ""}</div>${e.note ? `<div class="d reason">${t("ap.h.note", { note: esc(e.note) })}</div>` : ""}</div></div>`);
   });
   $("ap-handled").innerHTML = handled.length ? handled.join("") : `<div class="muted">${t("ap.handled.none")}</div>`;
   // switches per agent
   const sel = $("ap-agent"), names = s.agents.map((a) => a.agent);
-  if (!AP_AGENT || !names.includes(AP_AGENT)) AP_AGENT = pending[0] ? pending[0].e.agent : names[0] || null;
+  if (!AP_AGENT || !names.includes(AP_AGENT)) AP_AGENT = pending[0] ? pending[0].agent : names[0] || null;
   sel.innerHTML = names.length ? names.map((n) => `<option value="${esc(n)}"${n === AP_AGENT ? " selected" : ""}>${esc(n)}</option>`).join("") : `<option>${t("ap.noagent")}</option>`;
   sel.disabled = !names.length;
   const a = s.agents.find((x) => x.agent === AP_AGENT), read = readInputs(), armed = (a && a.armed) || {};
@@ -899,19 +1043,89 @@ function renderApprovals(s) {
   $("ap-toggles").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => arm(AP_AGENT, b.dataset.arm, N(b.dataset.v), b)));
 }
 $("ap-agent").addEventListener("change", () => { AP_AGENT = $("ap-agent").value; if (STATE) renderApprovals(STATE); });
-async function arm(agent, bit, v, btn, forReason) {
+async function arm(agent, bit, v, btn, forReason, code, note) {
   if (!agent) return;
   if (btn) btn.disabled = true;
   try {
     // A confirm from a pending item is for that exact call; the console holds it for the
-    // request with the same reason and lets other calls tick past it.
+    // request with the same reason and lets other calls tick past it. The two digits go
+    // with it: the console checks them, so approving means having read this screen.
     const body = { agent, [bit]: v };
-    if (forReason && (bit === "confirm" || bit === "confirm_b")) body.for_reason = forReason;
+    if (forReason && (bit === "confirm" || bit === "confirm_b")) {
+      body.for_reason = forReason;
+      if (code) body.code = code;
+    }
+    if (note && String(note).trim()) body.note = String(note).trim().slice(0, 200);
     const d = await post("/api/tool", body, { token: true });  // confirm/blocked/heartbeat need the operator token
     $("ap-msg").innerHTML = d.error ? `<span class="bad">${esc(d.error)}</span>` : `<span class="c-tool">${t("ap.done", { agent: esc(agent), bits: armedHtml(d.armed || {}, shownBits(d.armed)) })}</span>`;
   } catch (err) { $("ap-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
   await refresh();
 }
+
+// -- the big red button --
+// One press writes blocked = 1 for every agent the console knows. blocked is a level, so
+// it latches: nothing lifts it on its own, and lifting it is a second, deliberate action
+// (press "lift every block", type the word, confirm) placed away from the stop itself.
+// Whether everything is stopped is read out of the state, not remembered here, so the
+// phone and the desktop always agree and a reload changes nothing.
+function stopCount(s) {
+  const n = s.agents.length, m = s.agents.filter((a) => N((a.armed || {}).blocked)).length;
+  return { n, m, stopped: n > 0 && m === n };
+}
+function renderStop(s) {
+  const { n, m, stopped } = stopCount(s);
+  const label = stopped ? t("ap.stop.all", { m: num(m), n: num(n) }) : m ? t("ap.stop.some", { m: num(m), n: num(n) }) : t("ap.stop");
+  ["stop-all", "stop-all-2", "stop-big"].forEach((id) => {
+    const b = $(id);
+    if (!b) return;
+    b.textContent = label;
+    b.disabled = stopped;  // everything already blocked: the way back is the resume control
+  });
+  const banner = $("ap-stop-banner");
+  banner.hidden = !m;
+  banner.textContent = m ? t("ap.stopped.banner", { m: num(m), n: num(n) }) : "";
+  $("ap-resume").hidden = !m;
+  $("ap-resume-hint").textContent = t("ap.resume.ask", { word: t("ap.resume.word") });
+  $("resume-word").placeholder = t("ap.resume.word");
+  if (!m) closeResume();
+}
+function closeResume() {
+  $("resume-word").hidden = true; $("resume-go").hidden = true; $("resume-word").value = ""; $("resume-go").disabled = true;
+}
+async function stopAll(stop, note) {
+  const btns = ["stop-all", "stop-all-2", "stop-big", "resume-go"].map($).filter(Boolean);
+  btns.forEach((b) => { b.disabled = true; });
+  try {
+    const d = await post(stop ? "/api/stop-all" : "/api/resume-all", note ? { note } : {}, { token: true });
+    $("ap-stop-msg").innerHTML = d.error
+      ? `<span class="bad">${esc(d.error)}</span>`
+      : `<span class="${stop ? "bad" : "ok"}">${t(stop ? "ap.stop.done" : "ap.resume.done", { n: num(d.count) })}</span>`;
+    if (!d.error) closeResume();
+  } catch (err) { $("ap-stop-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
+  await refresh();
+}
+["stop-all", "stop-all-2", "stop-big"].forEach((id) => {
+  const b = $(id);
+  if (b) b.addEventListener("click", () => { show("approvals"); stopAll(true); });  // the banner and the way back are there
+});
+// The drill answers "what would this do?" without doing it: the same list of agents the
+// button would write to, computed from the state already on screen. Nothing is sent.
+$("stop-drill").addEventListener("click", () => {
+  const names = STATE ? STATE.agents.map((a) => a.agent) : [];
+  $("ap-drill").innerHTML = names.length
+    ? t("ap.drill.out", { n: num(names.length), list: esc(names.join(" · ")) })
+    : t("ap.drill.none");
+});
+$("resume-open").addEventListener("click", () => {
+  $("resume-word").hidden = false; $("resume-go").hidden = false; $("resume-word").focus();
+});
+$("resume-word").addEventListener("input", () => {
+  $("resume-go").disabled = $("resume-word").value.trim().toLowerCase() !== t("ap.resume.word").toLowerCase();
+});
+$("resume-go").addEventListener("click", () => {
+  if ($("resume-word").value.trim().toLowerCase() !== t("ap.resume.word").toLowerCase()) return;
+  stopAll(false, "lifted from the page");
+});
 
 // -- activity --
 let FILTER_CLS = "all", FILTER_KIND = "all", LAST = null;
@@ -941,7 +1155,8 @@ function entryHtml(e, compact) {
   const at = `<div class="t">${clock(e.at)}</div>`;
   if (e.kind === "tool") {
     const ar = e.armed || { blocked: e.blocked, confirm: e.confirm };
-    return `<div class="e tool">${at}<div><div class="h"><span class="verdict">${t("v.tool")}</span><span class="agent">${esc(e.agent)}</span></div><div class="d">${t("e.tool", { bits: armedHtml(ar, shownBits(ar)) })}</div></div></div>`;
+    return `<div class="e tool">${at}<div><div class="h"><span class="verdict">${t("v.tool")}</span><span class="agent">${esc(e.agent)}</span></div><div class="d">${t("e.tool", { bits: armedHtml(ar, shownBits(ar)) })}</div>` +
+      (e.note ? `<div class="d reason">${t("ap.h.note", { note: esc(e.note) })}</div>` : "") + `</div></div>`;
   }
   if (e.kind === "policy") {
     const cz = e.circuit;
@@ -962,10 +1177,13 @@ function entryHtml(e, compact) {
     if (e.halt) lines.push(`<span class="${e.halt.granted ? "muted" : "bad"}">${t(e.halt.granted ? "e.halt.ok" : "e.halt.no")}</span>`);
     if (ok) lines.push(t("e.granted"));
     body = `<div class="d">${lines.join(" · ")}</div>`;
+    // One line of what the call would have done, when the adapter said (I-1).
+    if (e.effect) body += `<div class="d">${effectLine(e.effect)}</div>`;
     if (!ok && (e.why || []).length) body += `<div class="d">${t("e.why")}</div><ul class="why">${e.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>`;
     if (e.chain && !e.chain.pending) body += `<div class="d">${e.chain.error ? `<span class="amber">${t("e.chain.err", { err: esc(e.chain.error) })}</span>` : e.chain.agrees ? `<span class="ok">${t("e.chain.ok", { id: N(e.chain.chain_id) })}</span>` : `<span class="bad">${t("e.chain.dis", { id: N(e.chain.chain_id), g: N(e.chain.grant) })}</span>`}</div>`;
   } else {
-    if (e.reason) body = `<div class="d">${esc(e.reason)}</div>`;
+    if (e.effect) body = `<div class="d">${effectLine(e.effect)}</div>`;
+    if (e.reason) body += `<div class="d">${esc(e.reason)}</div>`;
     if (!ok && (e.why || []).length) body += `<ul class="why"><li>${esc(e.why.join("; "))}</li></ul>`;
   }
   return `<div class="e ${ok ? "ok" : "no"}">${at}<div><div class="h"><span class="verdict">${t(ok ? "v.grant" : "v.refuse")}</span><span class="agent">${esc(e.agent)}</span>${chipFor(e.class || "exec")}<span class="mono muted">tick ${num(e.tick)}</span>` +
@@ -990,11 +1208,14 @@ async function post(path, body, opts) {
   const needsToken = opts && opts.token;
   if (needsToken) { if (!TOKEN) askToken(); if (TOKEN) headers["x-reflex-token"] = TOKEN; }
   let r = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
-  if (r.status === 403 && needsToken && askToken()) {  // wrong or missing: ask once and retry
+  let d = await r.json();
+  // Ask again only when the *token* was the problem. A wrong matching code is also 403,
+  // and prompting for the token there would blame the wrong thing and teach the wrong fix.
+  if (r.status === 403 && needsToken && /token/i.test(d.error || "") && askToken()) {
     headers["x-reflex-token"] = TOKEN;
     r = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
+    d = await r.json();
   }
-  const d = await r.json();
   if (!r.ok) d.error = d.error || `HTTP ${r.status}`;
   return d;
 }

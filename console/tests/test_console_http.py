@@ -126,7 +126,9 @@ def agent_token_cleanup():
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    import console
+    # Importable in the main venv only (the circuits repository and numpy); in the
+    # bnbagent venv this whole test skips rather than erroring on collection.
+    console = pytest.importorskip("console")
 
     made = []
 

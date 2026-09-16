@@ -38,6 +38,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import secrets
 import sys
 import threading
 import time
@@ -74,6 +76,28 @@ CONSUMED_BY_A_TICK = ("confirm", "confirm_b", "irreversible", "heartbeat", "fail
 # only make a decision stricter — an agent gains nothing by writing them. The Cardputer
 # relay writes the person's bits in-process, never over HTTP, so the token never gates it.
 PERSON_BITS = ("confirm", "confirm_b", "blocked", "heartbeat")
+
+# Which refusals a person can lift by writing one of the tool layer's bits, matched against
+# the circuit's own words (c3s/policy.py `reasons()`). This is the *one* place that mapping
+# lives: the page, the Cardputer relay and the chat bot all read `pending` out of
+# /api/state instead of each deriving it again (three copies drifted apart once already).
+PERSON_RESOLVES = (
+    (re.compile(r"^two keys needed.*confirm_b"), "confirm_b"),
+    (re.compile(r"^two keys needed"), "confirm"),
+    (re.compile(r"^irreversible"), "confirm"),
+    (re.compile(r"^no confirmation"), "confirm"),
+    (re.compile(r"^breaker tripped"), "confirm"),
+    (re.compile(r"^halted"), "confirm"),
+)
+# A blocked agent is the one refusal a confirm cannot help with: while `blocked` is high a
+# circuit that reads it refuses whatever else arrives, so an entry saying so waits for a
+# person to lift the block, not for a confirm. It carries no code.
+BLOCKED_SAYS = "blocked is high"
+
+# I-1: the shapes `effect` may take. The console never interprets an effect — it stores it
+# and every consumer escapes it — so the only thing checked here is the shape.
+EFFECT_KINDS = ("read", "send", "delete", "move", "write", "pay", "exec")
+EFFECT_STRINGS = (("target", 120), ("summary", 200), ("amount", 40), ("asset", 40), ("path", 400))
 
 # The classes of tool an agent's calls fall into, each with its own circuit, plus the
 # one circuit every class shares. `exec` is where an unclassified call lands, so it
@@ -330,6 +354,11 @@ class Boundary:
         self.save_lock = threading.Lock()
         self.policies: dict[str, Compiled | None] = {c: None for c in CLASSES}
         self.agents: dict[str, dict] = {}
+        # I-2: the two-digit code of every entry that is waiting, keyed by the call it
+        # belongs to — (agent, reason, bit). Generated once, kept while the entry waits,
+        # dropped when it stops waiting. Not a secret and not persisted: it exists so that
+        # approving means reading the digits off the same screen the request is on.
+        self.codes: dict[tuple[str, str, str], str] = {}
         self.state_file = state_file
         saved = self._load()
         if saved is None:
@@ -443,7 +472,7 @@ class Boundary:
              "classes": {c: _fresh_class_state() for c in CLASSES}},
         )
 
-    def arm(self, name: str, bits: dict, bind_to: str | None = None) -> dict:
+    def arm(self, name: str, bits: dict, bind_to: str | None = None, note: str | None = None) -> dict:
         """The tool layer's bits, held until the agent's next request reads them. Bits no
         installed policy reads are stored all the same: they describe the agent, and a
         later policy may read them. Armed bits are per agent, shared by its classes."""
@@ -472,6 +501,10 @@ class Boundary:
                 "blocked": a["armed"]["blocked"],
                 "confirm": a["armed"]["confirm"],
             }
+            # What the person said while writing it. A rule candidate, never a rule: nothing
+            # reads it back, it is shown next to the write in the log.
+            if note:
+                entry["note"] = note
             TRANSCRIPTS.appendleft(entry)
         self._save()
         return entry
@@ -502,7 +535,8 @@ class Boundary:
         decisive = (inputs, state_before, grant, cs["state"], compiled.netlist, compiled.n_in, compiled.state_bits)
         return grant, inp, why, decisive, gap
 
-    def request(self, name: str, intent: int, reason: str, cls: str = DEFAULT_CLASS) -> dict:
+    def request(self, name: str, intent: int, reason: str, cls: str = DEFAULT_CLASS,
+                effect: dict | None = None) -> dict:
         """One tick: the agent asks, the shared halt circuit answers first, then the
         class's circuit. Both verdicts are recorded; the class's is the decision."""
         if cls not in TOOL_CLASSES:
@@ -579,6 +613,9 @@ class Boundary:
                 # lets the agent resend exactly that instead of rewording it again.
                 "confirm_waiting_for": [a["bound"][b] for b in held if b in a["bound"]] if not grant else [],
                 "halt": halt_entry,
+                # Carried through untouched (I-1): the adapter's description of what this
+                # call would do, for the card a person reads. It decided nothing.
+                **({"effect": effect} if effect is not None else {}),
                 # Carried out of the lock so the chain re-evaluates the circuits that
                 # actually decided, not whichever are installed by the time it asks.
                 "_decisive": decisive,
@@ -604,6 +641,86 @@ class Boundary:
             "confirm_window_left": counters.get("window", 0),
             "counters": counters,
         }
+
+    # -- what waits for a person (I-2) -------------------------------------------
+
+    def _code(self, key: tuple[str, str, str], taken: set[str]) -> str:
+        """This call's two digits: the one it already has, or a fresh one no other waiting
+        entry is using (10–99, so nothing has a leading zero to lose in a chat)."""
+        code = self.codes.get(key)
+        if code is None:
+            free = [str(n) for n in range(10, 100) if str(n) not in taken]
+            code = secrets.choice(free) if free else str(secrets.randbelow(90) + 10)
+            self.codes[key] = code
+        return code
+
+    def _pending(self) -> list[dict]:
+        """What a person has to answer, computed here once instead of in three places.
+
+        One entry per (agent, class): that pair's newest request, and only while it stands
+        refused. A refusal a person can lift by writing a bit carries that `bit` and a
+        two-digit `code`; anything else — a cooldown, a commitment, a spent budget, a block
+        somebody has to lift by hand, a whole class denied — carries `waiting_on_time` and
+        no code, because no bit a person can write will change it. Called with the lock."""
+        seen: set[tuple[str, str]] = set()
+        items: list[dict] = []
+        for e in TRANSCRIPTS:
+            if e.get("kind") != "request":
+                continue
+            key = (e["agent"], e.get("class", DEFAULT_CLASS))
+            if key in seen:
+                continue
+            seen.add(key)
+            if e.get("granted"):
+                continue
+            why = list(e.get("why") or [])
+            bit = None
+            if not any(w.startswith(BLOCKED_SAYS) for w in why):
+                for w in why:
+                    bit = next((b for rx, b in PERSON_RESOLVES if rx.search(w)), None)
+                    if bit:
+                        break
+            item = {
+                "agent": e["agent"], "class": key[1], "tick": e.get("tick", 0),
+                "reason": e.get("reason", ""), "why": why, "at": e.get("at", 0),
+                "bit": bit, "waiting_on_time": bit is None, "armed": False,
+            }
+            if e.get("effect") is not None:
+                item["effect"] = e["effect"]
+            items.append(item)
+        live: set[tuple[str, str, str]] = set()
+        taken = set(self.codes.values())
+        for item in items:
+            if item["bit"] is None:
+                continue
+            key3 = (item["agent"], item["reason"], item["bit"])
+            live.add(key3)
+            item["code"] = self._code(key3, taken)
+            taken.add(item["code"])
+            # Armed means a confirm is waiting for *this* call: bound to it, or unbound and
+            # so good for whatever the agent sends next.
+            a = self.agents.get(item["agent"]) or {}
+            bound = (a.get("bound") or {}).get(item["bit"])
+            item["armed"] = bool((a.get("armed") or {}).get(item["bit"])) and (bound is None or bound == item["reason"])
+        self.codes = {k: v for k, v in self.codes.items() if k in live}  # a code lives exactly as long as its entry
+        return items
+
+    def code_for_call(self, name: str, reason: str, bit: str) -> str | None:
+        """The digits currently shown for this one call, or None if nothing is waiting."""
+        with self.lock:
+            return self.codes.get((name, reason, bit))
+
+    def stop_all(self, stop: bool, source: str = "page", note: str | None = None) -> list[str]:
+        """The big red button: `blocked` for every agent the console knows, one entry each.
+
+        `blocked` is a level, so this latches — it stays where it was put until a person
+        lowers it deliberately. An agent first seen *after* the button was pressed is not
+        blocked by it, which is why the page counts how many of how many are blocked."""
+        with self.lock:
+            names = sorted(self.agents)
+        for name in names:
+            self.arm(name, {"blocked": 1 if stop else 0}, note=note)["source"] = source
+        return names
 
     def status(self) -> dict:
         # I-3. Read before the lock (it is a file), and only ever as a boolean and a time:
@@ -644,6 +761,9 @@ class Boundary:
                 "halt_class": HALT,
                 "default_class": DEFAULT_CLASS,
                 "agents": agents,
+                # I-2: one list of what waits for a person, for the page, the device and
+                # the chat bot alike. Nothing downstream derives it again.
+                "pending": self._pending(),
                 "transcript": [{k: v for k, v in e.items() if not k.startswith("_")} for e in list(TRANSCRIPTS)[:60]],
                 "chain": {
                     "enabled": CHAIN is not None,
@@ -741,6 +861,44 @@ def class_from(payload: dict, allowed: tuple[str, ...]) -> str:
     if not isinstance(cls, str) or cls not in allowed:
         raise ValueError(f"class must be one of {', '.join(allowed)}")
     return cls
+
+
+def effect_from(payload: dict) -> dict | None:
+    """I-1: what the call would do, in the adapter's words, for the card a person approves.
+
+    Display only: it reaches no circuit and cannot change a verdict — `reason` is still the
+    identity of the call and the key a confirm binds to. A wrong shape is refused rather
+    than trimmed, because trimming would be the console interpreting an effect."""
+    effect = payload.get("effect")
+    if effect is None:
+        return None
+    if not isinstance(effect, dict):
+        raise ValueError("effect must be an object")
+    if effect.get("kind") not in EFFECT_KINDS:
+        raise ValueError(f"effect.kind must be one of {', '.join(EFFECT_KINDS)}")
+    out: dict = {"kind": effect["kind"]}
+    for key, limit in EFFECT_STRINGS:
+        value = effect.get(key)
+        if value is None:
+            out[key] = None
+        elif not isinstance(value, str):
+            raise ValueError(f"effect.{key} must be a string or null")
+        elif len(value) > limit:
+            raise ValueError(f"effect.{key} is longer than {limit} characters")
+        else:
+            out[key] = value
+    reversible = effect.get("reversible")
+    if reversible is not None and not isinstance(reversible, bool):
+        raise ValueError("effect.reversible must be true, false or null")
+    out["reversible"] = reversible
+    details = effect.get("details")
+    if details is not None:
+        if not isinstance(details, dict):
+            raise ValueError("effect.details must be an object")
+        if len(json.dumps(details)) > 1024:
+            raise ValueError("effect.details is longer than 1 KB")
+        out["details"] = details
+    return out
 
 
 CHAIN_WAIT_S = float(os.environ.get("CHAIN_WAIT_S", "1.5"))
@@ -910,18 +1068,52 @@ class Handler(BaseHTTPRequestHandler):
             TRANSCRIPTS.appendleft(note)
             self._json(200, summary)
         elif self.path == "/api/tool":
-            bits = {k: v for k, v in payload.items() if k not in ("agent", "for_reason", "token")}
+                return
+            bits = {k: v for k, v in payload.items() if k not in ("agent", "for_reason", "token", "code", "note")}
             # The person's bits need the operator token; the adapter's own (irreversible,
             # failed) do not, because setting either can only make a decision stricter.
             if any(b in PERSON_BITS for b in bits) and not self._has_token(payload):
                 self._json(403, {"error": f"{', '.join(b for b in bits if b in PERSON_BITS)} are the person's: "
                                           "send the token (see the console's log). An agent may not write these."})
                 return
-            bind_to = payload.get("for_reason")
+            bind_to = str(payload.get("for_reason"))[:160] if payload.get("for_reason") else None
+            # I-2: the two digits beside the request. Optional from the page and the device,
+            # which are already in the person's hands; a chat channel sends them so that
+            # approving means having read the same screen the request is on. The code is not
+            # a secret, and getting it wrong is refused rather than guessed at.
+            if payload.get("code") is not None:
+                keys = [b for b in ("confirm", "confirm_b") if bits.get(b)]
+                if bind_to is None or not keys:
+                    self._json(400, {"error": "a matching code belongs to one call: send for_reason and the "
+                                              "confirm it is for, or leave the code out"})
+                    return
+                want = BOUNDARY.code_for_call(name, bind_to, keys[0])
+                if want is None or str(payload["code"]).strip() != want:
+                    self._json(403, {"error": "those two digits are not the ones shown beside this call; read the "
+                                              "code again on the screen the request is on"})
+                    return
+            note = payload.get("note")
+            if note is not None and not isinstance(note, str):
+                self._json(400, {"error": "note must be a string of at most 200 characters"})
+                return
             try:
-                self._json(200, BOUNDARY.arm(name, bits, str(bind_to)[:160] if bind_to else None))
+                self._json(200, BOUNDARY.arm(name, bits, bind_to, (note or "").strip()[:200] or None))
             except ValueError as e:
                 self._json(400, {"error": str(e)})
+        elif self.path in ("/api/stop-all", "/api/resume-all"):
+            # The big red button, and the deliberate way back. Both are the person's: an
+            # agent that could call resume-all could lift its own block.
+            if not self._has_token(payload):
+                self._json(403, {"error": "stopping and resuming every agent is the operator's: send the token "
+                                          "(see the console's log)"})
+                return
+            stop = self.path == "/api/stop-all"
+            note = payload.get("note")
+            source = str(payload.get("source", "page"))[:20] or "page"
+            names = BOUNDARY.stop_all(stop, source, (str(note).strip()[:200] or None) if note else None)
+            print(f"{'stop-all' if stop else 'resume-all'}: blocked={int(stop)} for {len(names)} agent(s) "
+                  f"from {source} (a person pressed it)", flush=True)
+            self._json(200, {"stopped": stop, "agents": names, "count": len(names), "source": source})
         elif self.path == "/api/request":
             # Before anything ticks: a request under a bound name with the wrong token must
             # not spend that agent's confirm, move its cooldown, or count towards its
@@ -947,7 +1139,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             try:
                 cls = class_from(payload, TOOL_CLASSES)
-                entry = BOUNDARY.request(name, payload.get("intent", 0), str(payload.get("reason", ""))[:160], cls)
+                entry = BOUNDARY.request(name, payload.get("intent", 0), str(payload.get("reason", ""))[:160], cls,
+                                         effect_from(payload))
             except ValueError as e:
                 self._json(400, {"error": str(e)})
                 return

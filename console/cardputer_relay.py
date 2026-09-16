@@ -61,28 +61,29 @@ def clean(value, limit: int) -> str:
 
 
 def pending_items(state: dict) -> list[dict]:
-    """The same rule as the console page: newest request per (agent, class); refused;
-    and refused for a reason a person can resolve by writing a bit."""
-    seen, out = set(), []
-    for e in state["transcript"]:
-        if e.get("kind") != "request":
+    """What waits for a person, as the console computed it (I-2: `pending` in /api/state).
+
+    A thin shim, not a second derivation: it keeps only the entries a bit can resolve and
+    flattens `why` into one string, which is the shape this device and `bot_telegram.py`
+    already read. Everything about *which* entries wait, and their matching codes, now
+    comes from one place — the console."""
+    out = []
+    for it in state.get("pending") or []:
+        if it.get("waiting_on_time") or not it.get("bit"):
             continue
-        key = (e["agent"], e.get("class", "exec"))
-        if key in seen:
-            continue
-        seen.add(key)
-        if e.get("granted"):
-            continue
-        for w in e.get("why") or []:
-            bit = next((b for rx, b in RESOLVE if rx.search(w)), None)
-            if bit:
-                out.append({"agent": e["agent"], "class": key[1], "tick": e.get("tick", 0), "why": w, "bit": bit,
-                            "reason": e.get("reason", "")})
-                break
+        why = it.get("why")
+        out.append({**it, "why": "; ".join(why) if isinstance(why, list) else str(why or "")})
     return out
 
 
-def frame(state: dict) -> tuple[list[str], list[dict]]:
+def json_literal(value: str) -> str:
+    """A JSON string literal the device can splice into a request body without escaping
+    anything itself, and that survives a `|`-separated line: `|` becomes \\u007c, which
+    JSON reads back as `|`. Newlines and quotes json.dumps already escapes."""
+    return json.dumps(str(value), ensure_ascii=False).replace("|", "\\u007c")
+
+
+def frame(state: dict, wide: bool = False) -> tuple[list[str], list[dict]]:
     policies = state.get("policies", {})
     parts = []
     for cls in ("spend", "message", "exec", "files", "halt"):
@@ -103,14 +104,19 @@ def frame(state: dict) -> tuple[list[str], list[dict]]:
     blocked = sum(1 for a in state.get("agents", []) if a.get("armed", {}).get("blocked"))
     lines = [f"S|{clean(' '.join(parts), 40)}|{granted}|{len(requests) - granted}|{chain}|{blocked}"]
 
-    agents = {a["agent"]: a for a in state.get("agents", [])}
     items = pending_items(state)[:4]
     for i, it in enumerate(items):
-        # "given" on the device means a confirm is waiting for *this* call, not merely armed.
-        a = agents.get(it["agent"], {})
-        bound = (a.get("bound") or {}).get(it["bit"])
-        is_armed = int(bool((a.get("armed") or {}).get(it["bit"])) and (bound is None or bound == it.get("reason")))
-        lines.append(f"I|{i}|{clean(it['agent'], 30)}|{it['class']}|{it['tick']}|{clean(it['why'], 60)}|{it['bit']}|{is_armed}")
+        # "given" on the device means a confirm is waiting for *this* call, not merely
+        # armed; the console works that out (`armed`) along with the rest of the entry.
+        is_armed = int(bool(it.get("armed")))
+        effect = (it.get("effect") or {}).get("summary") or ""
+        lines.append(f"I|{i}|{clean(it['agent'], 30)}|{it['class']}|{it['tick']}|{clean(it['why'], 60)}|{it['bit']}"
+                     f"|{is_armed}|{clean(effect, 60)}")
+        if wide:
+            # What a write needs, next to the item it belongs to: the code, and the agent
+            # and reason as they really are (`I|` carries display text, which is cleaned
+            # and truncated, and a confirm binds on the reason exactly).
+            lines.append(f"C|{i}|{it.get('code') or ''}|{json_literal(it['agent'])}|{json_literal(it.get('reason') or '')}")
     if requests:
         e = requests[0]
         said = "; ".join(e.get("why") or []) or e.get("reason", "")
