@@ -14,8 +14,14 @@ import {ISafe} from "./ISafe.sol";
 ///                                        │
 ///                             supervisor writes blocked / confirm / heartbeat / irreversible
 ///
-/// The agent is *not* an owner of the Safe. It reaches the Safe only through `act`, and
-/// it supplies no input bit: every bit the circuit reads is derived here from the call
+/// The agent is *not* an owner of the Safe. It reaches the Safe only through `act`, and it
+/// has to be named there first: `records` is keyed by `msg.sender`, so without a list of
+/// who the agents are, any address at all would be a fresh agent with empty latches and be
+/// granted on its first tick — and every rule that counts ticks would bound one address
+/// rather than the arrangement, which is what AGENT.md calls a cost rather than a boundary.
+/// The supervisor writes that list (`setAgent`); a module nobody is named on grants nothing.
+///
+/// The agent supplies no input bit: every bit the circuit reads is derived here from the call
 /// itself and from storage that only the supervisor can write. `request` and `intent` are
 /// simply high on every call — the agent calling *is* the request — so any rule that rests
 /// on them alone is a cost the agent pays by calling, exactly as docs/AGENT.md says.
@@ -42,8 +48,10 @@ import {ISafe} from "./ISafe.sol";
 /// tick of `addOwnerWithThreshold(agent)` would end the boundary.
 ///
 /// A refused call does not revert: `act` returns `granted = false`, emits `Decision`, and
-/// the tick has been spent. Only hard errors revert (forbidden target, re-entry, a
-/// malformed constructor), and those spend no tick.
+/// the tick has been spent. A revert would refund the tick, so the cooldown would never run
+/// down and a `trip_after_refusals` counter could never trip. Only hard errors revert (an
+/// unnamed caller, a forbidden target, re-entry, a malformed constructor), and those spend
+/// no tick.
 ///
 /// What is verified and what is not. The circuit's rules hold for every input sequence
 /// (docs/PROPERTIES.md, `Policy.properties`), so whatever this module feeds it, no two
@@ -107,6 +115,9 @@ contract ReflexModule {
     uint256 public immutable netlistLength;
 
     mapping(address => Record) internal records;
+    /// @notice Who may call `act` at all. The supervisor names them, and until it names one
+    ///         the module grants nothing to anybody.
+    mapping(address => bool) public agents;
     mapping(bytes32 => bool) public confirmations;
     mapping(bytes32 => bool) public confirmationsB;
     mapping(bytes4 => bool) public irreversibleSelectors;
@@ -122,6 +133,7 @@ contract ReflexModule {
     event Confirmed(bytes32 indexed key, bool second, bool on);
     event IrreversibleSelector(bytes4 indexed selector, bool on);
     event AgentReset(address indexed agent);
+    event AgentSet(address indexed agent, bool on);
 
     error NetlistMismatch();
     error NetlistTooLong(uint256 length);
@@ -132,6 +144,7 @@ contract ReflexModule {
     error NotSupervisor();
     error ForbiddenTarget(address to);
     error Reentrant();
+    error NotAgent(address who);
 
     modifier onlySupervisor() {
         if (msg.sender != supervisor) revert NotSupervisor();
@@ -197,6 +210,7 @@ contract ReflexModule {
     ///         without reverting. Either way the tick is spent.
     function act(address to, uint256 value, bytes calldata data) external returns (bool granted, bytes memory result) {
         if (_entered != 1) revert Reentrant();
+        if (!agents[msg.sender]) revert NotAgent(msg.sender);
         if (to == address(safe) || to == address(this)) revert ForbiddenTarget(to);
         _entered = 2;
 
@@ -295,6 +309,14 @@ contract ReflexModule {
         if (msg.sender != supervisorB) revert NotSupervisor();
         delete confirmationsB[key];
         emit Confirmed(key, true, false);
+    }
+
+    /// @notice Name an agent, or take the name away. Only a named address can call `act`,
+    ///         and `setAgent(x, false)` is a kill switch for one agent — finer than the
+    ///         owners' `disableModule`, which ends the arrangement for all of them.
+    function setAgent(address agent, bool on) external onlySupervisor {
+        agents[agent] = on;
+        emit AgentSet(agent, on);
     }
 
     /// @notice Selectors that count as irreversible. ETH value always counts, listed or not.

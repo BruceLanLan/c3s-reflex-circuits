@@ -122,8 +122,10 @@ contract ReflexModuleTest is Test {
         target = new Target();
         vm.deal(address(safe), 1000 ether);
         module = new ReflexModule(machine, NETLIST, SHA, N_IN, OPTIONAL, N_STATE, safe, supervisor, address(0));
-        vm.prank(supervisor);
+        vm.startPrank(supervisor);
         module.setIrreversible(Target.burn.selector, true);
+        module.setAgent(agent, true);
+        vm.stopPrank();
     }
 
     function _act(bytes memory data) internal returns (bool granted) {
@@ -272,7 +274,14 @@ contract ReflexModuleTest is Test {
         module.resetAgent(agent);
         vm.expectRevert(ReflexModule.NotSupervisor.selector);
         module.confirmB(key);
+        vm.expectRevert(ReflexModule.NotSupervisor.selector);
+        module.setAgent(stranger, true);
         vm.stopPrank();
+        // And an address the supervisor has not named cannot spend a tick at all.
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(ReflexModule.NotAgent.selector, stranger));
+        module.act(address(target), 0, abi.encodeCall(Target.ping, ()));
+        assertEq(module.recordOf(stranger).ticks, 0, "an unnamed caller spent a tick");
         // The agent cannot reset its own latch either.
         vm.prank(agent);
         vm.expectRevert(ReflexModule.NotSupervisor.selector);
@@ -324,6 +333,8 @@ contract ReflexModuleTest is Test {
         bytes32 sha = 0x8f4bcbd8990fc5a47a76c116d860b879329e473d9628bcf4f3fc5d6612e2407d;
         address second = address(0xB0B);
         ReflexModule pair = new ReflexModule(machine, twoKey, sha, 5, 8, 2, safe, supervisor, second);
+        vm.prank(supervisor);
+        pair.setAgent(agent, true);
         assertEq(pair.inputPosition(pair.OPT_CONFIRM_B()), 4);
         uint8 irreversible = pair.OPT_IRREVERSIBLE();
         vm.expectRevert(abi.encodeWithSelector(ReflexModule.InputLayoutMismatch.selector, 5, uint8(8)));

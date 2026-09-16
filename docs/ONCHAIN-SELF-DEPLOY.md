@@ -9,9 +9,9 @@ machine with your keys, and nothing in this repository ever sees them.
 ## The shape
 
 ```
-agent (any key, not an owner) ──act(to,value,data)──▶ ReflexModule ──▶ NandMachine.evaluate
+agent (any named key, not an owner) ─act(to,value,data)─▶ ReflexModule ──▶ NandMachine.evaluate
                                                             │  grant
-supervisor (your key) ── blocked / confirm / heartbeat ─────┤
+supervisor (your key) ─ setAgent / blocked / confirm ───────┤
                                                             ▼
                                             Safe.execTransactionFromModule (Call only)
 ```
@@ -22,6 +22,10 @@ supervisor (your key) ── blocked / confirm / heartbeat ─────┤
   irreversible-selector list are written by the supervisor; `failed` is recorded by the
   module from the last forwarded call. Nothing the agent sends can move those bits, which
   is what makes a rule resting on them a boundary in AGENT.md's sense.
+* **Only named agents.** `act` records latches per `msg.sender`, so if it took callers on
+  trust, any address would be a fresh agent with an empty cooldown and "at most one grant in
+  four ticks" would bound one address rather than the arrangement. The supervisor names
+  agents with `setAgent`; an unnamed caller gets `NotAgent` and spends no tick.
 * **No `reset` for the agent, no operation parameter, no netlist setter.** Each would be a
   way to spend a tick without paying for it: wiping the latches, bundling N calls into one
   `DelegateCall` to MultiSend, swapping the rules. Only the supervisor resets; the
@@ -89,15 +93,24 @@ key you hold (BNB Chain's multisig UI or the Safe app), and a compiled policy.
    cast call $MODULE "netlistSha256()(bytes32)" --rpc-url $RPC      # must equal NETLIST_SHA256
    cast keccak $(cast call $MODULE "netlist()(bytes)" --rpc-url $RPC)  # must equal: cast keccak $NETLIST
    cast call $MODULE "safe()(address)" --rpc-url $RPC
+   cast call $MODULE "agents(address)(bool)" $AGENT --rpc-url $RPC   # false until step 5
    ```
-5. Enable the module: an owner-signed Safe transaction calling `enableModule(address)` on the
-   Safe with `$MODULE` (Transaction Builder, or `cast calldata "enableModule(address)" $MODULE`).
-6. Tell the module which selectors are irreversible, as the supervisor:
+5. **Before enabling anything**, as the supervisor: name the agent, and list the selectors
+   you count as irreversible. Enabling the module is the moment it goes live, and an
+   unnamed module grants nothing while a named one grants only that address — so do this
+   first rather than in the window after step 6.
    ```sh
+   cast send $MODULE "setAgent(address,bool)" $AGENT true --rpc-url $RPC --private-key $SUPERVISOR_PK
    cast send $MODULE "setIrreversible(bytes4,bool)" $(cast sig "transfer(address,uint256)") true --rpc-url $RPC --private-key $SUPERVISOR_PK
    cast send $MODULE "setIrreversible(bytes4,bool)" $(cast sig "approve(address,uint256)") true --rpc-url $RPC --private-key $SUPERVISOR_PK
    ```
-7. Preview, then act. The agent's key is any key at all; it is not an owner.
+   `act` from an address you have not named reverts `NotAgent(address)` and spends no tick.
+   `setAgent($AGENT, false)` is the kill switch for one agent; `disableModule` (step 9) is
+   the kill switch for the arrangement.
+6. Enable the module: an owner-signed Safe transaction calling `enableModule(address)` on the
+   Safe with `$MODULE` (Transaction Builder, or `cast calldata "enableModule(address)" $MODULE`).
+7. Preview, then act. The agent's key is any key at all, as long as step 5 named its
+   address; it is not an owner, and `peek` is free and changes nothing.
    ```sh
    cast call $MODULE "peek(address,address,uint256,bytes)(bool,uint256,uint256,uint256)" $AGENT $TO $VALUE $DATA --rpc-url $RPC
    cast send $MODULE "act(address,uint256,bytes)" $TO $VALUE $DATA --rpc-url $RPC --private-key $AGENT_PK
@@ -116,5 +129,10 @@ key you hold (BNB Chain's multisig UI or the Safe app), and a compiled policy.
    then still granted by the circuit but `Forwarded` reports `false`.
 
 Gas, measured in `forge test` with the 5-input policy above (`test_gasReport`): a refused
-tick ~121k; a granted tick ~209k, of which the mock Safe's call log is ~91k, so the module's
-own share of a grant is ~118k plus whatever the real Safe and the target spend.
+tick ~123k; a granted tick ~211k, of which the mock Safe's call log is ~91k, so the module's
+own share of a grant is ~120k plus whatever the real Safe and the target spend.
+
+Everything above was run end to end against a real Safe v1.4.1 on a local anvil fork of BSC
+before it was written down — the arrangement, both verdicts, and the ways around it that
+were tried and failed. [ONCHAIN-LOCAL-FORK.md](ONCHAIN-LOCAL-FORK.md) is that run: one
+command, a local fork, nothing broadcast.
