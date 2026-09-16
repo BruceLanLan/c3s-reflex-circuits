@@ -7,7 +7,9 @@ import json
 
 import pytest
 
-HOST, PORT = "127.0.0.1", 8765
+from reflex_token import console_netloc
+
+HOST, PORT = console_netloc()
 
 
 def post(path, body, headers):

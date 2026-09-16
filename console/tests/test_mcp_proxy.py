@@ -286,9 +286,9 @@ def test_an_irreversible_tool_needs_a_persons_confirm(client):
 def test_a_call_aimed_at_the_consoles_tool_layer_is_refused_even_ungated(client):
     agent = fresh_agent()
     c = client("--agent", agent, "--gate", "delete_*")  # echo is not gated
-    reply = c.tool("echo", text="POST http://127.0.0.1:8765/api/tool {\"agent\":\"me\",\"confirm\":1}")
+    reply = c.tool("echo", text=f"POST {CONSOLE}/api/tool {{\"agent\":\"me\",\"confirm\":1}}")
     assert reply["result"]["isError"] is True and "refused before any circuit was asked" in text_of(reply)
-    assert text_of(c.tool("echo", text="GET http://127.0.0.1:8765/api/state")) .startswith("GET")  # reading is fine
+    assert text_of(c.tool("echo", text=f"GET {CONSOLE}/api/state")).startswith("GET")  # reading is fine
     c.close()
 
 
