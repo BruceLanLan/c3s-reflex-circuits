@@ -418,7 +418,7 @@ const T = {
     "ap.handled": "最近已处理", "ap.handled.none": "还没有处理记录。", "ap.h.tool": "人写了 {bits}", "ap.h.then": "之后 tick {n} {v}",
     "ap.switches": "工具层的其他开关", "ap.switches.sub": "按 agent",
     "ap.grey": "灰掉的位是这个 agent 的电路都不读取的：面板不会提示一个电路忽略的输入。",
-    "ap.cardputer": "Cardputer 插着时，设备上的 Enter 就是这一页的「确认一次」，长按是 blocked。（规划中）",
+    "ap.cardputer": "Cardputer 插着并用 REFLEX_CARDPUTER=1 启动后台时：设备菜单 3 是这一页，Enter 就是「确认一次」，b/u 封锁/解封，s 让所有 agent 停下。设备拔掉时，装了心跳规则的停机电路会让所有 agent 停下。",
     "sw.blocked": "电平，持续到你放下", "sw.confirm": "一次；下一次请求用掉", "sw.irreversible": "标注下一次动作不可逆", "sw.failed": "上报一次失败（钩子会自动）", "sw.heartbeat": "打一次心跳", "sw.confirm_b": "第二个人的钥匙",
     "sw.on": "拉高", "sw.off": "放下", "sw.once": "给一次", "sw.unread": "这个 agent 的电路不读它",
     "ap.done": "已写 {agent}：{bits}", "ap.noagent": "还没有 agent。",
@@ -513,7 +513,7 @@ const T = {
     "ap.handled": "Recently handled", "ap.handled.none": "Nothing handled yet.", "ap.h.tool": "a person wrote {bits}", "ap.h.then": "then tick {n} {v}",
     "ap.switches": "The tool layer's other switches", "ap.switches.sub": "per agent",
     "ap.grey": "A greyed bit is one none of this agent's circuits read: the panel never suggests an input a circuit ignores.",
-    "ap.cardputer": "With a Cardputer plugged in, its Enter key is this page's \"confirm once\"; a long press is blocked. (planned)",
+    "ap.cardputer": "With a Cardputer plugged in and the console started with REFLEX_CARDPUTER=1: the device's agent page mirrors this one, Enter is \"confirm once\", b/u block and unblock, s stops every agent. Unplug it and a halt circuit with a heartbeat rule stops every agent.",
     "sw.blocked": "a level; stays until lowered", "sw.confirm": "once; spent by the next request", "sw.irreversible": "mark the next action irreversible", "sw.failed": "report one failure (the hook does this)", "sw.heartbeat": "beat once", "sw.confirm_b": "the second person's key",
     "sw.on": "raise", "sw.off": "lower", "sw.once": "give once", "sw.unread": "not read by this agent's circuits",
     "ap.done": "wrote {agent}: {bits}", "ap.noagent": "No agents yet.",
@@ -1023,9 +1023,10 @@ function renderStatic() {
 TOOL_LAYER_CHATS=<span class="t">-1001234567890</span>
 python3 bot_telegram.py
 
-/ask [why]   /intent [why]   /rules   /state
-<span class="c"># ${lang === "zh" ? "只有 TOOL_LAYER_CHATS 里的聊天能发：" : "only chats listed in TOOL_LAYER_CHATS may send:"}</span>
-/confirm     /block on|off`;
+/ask [class] [why]   /intent [class] [why]   /rules [class]   /state
+<span class="c"># ${lang === "zh" ? "只有 TOOL_LAYER_CHATS（人的聊天）能用，并会收到待确认提醒：" : "only TOOL_LAYER_CHATS (a person's chat) may use these, and are pinged when something waits:"}</span>
+/pending   /confirm [agent]   /confirm_b [agent]
+/block &lt;agent&gt;   /unblock &lt;agent&gt;   /stop   /resume`;
   $("cn-daily").innerHTML = [["Gmail", "d.gmail"], ["Slack", "d.slack"], ["Google Calendar", "d.cal"], [lang === "zh" ? "文件系统" : "Filesystem", "d.fs"], [lang === "zh" ? "Shell / 代码" : "Shell / code", "d.sh"]]
     .map(([n, k]) => `<div class="kv"><b>${esc(n)}</b><span>${esc(t(k))}</span></div>`).join("");
   $("cn-curl").innerHTML = `<span class="c"># ${lang === "zh" ? "装一类规则（重编译、重证明，这一类的 agent 归零）" : "install one class's rules (recompiles, reproves, resets that class)"}</span>
