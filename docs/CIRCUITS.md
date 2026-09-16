@@ -185,20 +185,53 @@ performs one tick for `msg.sender` and emits `Tick`; `peek` is the read-only for
 `reset` clears the caller's state. The netlist, port counts and SHA-256 are fixed
 at deployment. There is no owner and no upgrade path.
 
+### `ReflexGuard`
+
+Nothing here is deployed, and this is the only part of the repository that looks like
+an *agent* rather than a circuit. The guard uses the verified core as an authoriser: a
+caller gets one authorisation exactly on a tick where the circuit commands a takeoff.
+It evaluates through the same `NandMachine` and the same netlist bytes (the
+constructor checks the SHA-256) but keeps its own latch state per caller, since
+`ReflexCore` keys state by `msg.sender`. It moves no value and names no action.
+
+What it **inherits** from the proofs, for any inputs whatsoever:
+
+* **P1** — no takeoff within 7 ticks of a takeoff. One call is one tick, so at most
+  one authorisation in any 8 consecutive calls by one caller. `forge test` re-checks
+  this on chain with a 256-run fuzz over arbitrary input sequences.
+* **P2** — a long-mode authorisation is immediately preceded by four consecutive
+  raising ticks, so it costs the caller four earlier calls.
+
+What it does **not** inherit, and what must therefore never be called verified:
+
+* **Time.** Eight calls fit in one transaction, so the proven limit bounds *calls*,
+  not wall-clock. The optional `minBlocks` spacing is the guard's own ordinary code,
+  covered by tests only.
+* **Meaning of the inputs.** The caller builds the 17 bits, so a caller who wants a
+  long-mode authorisation can simply supply four raising ticks. P2 is a commitment
+  cost, not a security property.
+* **The actuator.** Whatever consumes `Authorised` is outside the contract, and no
+  proof here says anything about it.
+
 ### Tests
 
 `forge test` runs:
 
-* **full-domain differential test**: for 18 circuits (all 14 components, both
-  74-NAND policies and both 173-NAND cores) the EVM evaluator's output and
+* **full-domain differential test**: for 20 circuits (all 14 components, both
+  74-NAND policies, both 173-NAND cores and the two minimal cores) the EVM
+  evaluator's output and
   next-state planes over the complete (input, state) domain are chained with
   SHA-256 and compared with the chain computed in Python — up to 8,388,608 rows
   per circuit;
 * **episode replay**: three stimulus episodes through a deployed `ReflexCore`,
   checking the motor command at every tick;
-* malformed-netlist and per-caller-isolation tests.
+* malformed-netlist and per-caller-isolation tests;
+* **the guard's limits**: the fixture episodes authorise exactly on their takeoff
+  ticks, a 256-run fuzz over arbitrary input sequences finds no two authorisations
+  within 8 calls by one caller, and the block-spacing rule refuses one that comes
+  too soon.
 
-All 10 tests pass (Foundry 1.8.1, solc 0.8.28, via-IR, optimiser 10,000 runs).
+All 17 tests pass (Foundry 1.8.1, solc 0.8.28, via-IR, optimiser 10,000 runs).
 
 ### Gas
 
