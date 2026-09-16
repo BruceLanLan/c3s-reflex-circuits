@@ -306,6 +306,25 @@ this section started; the switch without binding refuses every agent, including 
 one; and a program that can read the container's environment still has the container's own
 token (limitation 2 of `SECURITY.md`, which is what the container is for).
 
+**The container is not treated as "the network", and that is measured, not assumed.** The
+console's LAN rule (`SECURITY.md`, "on a shared network") turns on the same narrowing for
+any request that does not come from this machine — which would have closed the squat
+above for free. It does not apply here: under colima (and Docker Desktop, which works the
+same way) the hop to `host.docker.internal` is dialled *by a helper on the host*, so the
+console sees the request arrive from `127.0.0.1`:
+
+```
+$ docker compose exec agent python3 …   # an unbound name, no token, default mode
+unbound name, no token : (200, b'{"at": …, "kind": "request", "agent": "w6-unbound-check", …')
+$ tail -1 /tmp/console.log
+127.0.0.1 "POST /api/request HTTP/1.1" 200 -
+```
+
+On a Linux docker host the peer address is usually the bridge instead, and then the LAN
+rule *does* apply: the container's name must be bound and send its token, or every request
+is refused. Either way the two steps above are what you should be doing; do not rely on
+which side of that line your container happens to fall.
+
 ## What this does not do
 
 * **The agent still needs the network for its model.** This recipe gives the agent *no*
