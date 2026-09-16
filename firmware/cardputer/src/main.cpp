@@ -439,6 +439,16 @@ void setup() {
 void loop() {
   M5Cardputer.update();
   readInput();
+  // A host can ask for the digest over serial, so its timing can be recorded off-device.
+  while (Serial.available()) {
+    if ((char)Serial.read() == 'd') {
+      page = Page::Digest;
+      pageUntil = 0;
+      digestRows = 0;
+      digestPending = true;
+      dirty = true;
+    }
+  }
   uint32_t now = millis();
 
   if (page == Page::SelfTest && pageUntil && now > pageUntil) {
@@ -481,6 +491,8 @@ void loop() {
     c3s_hex(d, 32, digestHex);
     digestPending = false;
     dirty = true;
+    Serial.printf("digest %s over %lu rows in %lu ms\n", digestHex, (unsigned long)digestRows,
+                  (unsigned long)digestMs);
   }
   delay(1);
 }

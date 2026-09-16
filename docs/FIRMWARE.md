@@ -95,7 +95,10 @@ compiler (the test is skipped without one) and checks:
   `digest policy`, a SHA-256 chain over the output and next-state bit planes of every
   row, in blocks of 256 rows) equals the chain in the EVM fixtures, which the
   Solidity evaluator is checked against — so one 32-byte value ties the device's C,
-  the browser's WebAssembly, Python and the EVM together;
+  the browser's WebAssembly, Python and the EVM together. Measured on the Cardputer
+  ADV this firmware was developed on: all 8,388,608 rows in **10,218 ms**, digest
+  `477aee38…fba1e1ea`, equal to the fixtures' chain; the same work takes about 1.1 s
+  on the development Mac;
 - the sensory encoding equals `loom.encode_features` at, and one ulp either side of,
   every bin edge and the edges of the binocular overlap;
 - an episode run tick by tick as the firmware runs it (geometry, encoding, policy and
@@ -130,7 +133,7 @@ The screen is 240 × 135:
 | `a` | auto demo (on at boot): random l/v and azimuth every few seconds |
 | `m` | sound on takeoff |
 | `t`, `h` | self-test report, key help |
-| `d` | digest the whole 8,388,608-row step relation on the device and show it with the time it took |
+| `d` | digest the whole 8,388,608-row step relation on the device and show it with the time it took; sending `d` over the serial port does the same and prints the result |
 
 Each serial line is one tick, for example:
 
