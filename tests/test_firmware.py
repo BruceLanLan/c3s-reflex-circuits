@@ -127,6 +127,31 @@ def test_policy_truth_table_equals_the_python_engine_on_all_rows(evaluator, tmp_
     assert not got[:, 1].any()
 
 
+def test_simulator_skeleton_data_matches_the_connectome_subgraph():
+    """docs/sim/skeletons.{json,bin} are the released shapes of cells the model names.
+    Every cell in them must be one the subgraph lists, with the subgraph's own synapse
+    count, and the binary's size must follow the layout it declares."""
+    doc = json.loads((SIM / "skeletons.json").read_text())
+    raw = (ROOT / "data" / "malecns-v1.0-gf-escape-subgraph.json").read_bytes()
+    assert doc["source"]["subgraph_sha256"] == hashlib.sha256(raw).hexdigest()
+    sub = json.loads(raw)
+    known: dict[tuple[int, str], tuple[str, int]] = {}
+    for gf in sub["giant_fibers"]:
+        side = gf["instance"].rstrip(")").split("_")[-1]
+        known[(int(gf["body_id"]), side)] = ("DNp01", gf["visual_projection_input_synapses"])
+        for t in ("LC4", "LPLC2"):
+            for body, syn in gf["inputs"][t]["per_cell_synapses"]:
+                known[(int(body), side)] = (t, int(syn))
+    for cell in doc["cells"]:
+        key = (cell["body_id"], cell["side"])
+        assert key in known, key
+        assert (cell["type"], cell["synapses"]) == known[key]
+    layout = doc["layout"]
+    assert layout["segments_byte_offset"] == layout["points"] * 12
+    assert (SIM / "skeletons.bin").stat().st_size == layout["points"] * 12 + layout["segments"] * 8
+    assert len(doc["source"]["files"]) == len(doc["cells"])
+
+
 def test_simulator_wiring_data_matches_the_connectome_subgraph():
     """docs/sim/wiring.json feeds the page's wiring view. Every number in it must come
     from the committed subgraph, and it must name that file's real digest."""

@@ -16,6 +16,13 @@ CC-BY. Cite:
   dimorphism in the complete Drosophila male central nervous system connectome.
   Cell (2026). doi:10.1016/j.cell.2026.08.015
 
+docs/sim/skeletons.bin and docs/sim/skeletons.json are derived from the same
+release: the published SWC skeletons of 26 of the cells the model names, fetched
+from the public bucket
+https://storage.googleapis.com/flyem-male-cns/v1.0/segmentation/skeletons-malecns/skeletons-swc/
+and decimated by scripts/build_sim_skeletons.py, which records each source file's
+SHA-256. Same dataset, same CC-BY terms and citation as above.
+
 Differentiable logic gate networks
 ----------------------------------
 c3s/dlgn.py is an independent implementation of the method described in:

@@ -18,7 +18,9 @@
 # unpublished sealed spec), docs/sim/c3s_core.wasm (scripts/build_sim.py; another
 # clang may emit different bytes, so tests/test_firmware.py checks it by behaviour)
 # and the minimal cores (scripts/build_minimal_cores.py; the bytes depend on the ABC
-# build, so tests/test_minimal_cores.py checks them by equivalence).
+# build, so tests/test_minimal_cores.py checks them by equivalence). The simulator's
+# skeleton geometry (scripts/build_sim_skeletons.py) needs the network, so it is not
+# rebuilt either; tests/test_firmware.py checks it against the committed subgraph.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"

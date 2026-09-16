@@ -217,10 +217,17 @@
       </div>
 
       <section class="bench-wiring">
-        <h2 data-i18n="wiringTitle">Measured wiring</h2>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
+          <h2 data-i18n="wiringTitle">Measured wiring</h2>
+          <div class="modes" id="wiring-view" role="group" aria-label="View">
+            <button type="button" data-view="graph" aria-pressed="true" data-i18n="wiringGraph">Connections</button>
+            <button type="button" data-view="cells" aria-pressed="false" data-i18n="wiringCells">Real shapes</button>
+          </div>
+        </div>
         <canvas id="wiring" width="1560" height="600" role="img"
                 aria-label="Measured LC4 and LPLC2 input wiring of the two giant fibers"></canvas>
-        <p class="bench-note" data-i18n="wiringNote">Every LC4 and LPLC2 cell that synapses onto the two giant fibers in MaleCNS v1.0, each line as thick as that cell's measured synapse count: 55 LC4 and 91 LPLC2 cells onto the right fiber, 71 and 94 onto the left. The layout is not anatomy — the release's positions are not used — and the lamps follow the policy's two pathways, never individual cells, because the circuit only ever sees 16 sensory bits.</p>
+        <p class="bench-note" id="wiring-note-graph" data-i18n="wiringNote">Every LC4 and LPLC2 cell that synapses onto the two giant fibers in MaleCNS v1.0, each line as thick as that cell's measured synapse count: 55 LC4 and 91 LPLC2 cells onto the right fiber, 71 and 94 onto the left. The layout is not anatomy — the release's positions are not used — and the lamps follow the policy's two pathways, never individual cells, because the circuit only ever sees 16 sensory bits.</p>
+        <p class="bench-note" id="wiring-note-cells" hidden data-i18n="wiringNoteCells">The real shapes of 26 of those cells, as MaleCNS v1.0 published them: both giant fibers and, per fiber, the six strongest LC4 and LPLC2 inputs by synapse count, decimated to fit a web page. Here the positions are the release's own. Colour follows the model's own mapping and nothing finer: the speed field lights the LC4 population of that eye, the size field the LPLC2 population, and the giant fibers light when the policy's GF pathway crosses. No cell is ever lit on its own — the circuit cannot tell them apart.</p>
       </section>
 
       <section class="bench-log">
@@ -347,6 +354,9 @@ const I18N = {
     bfProofs: "起飞后七拍内不会再起飞、长模式起飞前必有连续四拍抬翅，另外还有三条——每条都用两套独立引擎各证一次。",
     wiringTitle: "实测连线",
     wiringNote: "MaleCNS v1.0 里所有与两根巨纤维成突触的 LC4 与 LPLC2 细胞，每条线的粗细就是该细胞的实测突触数：右侧巨纤维收 55 个 LC4、91 个 LPLC2，左侧收 71 与 94。这个排布不是解剖形态——发布数据里的坐标没有被用到——而且点亮只跟随策略的两条通路，绝不按单个细胞，因为电路看到的只有 16 位感觉输入。",
+    wiringGraph: "连接图",
+    wiringCells: "真实形态",
+    wiringNoteCells: "其中 26 个细胞的真实形态，直接来自 MaleCNS v1.0 发布的骨架：两根巨纤维，加上每根纤维上按突触数最强的 6 个 LC4 与 6 个 LPLC2，为了能放进网页做了抽稀。这里的坐标就是发布数据自己的坐标。着色只跟随模型自己的映射、不再更细：速度字段点亮该侧眼的 LC4 群体，大小字段点亮 LPLC2 群体，巨纤维在策略的 GF 通路越过阈值时点亮。任何单个细胞都不会被单独点亮——电路根本分辨不出它们。",
   },
 };
 Object.assign(I18N.en, {
@@ -970,6 +980,76 @@ async function loadWiring() {
   wiringLabels = labels;
 }
 
+// The same cells' real shapes, as the release published them (docs/sim/skeletons.bin,
+// built by scripts/build_sim_skeletons.py). Loaded only when asked for: it is 323 kB.
+let wiringView = "graph", skel = null, skelPending = false;
+
+async function loadSkeletons() {
+  if (skel || skelPending) return;
+  skelPending = true;
+  try {
+    const meta = await (await fetch("skeletons.json")).json();
+    const buf = await (await fetch("skeletons.bin")).arrayBuffer();
+    skel = {
+      cells: meta.cells,
+      pts: new Float32Array(buf, 0, meta.layout.points * 3),
+      segs: new Uint32Array(buf, meta.layout.segments_byte_offset, meta.layout.segments * 2),
+    };
+  } catch (e) {
+    skel = null;  // the connection view still works; this one is extra
+  }
+  skelPending = false;
+}
+
+// Colour follows the model's own mapping and nothing finer: the speed field drives the
+// LC4 population of that eye, the size field the LPLC2 population, and the giant fibers
+// light with the policy's GF pathway. Lighting one cell would claim a resolution the
+// circuit does not have — it sees four 4-bit fields, not 311 cells.
+function skeletonTint(cell) {
+  const x = haveTick ? last.x : 0, path = haveTick ? last.pathways : 0;
+  if (cell.type === "DNp01") return (path & 1) ? "#7BE0A8" : "#55606E";
+  const field = cell.type === "LC4"
+    ? (cell.side === "L" ? (x >> 4) & 15 : (x >> 12) & 15)
+    : (cell.side === "L" ? x & 15 : (x >> 8) & 15);
+  if (!field) return cell.type === "LC4" ? "#4A5568" : "#53566A";
+  const k = (0.35 + 0.65 * (field / 15)).toFixed(2);
+  return cell.type === "LC4" ? `rgba(255,138,101,${k})` : `rgba(255,196,84,${k})`;
+}
+
+function drawSkeletonView(ctx, W, H, cos, sin, R) {
+  const label = (s, y) => { ctx.fillStyle = "#8A93A0"; ctx.font = `${Math.round(0.03 * R)}px ui-monospace, monospace`; ctx.fillText(s, 0.02 * W, y); };
+  if (!skel) { loadSkeletons(); label(skelPending ? "loading skeletons…" : "skeletons unavailable", 0.09 * H); return; }
+  const pts = skel.pts, segs = skel.segs;
+  for (const cell of skel.cells) {
+    ctx.strokeStyle = skeletonTint(cell);
+    ctx.lineWidth = cell.type === "DNp01" ? 0.004 * R : 0.0016 * R;
+    ctx.beginPath();
+    const end = (cell.first_segment + cell.segments) * 2;
+    for (let k = cell.first_segment * 2; k < end; k += 2) {
+      const a = segs[k] * 3, b = segs[k + 1] * 3;
+      const ax = pts[a] * cos - pts[a + 2] * sin, az = pts[a] * sin + pts[a + 2] * cos;
+      const bx = pts[b] * cos - pts[b + 2] * sin, bz = pts[b] * sin + pts[b + 2] * cos;
+      const as = 1 / (1.9 - az * 0.55), bs = 1 / (1.9 - bz * 0.55);
+      ctx.moveTo(W / 2 + ax * W * 0.60 * as, H / 2 + pts[a + 1] * R * 1.35 * as);
+      ctx.lineTo(W / 2 + bx * W * 0.60 * bs, H / 2 + pts[b + 1] * R * 1.35 * bs);
+    }
+    ctx.stroke();
+  }
+  label("MaleCNS v1.0 skeletons · CC-BY · 26 cells", H - 0.05 * H);
+}
+
+for (const b of document.querySelectorAll("#wiring-view button")) {
+  b.addEventListener("click", () => {
+    wiringView = b.dataset.view;
+    if (wiringView === "cells") loadSkeletons();
+    for (const o of document.querySelectorAll("#wiring-view button")) {
+      o.setAttribute("aria-pressed", String(o.dataset.view === wiringView));
+    }
+    document.getElementById("wiring-note-graph").hidden = wiringView !== "graph";
+    document.getElementById("wiring-note-cells").hidden = wiringView !== "cells";
+  });
+}
+
 function drawWiring(now) {
   const c = document.getElementById("wiring");
   if (!c || !wiringEdges || now - wiringDrawMs < 33) return;
@@ -979,6 +1059,7 @@ function drawWiring(now) {
   ctx.fillStyle = "#0C0E12";
   ctx.fillRect(0, 0, W, H);
   const cos = Math.cos(wiringSpin), sin = Math.sin(wiringSpin);
+  if (wiringView === "cells") { drawSkeletonView(ctx, W, H, cos, sin, R); return; }
   const proj = (p) => {
     const x = p.x * cos - p.z * sin, z = p.x * sin + p.z * cos;
     const s = 1 / (1.8 - z * 0.7);

@@ -25,6 +25,16 @@ checks that `build.json` matches the module and the current sources. The module 
 rebuilt by `scripts/verify.sh`: another clang version may emit different bytes for the
 same sources.
 
+Beside the device the page draws the cells themselves, in two views. **Connections**
+is the measured graph: all 311 LC4 and LPLC2 cells that synapse onto the two giant
+fibers, each line as thick as its synapse count, in a layout that carries no spatial
+meaning. **Real shapes** loads `docs/sim/skeletons.bin` (323 kB, built by
+`scripts/build_sim_skeletons.py` from the release's published SWC skeletons) and
+draws 26 of those cells where the release says they are. Colour follows the model's
+own mapping and nothing finer — the speed field lights that eye's LC4 population,
+the size field its LPLC2 population, and the giant fibers light with the GF pathway —
+because the circuit sees four 4-bit fields, not individual cells.
+
 The page carries a second evaluator, off by default. Switching to **On BNB Smart
 Chain** sends one read-only `eth_call` per row whose state override installs the
 compiled `NandMachine` runtime at a throwaway address, so a public node executes the

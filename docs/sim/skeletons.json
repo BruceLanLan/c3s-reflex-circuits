@@ -1,0 +1,390 @@
+{
+ "format": "c3s.skeletons/1",
+ "note": "real skeletons from MaleCNS v1.0 (CC-BY, see NOTICE), decimated; positions are the release's, normalised into a unit box",
+ "source": {
+  "release": "male-cns:v1.0",
+  "licence": "CC-BY (MaleCNS dataset); this file is a derived aggregate",
+  "url_pattern": "https://storage.googleapis.com/flyem-male-cns/v1.0/segmentation/skeletons-malecns/skeletons-swc/{body}.swc",
+  "subgraph_sha256": "8dff72df950377a14e2b2243f13200c9c5780c28bdcf395a5732854d2d6bc2de",
+  "selection": "both giant fibers, and per fiber the 6 strongest LC4 and LPLC2 inputs by synapse count",
+  "decimation": {
+   "chain_step": 18,
+   "giant_fiber_chain_step": 4
+  },
+  "files": [
+   {
+    "body_id": 10001,
+    "sha256": "838c60b0e4724d8ca163be994012ebdc23e7ccbdcb9cde92f25e541bc4696511",
+    "bytes": 102779
+   },
+   {
+    "body_id": 22847,
+    "sha256": "6834b580fecfb8fa311619152b8e69dbdf83c41e7344e09c0983999aebd4f96d",
+    "bytes": 42990
+   },
+   {
+    "body_id": 16128,
+    "sha256": "ffe661f5c0669fe54b253a2101940bd2b36d098a1c0af8caf3edee7c857354a0",
+    "bytes": 58776
+   },
+   {
+    "body_id": 17668,
+    "sha256": "e772a401014e4611a8f23596f1a286c04e22585b8e7684caabc86e533d10bb6d",
+    "bytes": 46024
+   },
+   {
+    "body_id": 24338,
+    "sha256": "a72fcf53c6a659a3598182ec623255daea14358178b0020f168fcc54ecfd28c0",
+    "bytes": 183393
+   },
+   {
+    "body_id": 20399,
+    "sha256": "9661d82d8c7c0b2373ce2468e270229e310c7d78178636e850df04b033efeb7e",
+    "bytes": 41867
+   },
+   {
+    "body_id": 22966,
+    "sha256": "3fa92ef2e0bcc052e9af247ff9abacb73fd18e69c179486786abb9072b91751c",
+    "bytes": 41967
+   },
+   {
+    "body_id": 20182,
+    "sha256": "21f00c1a7f2f5c11b4e99a98a07b9d9f648c033bdf06c22768a8d96b2931a62d",
+    "bytes": 83921
+   },
+   {
+    "body_id": 20269,
+    "sha256": "170d06d1b321ff123770b04f958f9878d7ce4d9fedfe4ed8ff65ea1ed04ebf30",
+    "bytes": 74250
+   },
+   {
+    "body_id": 19608,
+    "sha256": "b4d4d3e68835596dceb070b4128662d16a3801ab8e132772accc977eb4b922ad",
+    "bytes": 90502
+   },
+   {
+    "body_id": 20103,
+    "sha256": "ddfd336be3030372bc71a5d8e2645bf933d4eaac11ddae57c18388743b8c007c",
+    "bytes": 83743
+   },
+   {
+    "body_id": 24187,
+    "sha256": "6c2f16fb59de518f4cffdc5cfe8c2d3b15904a2d0f06a582a1b7195bf56206df",
+    "bytes": 64046
+   },
+   {
+    "body_id": 20047,
+    "sha256": "0c97f8b6b7550cb0712ef63f2227da60600817ca4ec60b6b3f49a99e9ace95e1",
+    "bytes": 83411
+   },
+   {
+    "body_id": 10010,
+    "sha256": "97e1c587397bd6ec1d6489c1ff129c13b3794745f1ada4376313fdf50363d336",
+    "bytes": 115111
+   },
+   {
+    "body_id": 17478,
+    "sha256": "1e02433925513c7b9f03fcc7294ba742f330c7206a8794af6ce2e86e74e165ca",
+    "bytes": 46707
+   },
+   {
+    "body_id": 17653,
+    "sha256": "af7e3cfc9e95a5827ffb76b6b3c9bfcf6e0aac7e6fbc2fea4a3cca7cd3dd90ca",
+    "bytes": 52116
+   },
+   {
+    "body_id": 518439,
+    "sha256": "22e4a3d298261279bc17178de7f96d9ef07cbebcf167b66946c5bf6b7195a711",
+    "bytes": 151368
+   },
+   {
+    "body_id": 20859,
+    "sha256": "8f307869e862ee00522f319a3b7e7939835e831bc667bf14bc927039aee435d6",
+    "bytes": 46322
+   },
+   {
+    "body_id": 29469,
+    "sha256": "75a45a4d5f506b7cc1ca65950ce2322ea341d6d8886a1de86789883fc129c3e5",
+    "bytes": 35870
+   },
+   {
+    "body_id": 32597,
+    "sha256": "01ca3cf304b9da50eb8d8733d12fda14eda54e34bf6c97e25eb87a6783a38f7b",
+    "bytes": 31842
+   },
+   {
+    "body_id": 31563,
+    "sha256": "a0bd7c9a461adcb2826f9e8ccdea7a4ce1ecf39832a31150d8f94404bfcfd838",
+    "bytes": 54533
+   },
+   {
+    "body_id": 22253,
+    "sha256": "ac36a1594cf64864ffd04ac927c4638a0d4262fa31c1ada94f4e56cc4e2aba7c",
+    "bytes": 72442
+   },
+   {
+    "body_id": 19787,
+    "sha256": "c9f491228b187ac2ca7d6d3982d5d6c9eba1ea8f266ffb0a795f49128b967c46",
+    "bytes": 61510
+   },
+   {
+    "body_id": 22557,
+    "sha256": "3fa6699e8acce7c293b4c14c3b0cc6976a3c2e466254d3e884f26075e84903cd",
+    "bytes": 60434
+   },
+   {
+    "body_id": 533895,
+    "sha256": "6442e1794c203d7971bdacba58af05385f9675e4485f4822d1424b5746e8db17",
+    "bytes": 246803
+   },
+   {
+    "body_id": 25854,
+    "sha256": "36a33eb7bc11d464b33d4a4dc1a50a04e1faffa9a6728007e3e06cfb50fa25db",
+    "bytes": 50934
+   }
+  ]
+ },
+ "layout": {
+  "points": 16180,
+  "segments": 16154,
+  "segments_byte_offset": 194160,
+  "point_format": "float32 xyz",
+  "segment_format": "uint32 pair of point indices"
+ },
+ "cells": [
+  {
+   "body_id": 10001,
+   "type": "DNp01",
+   "side": "R",
+   "synapses": 4819,
+   "first_segment": 0,
+   "segments": 1486,
+   "nodes_in_release": 2975
+  },
+  {
+   "body_id": 22847,
+   "type": "LC4",
+   "side": "R",
+   "synapses": 67,
+   "first_segment": 1486,
+   "segments": 348,
+   "nodes_in_release": 1311
+  },
+  {
+   "body_id": 16128,
+   "type": "LC4",
+   "side": "R",
+   "synapses": 65,
+   "first_segment": 1834,
+   "segments": 482,
+   "nodes_in_release": 1773
+  },
+  {
+   "body_id": 17668,
+   "type": "LC4",
+   "side": "R",
+   "synapses": 63,
+   "first_segment": 2316,
+   "segments": 339,
+   "nodes_in_release": 1398
+  },
+  {
+   "body_id": 24338,
+   "type": "LC4",
+   "side": "R",
+   "synapses": 63,
+   "first_segment": 2655,
+   "segments": 1560,
+   "nodes_in_release": 5261
+  },
+  {
+   "body_id": 20399,
+   "type": "LC4",
+   "side": "R",
+   "synapses": 62,
+   "first_segment": 4215,
+   "segments": 308,
+   "nodes_in_release": 1276
+  },
+  {
+   "body_id": 22966,
+   "type": "LC4",
+   "side": "R",
+   "synapses": 61,
+   "first_segment": 4523,
+   "segments": 308,
+   "nodes_in_release": 1281
+  },
+  {
+   "body_id": 20182,
+   "type": "LPLC2",
+   "side": "R",
+   "synapses": 59,
+   "first_segment": 4831,
+   "segments": 537,
+   "nodes_in_release": 2535
+  },
+  {
+   "body_id": 20269,
+   "type": "LPLC2",
+   "side": "R",
+   "synapses": 53,
+   "first_segment": 5368,
+   "segments": 530,
+   "nodes_in_release": 2242
+  },
+  {
+   "body_id": 19608,
+   "type": "LPLC2",
+   "side": "R",
+   "synapses": 49,
+   "first_segment": 5898,
+   "segments": 574,
+   "nodes_in_release": 2729
+  },
+  {
+   "body_id": 20103,
+   "type": "LPLC2",
+   "side": "R",
+   "synapses": 48,
+   "first_segment": 6472,
+   "segments": 556,
+   "nodes_in_release": 2532
+  },
+  {
+   "body_id": 24187,
+   "type": "LPLC2",
+   "side": "R",
+   "synapses": 48,
+   "first_segment": 7028,
+   "segments": 433,
+   "nodes_in_release": 1938
+  },
+  {
+   "body_id": 20047,
+   "type": "LPLC2",
+   "side": "R",
+   "synapses": 47,
+   "first_segment": 7461,
+   "segments": 582,
+   "nodes_in_release": 2513
+  },
+  {
+   "body_id": 10010,
+   "type": "DNp01",
+   "side": "L",
+   "synapses": 6433,
+   "first_segment": 8043,
+   "segments": 1701,
+   "nodes_in_release": 3312
+  },
+  {
+   "body_id": 17478,
+   "type": "LC4",
+   "side": "L",
+   "synapses": 86,
+   "first_segment": 9744,
+   "segments": 398,
+   "nodes_in_release": 1422
+  },
+  {
+   "body_id": 17653,
+   "type": "LC4",
+   "side": "L",
+   "synapses": 83,
+   "first_segment": 10142,
+   "segments": 392,
+   "nodes_in_release": 1578
+  },
+  {
+   "body_id": 518439,
+   "type": "LC4",
+   "side": "L",
+   "synapses": 82,
+   "first_segment": 10534,
+   "segments": 1324,
+   "nodes_in_release": 4412
+  },
+  {
+   "body_id": 20859,
+   "type": "LC4",
+   "side": "L",
+   "synapses": 81,
+   "first_segment": 11858,
+   "segments": 367,
+   "nodes_in_release": 1406
+  },
+  {
+   "body_id": 29469,
+   "type": "LC4",
+   "side": "L",
+   "synapses": 73,
+   "first_segment": 12225,
+   "segments": 250,
+   "nodes_in_release": 1101
+  },
+  {
+   "body_id": 32597,
+   "type": "LC4",
+   "side": "L",
+   "synapses": 69,
+   "first_segment": 12475,
+   "segments": 228,
+   "nodes_in_release": 984
+  },
+  {
+   "body_id": 31563,
+   "type": "LPLC2",
+   "side": "L",
+   "synapses": 64,
+   "first_segment": 12703,
+   "segments": 330,
+   "nodes_in_release": 1660
+  },
+  {
+   "body_id": 22253,
+   "type": "LPLC2",
+   "side": "L",
+   "synapses": 60,
+   "first_segment": 13033,
+   "segments": 475,
+   "nodes_in_release": 2191
+  },
+  {
+   "body_id": 19787,
+   "type": "LPLC2",
+   "side": "L",
+   "synapses": 55,
+   "first_segment": 13508,
+   "segments": 383,
+   "nodes_in_release": 1869
+  },
+  {
+   "body_id": 22557,
+   "type": "LPLC2",
+   "side": "L",
+   "synapses": 54,
+   "first_segment": 13891,
+   "segments": 405,
+   "nodes_in_release": 1834
+  },
+  {
+   "body_id": 533895,
+   "type": "LPLC2",
+   "side": "L",
+   "synapses": 50,
+   "first_segment": 14296,
+   "segments": 1552,
+   "nodes_in_release": 7266
+  },
+  {
+   "body_id": 25854,
+   "type": "LPLC2",
+   "side": "L",
+   "synapses": 48,
+   "first_segment": 15848,
+   "segments": 306,
+   "nodes_in_release": 1556
+  }
+ ]
+}
