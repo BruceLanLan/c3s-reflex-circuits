@@ -66,6 +66,21 @@ def test_manifest_records_the_checks(manifest):
     assert "onchain" not in manifest
 
 
+def test_manifest_names_the_fly_core_as_its_parent(manifest):
+    """Lineage is by method, not by data: the same compiler and the same exhaustive
+    checks produced the first circuit and this one. The parent is named by the digest
+    the escape core is published under, so a copy with another digest is another
+    lineage."""
+    core = json.loads((ROOT / "circuits" / "loom-escape" / "core-hand-abc.json").read_text())
+    assert manifest["lineage"] == {
+        "parent": "0x" + core["netlist_sha256"].removeprefix("0x"),
+        "parent_name": "core-hand-abc",
+        "relation": "compiled-by-the-same-method",
+    }
+    # the parent is the fly core, not this policy
+    assert manifest["lineage"]["parent"] != manifest["circuit"]["netlist_sha256"]
+
+
 def test_channel_map_matches_policy(manifest):
     names = [i["name"] for i in manifest["inputs"]]
     assert names == list(POLICY.input_names())
@@ -123,6 +138,11 @@ TAMPERS = {
     "setting": (lambda m: m["rules"]["settings"].__setitem__("max_grants", 6), "rules_describe"),
     "channel": (lambda m: m["inputs"][2].__setitem__("channel", "agent"), "input_channels"),
     "limits_dropped": (lambda m: m.__setitem__("limits", []), "limits_stated"),
+    "wrong_parent": (lambda m: m["lineage"].__setitem__("parent", "0x" + "ab" * 32), "lineage"),
+    "parent_renamed": (lambda m: m["lineage"].__setitem__("parent_name", "core-table-abc"), "lineage"),
+    "relation_changed": (lambda m: m["lineage"].__setitem__("relation", "derived-from"), "lineage"),
+    "lineage_dropped": (lambda m: m.pop("lineage"), "lineage"),
+    "lineage_not_an_object": (lambda m: m.__setitem__("lineage", "core-hand-abc"), "lineage"),
 }
 
 
@@ -134,6 +154,16 @@ def test_tampering_is_caught_by_name(manifest, which):
     report, _ = erc8004.validate(raw)
     assert report.score < 100
     assert check in report.failing(), report.failing()
+
+
+@needs_cast
+def test_a_parent_spelled_differently_is_the_same_parent(manifest):
+    """The digest is what matters, not how it was written: no prefix, or capitals."""
+    for spelling in (manifest["lineage"]["parent"].removeprefix("0x"), manifest["lineage"]["parent"].upper()):
+        m = json.loads(json.dumps(manifest))
+        m["lineage"]["parent"] = spelling
+        report, _ = erc8004.validate(erc8004.canonical_bytes(m))
+        assert report.score == 100, report.failing()
 
 
 @needs_cast

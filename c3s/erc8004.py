@@ -7,7 +7,8 @@ in which a validator the agent's owner names answers a request with a score from
 
 This module writes the document: a *boundary manifest* for one compiled `Policy` — the
 rules in their own words and settings, which channel each input bit must come from, the
-netlist bytes and their SHA-256, and every number the exhaustive checks produced — as
+netlist bytes and their SHA-256, every number the exhaustive checks produced, and the
+lineage the circuit was compiled in (the fly escape core's netlist digest as parent) — as
 canonical JSON whose keccak256 is what goes on chain. `validate` is the other half:
 given those bytes it recompiles the policy, decodes the published netlist, re-runs
 `verify()` and `properties()` on it and compares every recorded value, one named check
@@ -42,6 +43,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 FORMAT = "c3s.boundary/1"
 REPORT_FORMAT = "c3s.boundary-validation/1"
+
+# Every boundary circuit is descended from the first one by method, not by data: the fly
+# escape core was compiled, checked on every row of its domain and proven over every
+# reachable state by the same code that compiles a policy. A manifest says so by naming
+# that core's netlist digest as its parent, and `validate` refuses a manifest that
+# claims a parent which is not the committed core.
+PARENT_CIRCUIT = "core-hand-abc"
+PARENT_RELATION = "compiled-by-the-same-method"
 METADATA_KEY = "c3s.boundary"
 SERVICE_NAME = "c3s-boundary"
 VALIDATION_TAG = "c3s-boundary"
@@ -147,6 +156,23 @@ def optional_inputs_mask(policy: Policy) -> int:
     return sum(OPTIONAL_INPUT_BITS[n] for n in policy.input_names() if n in OPTIONAL_INPUT_BITS)
 
 
+def parent_netlist_sha256(root: Path = ROOT) -> str:
+    """The committed netlist SHA-256 of the fly escape core, 0x-prefixed."""
+    raw = json.loads((root / "circuits" / "loom-escape" / f"{PARENT_CIRCUIT}.json").read_text())
+    digest = str(raw["netlist_sha256"]).lower().removeprefix("0x")
+    if len(digest) != 64:
+        raise ValueError(f"{PARENT_CIRCUIT} has no usable netlist_sha256")
+    return "0x" + digest
+
+
+def lineage(root: Path = ROOT) -> dict:
+    return {
+        "parent": parent_netlist_sha256(root),
+        "parent_name": PARENT_CIRCUIT,
+        "relation": PARENT_RELATION,
+    }
+
+
 def git_commit(root: Path = ROOT) -> str:
     try:
         out = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10)
@@ -205,6 +231,7 @@ def build_manifest(
             "netlist_hex": "0x" + raw.hex(),
         },
         "checked": checked,
+        "lineage": lineage(),
         "limits": list(LIMITS),
         "tool": tool if tool is not None else tool_info(),
     }
@@ -267,6 +294,16 @@ def validate(raw: bytes, *, expected_hash: str | None = None, report: Report | N
     r.add("canonical_bytes", canonical_bytes(m) == raw, "sorted keys, no whitespace, UTF-8", None if canonical_bytes(m) == raw else "differs")
     r.add("format", m.get("format") == FORMAT, FORMAT, m.get("format"))
     r.add("limits_stated", m.get("limits") == LIMITS, LIMITS, m.get("limits"))
+    # A manifest may claim descent only from the circuit this repository publishes: a
+    # parent digest that is not the committed core's is a claim about another lineage.
+    want_lineage = lineage()
+    got_lineage = m.get("lineage")
+    if isinstance(got_lineage, dict):
+        got_lineage = dict(got_lineage)
+        got_lineage["parent"] = str(got_lineage.get("parent", "")).lower()
+        if not got_lineage["parent"].startswith("0x"):
+            got_lineage["parent"] = "0x" + got_lineage["parent"]
+    r.add("lineage", got_lineage == want_lineage, want_lineage, m.get("lineage"))
 
     rules = m.get("rules") or {}
     try:
