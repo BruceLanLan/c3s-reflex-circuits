@@ -61,7 +61,9 @@ class Circuit:
         self.agents: dict[str, dict] = {}
 
     def agent(self, name: str) -> dict:
-        return self.agents.setdefault(name, {"state": 0, "tick": 0, "last_authorised_tick": None, "authorisations": 0})
+        return self.agents.setdefault(
+            name, {"state": 0, "tick": 0, "last_authorised_tick": None, "last_authorised_at": None, "authorisations": 0}
+        )
 
     def propose(self, name: str, lv: float, az: float, reason: str, hold: int | None = None) -> dict:
         """Drive the circuit with the proposed stimulus.
@@ -93,6 +95,7 @@ class Circuit:
                         if first_gap is None:
                             first_gap = gap
                     a["last_authorised_tick"] = a["tick"]
+                    a["last_authorised_at"] = time.time()  # wall clock, for the page only
                     a["authorisations"] += 1
                     authorised_at.append(a["tick"])
                     actions.append(loom.CORE_ACTION_NAMES[motor])
@@ -138,17 +141,33 @@ class Circuit:
                         "authorisations": a["authorisations"],
                         "ticks_since_authorisation": since,
                         "refractory_ticks_left": None if since is None else max(0, REFRACTORY_TICKS - since),
+                        "last_authorised_at": a["last_authorised_at"],
                     }
                 )
             return {
                 "circuit": {"name": self.name, "sha256": self.sha256, **self.metrics},
                 "refractory_ticks": REFRACTORY_TICKS,
+                # One tick of circuit time, from the calibration the netlist was built
+                # against. The circuit's clock advances only when a proposal drives it.
+                "tick_ms": self.params.tick_ms,
+                # Whether a public node is asked for a second opinion. chain_id is the
+                # cached value from the first successful call, so no network round trip
+                # happens here; null means no node has answered yet this session.
+                "chain": {
+                    "enabled": CHAIN is not None,
+                    "rpc": BSC_RPC if CHAIN is not None else None,
+                    "chain_id": CHAIN.chain_id if CHAIN is not None else None,
+                    "deployed": False,
+                },
+                "started_at": STARTED_AT,
                 "agents": agents,
                 "transcript": list(TRANSCRIPTS)[:60],
             }
 
 
 TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
+STARTED_AT = time.time()
+CHAIN = None  # set in __main__ once the circuit is loaded
 
 
 class Chain:

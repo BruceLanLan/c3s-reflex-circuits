@@ -1,104 +1,497 @@
 <!doctype html>
+<html lang="zh-CN">
 <meta charset="utf-8">
-<title>Reflex console</title>
+<title>Reflex console · 反射弧值班台</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { --bg: #15181C; --panel: #1C2025; --line: #2B3037; --text: #ECE7DC; --dim: #979CA3;
-          --faint: #5E646C; --ok: #46C878; --bad: #E36A52; --amber: #F2A541;
+  :root { --bg: #15181C; --panel: #1C2025; --panel2: #202529; --line: #2B3037; --text: #ECE7DC; --dim: #979CA3;
+          --faint: #5E646C; --ok: #46C878; --bad: #E36A52; --amber: #F2A541; --blue: #6FA8DC;
           --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--dim); font: 14px/1.5 system-ui, -apple-system, "PingFang SC", sans-serif; }
-  main { max-width: 900px; margin: 0 auto; padding: 22px 16px 40px; display: grid; gap: 20px; }
-  h1 { margin: 0; font-size: 16px; color: var(--text); font-weight: 600; }
-  h2 { margin: 0 0 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
-  .sub { font-size: 12.5px; color: var(--faint); }
-  .card { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 14px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; color: var(--faint); font-weight: 500; padding: 4px 8px 4px 0; }
-  td { padding: 4px 8px 4px 0; color: var(--text); }
-  code, .mono { font-family: var(--mono); font-size: 12px; }
-  form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  input { background: none; border: 1px solid var(--line); color: inherit; padding: 6px 8px; font: inherit; font-size: 13px; border-radius: 6px; }
-  input[type=number] { width: 8.5em; }
-  #reason { flex: 1; min-width: 12em; }
-  button { background: var(--amber); color: #121417; border: 0; border-radius: 8px; padding: 7px 14px; font: inherit; font-weight: 600; cursor: pointer; }
-  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
-  li { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 9px; align-items: baseline; font-size: 13px; }
-  li i { width: 8px; height: 8px; border-radius: 2px; background: var(--faint); margin-top: 6px; }
-  li.ok i { background: var(--ok); } li.no i { background: var(--faint); } li.err i { background: var(--bad); }
+  html { color-scheme: dark; }
+  body { margin: 0; background: var(--bg); color: var(--dim); font: 14px/1.5 system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+  a { color: var(--blue); text-decoration: none; }
+  code, .mono, .num { font-family: var(--mono); font-size: 12.5px; }
+  .num { color: var(--text); font-variant-numeric: tabular-nums; }
   .muted { color: var(--faint); }
-  .chain { color: var(--ok); }
-  .disagree { color: var(--bad); font-weight: 600; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .amber { color: var(--amber); }
+
+  /* top bar */
+  header { position: sticky; top: 0; z-index: 2; background: #111417; border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1120px; margin: 0 auto; padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: 12.5px; }
+  .bar h1 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: .01em; }
+  .bar h1 small { color: var(--faint); font-weight: 400; margin-left: 6px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); margin-right: 6px; vertical-align: 0; }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 6px rgba(70,200,120,.5); }
+  .dot.bad { background: var(--bad); } .dot.amber { background: var(--amber); }
+  .spacer { flex: 1; }
+  .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .lang button { background: none; border: 0; color: var(--dim); padding: 3px 9px; font: inherit; font-size: 12px; cursor: pointer; }
+  .lang button.on { background: var(--line); color: var(--text); }
+
+  main { max-width: 1120px; margin: 0 auto; padding: 18px 16px 48px; display: grid; gap: 16px; }
+  section { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  h2 { margin: 0 0 10px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); font-weight: 600; display: flex; gap: 10px; align-items: baseline; }
+  h2 .sub { font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--faint); font-size: 12px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+
+  /* stat tiles */
+  html[lang="zh-CN"] h2 { text-transform: none; letter-spacing: .04em; font-size: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .tile { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+  .tile .k { font-size: 11px; color: var(--faint); letter-spacing: .04em; }
+  .tile .v { font-family: var(--mono); font-size: 18px; white-space: nowrap; color: var(--text); line-height: 1.3; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tile .v small { font-size: 12px; color: var(--dim); margin-left: 4px; }
+  .tile .v.txt { font-size: 15px; word-break: keep-all; overflow-wrap: anywhere; }
+  .tile .s { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+
+  /* tables */
+  .wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--faint); font-weight: 500; padding: 4px 10px 6px 0; border-bottom: 1px solid var(--line); white-space: nowrap; font-size: 12px; }
+  td { padding: 6px 10px 6px 0; color: var(--text); vertical-align: top; }
+  tr + tr td { border-top: 1px solid #23282e; }
+  td.num { white-space: nowrap; }
+  @media (max-width: 700px) {
+    /* one card per agent instead of a cramped table */
+    #agents tr:first-child { display: none; }
+    #agents, #agents tbody, #agents tr, #agents td { display: block; }
+    #agents tr { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--panel2); }
+    #agents tr + tr { margin-top: 8px; }
+    #agents td { padding: 3px 0; border: 0 !important; display: grid; grid-template-columns: minmax(7em, auto) 1fr; gap: 8px; white-space: normal; }
+    #agents td::before { content: attr(data-l); color: var(--faint); font-family: system-ui, -apple-system, "PingFang SC", sans-serif; font-size: 12px; }
+    #agents td:first-child { grid-template-columns: 1fr; font-weight: 600; padding-bottom: 5px; }
+    #agents td:first-child::before { content: none; }
+  }
+  .refr { display: inline-grid; grid-template-columns: repeat(7, 9px); gap: 2px; vertical-align: middle; margin-right: 8px; }
+  .refr i { height: 9px; border-radius: 2px; background: #2c3138; }
+  .refr i.on { background: var(--amber); }
+
+  /* form */
+  form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+  @media (max-width: 480px) { form { grid-template-columns: 1fr; } }
+  label { display: grid; gap: 3px; font-size: 12px; color: var(--dim); min-width: 0; }
+  label .hint { font-size: 11.5px; color: var(--faint); line-height: 1.35; }
+  label.wide { grid-column: 1 / -1; }
+  input { background: #14171a; border: 1px solid var(--line); color: var(--text); padding: 6px 8px; font: inherit; font-size: 13px; border-radius: 6px; width: 100%; min-width: 0; }
+  input[type=number] { font-family: var(--mono); }
+  input:focus { outline: 1px solid var(--amber); border-color: var(--amber); }
+  .row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button.go { background: var(--amber); color: #121417; border: 0; border-radius: 8px; padding: 7px 16px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.go:disabled { opacity: .5; cursor: wait; }
+  button.pre { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 6px; padding: 4px 9px; font: inherit; font-size: 12px; cursor: pointer; }
+  button.pre:hover { color: var(--text); border-color: var(--faint); }
+  #last { grid-column: 1 / -1; font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel2); border: 1px solid var(--line); min-height: 2.2em; }
+  #last:empty { display: none; }
+
+  /* connect */
+  pre { margin: 0; padding: 10px 12px; background: #111417; border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--text); overflow-x: auto; white-space: pre; }
+  pre .c { color: var(--faint); }
+  .connect p { margin: 8px 0 6px; font-size: 12.5px; }
+  .fields { font-size: 12.5px; margin: 8px 0 0; padding-left: 0; list-style: none; display: grid; gap: 3px; }
+  .fields code { color: var(--text); }
+
+  /* decisions log */
+  .log { display: grid; gap: 6px; }
+  .e { display: grid; grid-template-columns: 62px 1fr; gap: 10px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-left-width: 3px; border-radius: 6px; font-size: 13px; }
+  .e.ok { border-left-color: var(--ok); } .e.no { border-left-color: var(--faint); } .e.err { border-left-color: var(--bad); }
+  .e .t { font-family: var(--mono); font-size: 12px; color: var(--faint); padding-top: 2px; }
+  .e .h { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-width: 0; }
+  .e .h .agent { color: var(--text); font-weight: 600; }
+  .e .h .stim { font-family: var(--mono); font-size: 12.5px; color: var(--dim); }
+  .e .verdict { font-family: var(--mono); font-size: 11.5px; font-weight: 700; letter-spacing: .06em; padding: 1px 7px; border-radius: 4px; }
+  .e.ok .verdict { background: rgba(70,200,120,.14); color: var(--ok); }
+  .e.no .verdict { background: rgba(151,156,163,.14); color: var(--dim); }
+  .e.err .verdict { background: rgba(227,106,82,.14); color: var(--bad); }
+  .e .d { color: var(--dim); margin-top: 2px; font-size: 12.5px; overflow-wrap: anywhere; }
+  .e .d b { color: var(--text); font-weight: 500; }
+  .e .reason { color: var(--faint); font-style: italic; }
+  @media (max-width: 480px) { .e { grid-template-columns: 1fr; gap: 2px; } }
+
+  /* properties */
+  .props { display: grid; gap: 8px; font-size: 13px; }
+  .props div { display: grid; grid-template-columns: 34px 1fr; gap: 8px; }
+  .props code { color: var(--amber); }
+  .props b { color: var(--text); font-weight: 500; }
+  .warn { display: grid; gap: 6px; font-size: 12.5px; }
+  .warn div { display: grid; grid-template-columns: 14px 1fr; gap: 8px; }
+  .warn div::before { content: "—"; color: var(--faint); }
+  footer { max-width: 1120px; margin: 0 auto; padding: 0 16px 24px; font-size: 11.5px; color: var(--faint); }
 </style>
+
+<header>
+  <div class="bar">
+    <h1>reflex-console <small id="circuit" class="mono">…</small></h1>
+    <span><i class="dot" id="svc-dot"></i><span id="svc"></span></span>
+    <span><i class="dot" id="chain-dot"></i><span id="chain"></span></span>
+    <span class="mono" id="clock"></span>
+    <span class="spacer"></span>
+    <span class="lang"><button data-lang="zh">中文</button><button data-lang="en">EN</button></span>
+  </div>
+</header>
+
 <main>
-  <div>
-    <h1>Reflex console</h1>
-    <div class="sub" id="circuit">loading…</div>
-    <div class="sub">A model proposes; the circuit decides. Nothing here holds a wallet or a key, and an authorisation is a verdict, not an action.</div>
+  <section>
+    <h2><span data-i18n="h.status"></span><span class="sub" id="uptime"></span></h2>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section>
+    <h2><span data-i18n="h.agents"></span><span class="sub" data-i18n="h.agents.sub"></span></h2>
+    <div class="wrap"><table id="agents"><tbody></tbody></table></div>
+  </section>
+
+  <div class="two">
+    <section>
+      <h2><span data-i18n="h.propose"></span><span class="sub" data-i18n="h.propose.sub"></span></h2>
+      <form id="form">
+        <label><span data-i18n="f.agent"></span><input id="agent" value="console" maxlength="40" autocomplete="off"><span class="hint" data-i18n="f.agent.hint"></span></label>
+        <label><span data-i18n="f.reason"></span><input id="reason" maxlength="160" autocomplete="off"><span class="hint" data-i18n="f.reason.hint"></span></label>
+        <label><span data-i18n="f.lv"></span><input id="lv" type="number" value="40" min="5" max="400" step="1" required><span class="hint" data-i18n="f.lv.hint"></span></label>
+        <label><span data-i18n="f.az"></span><input id="az" type="number" value="-60" min="-90" max="90" step="5" required><span class="hint" data-i18n="f.az.hint"></span></label>
+        <label class="wide"><span data-i18n="f.hold"></span><input id="hold" type="number" min="1" max="400" step="1" placeholder="—"><span class="hint" data-i18n="f.hold.hint"></span></label>
+        <div class="row">
+          <button class="go" type="submit" id="go" data-i18n="f.go"></button>
+          <span class="muted" data-i18n="f.presets"></span>
+          <button class="pre" type="button" data-preset="20,0,,charge" data-i18n="p.charge"></button>
+          <button class="pre" type="button" data-preset="40,-60,,left" data-i18n="p.left"></button>
+          <button class="pre" type="button" data-preset="300,75,,drift" data-i18n="p.drift"></button>
+          <button class="pre" type="button" data-preset="20,0,120,stress" data-i18n="p.stress"></button>
+        </div>
+        <div id="last"></div>
+      </form>
+    </section>
+
+    <section class="connect">
+      <h2><span data-i18n="h.connect"></span><span class="sub" data-i18n="h.connect.sub"></span></h2>
+      <p data-i18n="c.http"></p>
+      <pre id="curl"></pre>
+      <p data-i18n="c.tg"></p>
+      <pre id="tg"></pre>
+      <ul class="fields" id="fields"></ul>
+    </section>
   </div>
 
-  <div class="card">
-    <h2>Propose</h2>
-    <form id="form">
-      <input id="agent" value="console" aria-label="agent" size="10">
-      <input id="lv" type="number" value="40" min="5" max="400" step="1" aria-label="l/v in ms">
-      <input id="az" type="number" value="-60" min="-90" max="90" step="5" aria-label="azimuth in degrees">
-      <input id="reason" placeholder="why this one" value="closing in">
-      <button type="submit">Ask the circuit</button>
-    </form>
-  </div>
+  <section>
+    <h2><span data-i18n="h.log"></span><span class="sub" id="log-sub"></span></h2>
+    <div class="log" id="log"></div>
+  </section>
 
-  <div class="card">
-    <h2>Agents</h2>
-    <table id="agents"><tbody></tbody></table>
-  </div>
-
-  <div class="card">
-    <h2>Transcript</h2>
-    <ul id="log"></ul>
+  <div class="two">
+    <section>
+      <h2><span data-i18n="h.props"></span><span class="sub" data-i18n="h.props.sub"></span></h2>
+      <div class="props" id="props"></div>
+    </section>
+    <section>
+      <h2><span data-i18n="h.warn"></span></h2>
+      <div class="warn" id="warn"></div>
+    </section>
   </div>
 </main>
+<footer id="foot"></footer>
+
 <script>
+"use strict";
 const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// ---------- text ----------
+const T = {
+  zh: {
+    "h.status": "运行状态", "h.agents": "接入的 agent", "h.agents.sub": "每个名字一份独立的电路锁存状态",
+    "h.propose": "提交提议", "h.propose.sub": "模型只能提议，放不放行由电路说了算",
+    "h.connect": "接入方式", "h.connect.sub": "两个接口，任何能发 HTTP 的模型都能接",
+    "h.log": "裁决记录", "h.props": "电路证明了什么", "h.props.sub": "换成人话",
+    "h.warn": "这个台子不做什么",
+    "svc.ok": "服务已连接", "svc.bad": "服务无响应", "svc.wait": "连接中…",
+    "chain.off": "链上复核已关闭", "chain.idle": "链上复核就绪（BSC 只读）", "chain.ok": "链上复核一致 · 未部署", "chain.err": "链上节点不可用，仅本地裁决", "chain.dis": "链上复核不一致！",
+    "up": "已运行 {t}",
+    "t.circuit": "裁决电路", "t.circuit.s": "{nand} NAND + {latch} LATCH · 全部 8,388,608 行已查",
+    "t.tick": "一拍", "t.tick.s": "电路时钟按拍推进，只有提议驱动时才走",
+    "t.refr": "不应期", "t.refr.s": "放行后 {t} 拍内谁来都不放（P1，已证明）",
+    "t.gap": "最小放行间隔", "t.gap.s": "两次放行不可能靠得比这更近",
+    "t.agents": "agent", "t.agents.s": "各自独立计拍",
+    "t.recent": "最近裁决", "t.allow": "放行", "t.block": "拦下", "t.reject": "拒收", "t.recent.s": "最近 {n} 条记录",
+    "a.name": "agent", "a.ticks": "已驱动", "a.auth": "放行次数", "a.last": "上次放行", "a.since": "距上次放行", "a.refr": "不应期剩余",
+    "a.none": "还没有任何提议。用左下角的表单，或按「接入方式」发一条。",
+    "a.never": "从未放行", "a.ago": "{t} 前", "a.now": "刚刚",
+    "a.refr.left": "{n} 拍 = {ms}（电路时钟）", "a.refr.over": "已过", "a.refr.none": "—",
+    "f.agent": "agent 名", "f.agent.hint": "随便起，同名共享一份电路状态和限速",
+    "f.reason": "理由", "f.reason.hint": "记在案，不影响裁决",
+    "f.lv": "l/v（ms）— 逼近物体的尺寸/速度比", "f.lv.hint": "越小越危急：20 ms 是迎面急冲，300 ms 是远处慢飘。范围 5–400。",
+    "f.az": "方位（°）", "f.az.hint": "负=左，正=右，0=正前方。范围 −90…90。",
+    "f.hold": "持续拍数 hold_ticks（可选）", "f.hold.hint": "留空：首次起飞即停，一条提议一个裁决。填 120（= {ms120}）：同一刺激连喂 120 拍，能看到限速——约 11 次放行，最近两次正好隔 8 拍 = {ms8}。上限 400。",
+    "f.go": "问电路", "f.presets": "预设：",
+    "p.charge": "迎面急冲", "p.left": "左侧逼近", "p.drift": "远处慢飘", "p.stress": "压测限速（120 拍）",
+    "r.charge": "迎面急冲", "r.left": "左侧逼近", "r.drift": "远处慢飘一个", "r.stress": "把限速顶到底",
+    "l.sending": "已提交，等电路…", "l.neterr": "发不出去：{e}",
+    "c.http": "HTTP（任何语言都行，一次调用一个裁决）：",
+    "c.tg": "Telegram 中转（bot_telegram.py，只转发、无权限）：",
+    "c.f.auth": "<code>authorised</code> 电路是否放行；<code>action</code> 放行的动作（短/长模式起飞）",
+    "c.f.ticks": "<code>ticks_used</code> 电路跑了几拍；<code>authorisations</code> 本次放行次数；<code>smallest_gap</code> 最近两次放行相隔几拍",
+    "c.f.chain": "<code>chain.agrees</code> 公链只读复核是否一致（节点不通时是 <code>chain.error</code>，裁决不受影响）",
+    "c.f.err": "数值越界的提议在进电路前就被拒收，HTTP 400，<code>error</code> 里写原因",
+    "v.allow": "放行", "v.block": "拦下", "v.reject": "拒收",
+    "e.stim": "l/v {lv} ms · 方位 {az}°",
+    "e.action": "{action}", "e.at": "第 {n} 拍放行", "e.since": "距上次放行 {n} 拍 = {ms}",
+    "e.held": "连喂 {n} 拍（{ms}）：放行 {k} 次，最近间隔 {gap} 拍 = {gapms}",
+    "e.held1": "连喂 {n} 拍（{ms}）：只放行 1 次",
+    "e.hold": "电路跑完 {n} 拍（{ms}）始终 hold，未放行",
+    "e.holdheld": "连喂 {n} 拍（{ms}）电路始终 hold，未放行",
+    "e.reject": "未进电路，参数越界：{err}",
+    "e.chain.ok": "BSC(链 {id}) 只读复核一致，未部署", "e.chain.dis": "BSC(链 {id}) 复核不一致：节点算出 motor {m}", "e.chain.err": "链上复核不可用：{err}",
+    "e.none": "还没有裁决记录。",
+    "act.0": "hold", "act.1": "抬翅中", "act.2": "短模式起飞", "act.3": "长模式起飞",
+    "P1": "一次放行之后，接下来 <b>7 拍 = {ms7}</b> 内不管 agent 怎么求都不会再放行；两次放行最近也隔 8 拍 = {ms8}。这是限速，靠证明不靠代码。",
+    "P2": "贵的那个动作（<b>长模式起飞</b>）只会出现在连续 4 拍抬翅之后：要花四拍的承诺才拿得到。",
+    "P3": "不站立、或者还在不应期里，答案一律是 <b>hold</b>——存在什么都不放行的状态。",
+    "props.foot": "电路的每一行（全部 8,388,608 个输入×状态组合）都查过；五条时序性质各用两套互相独立的方法证明。这些性质约束的是<b>多频繁、什么顺序</b>，不约束 agent 诚不诚实，也不管放行之后谁去执行。",
+    "w1": "没有钱包，没有私钥，不签任何东西，不广播任何东西。",
+    "w2": "链上复核是一次只读 eth_call，什么都没部署，不花 gas，也不出现你的地址。",
+    "w3": "「放行」是对一条提议的裁决，不是动作本身。动作是什么、谁去做，都在这个程序之外。",
+    "w4": "这个台子自己不设任何规则：所有拦下都来自电路的证明，台子只负责记录和展示。",
+    "foot": "本机服务 · stdlib HTTP · 单文件静态页 · 无外部依赖。语言选择存在浏览器本地。",
+  },
+  en: {
+    "h.status": "Status", "h.agents": "Connected agents", "h.agents.sub": "one independent latch state per name",
+    "h.propose": "Propose", "h.propose.sub": "the model proposes; the circuit decides",
+    "h.connect": "How to connect", "h.connect.sub": "two endpoints; anything that speaks HTTP can plug in",
+    "h.log": "Decisions", "h.props": "What the circuit proves", "h.props.sub": "in plain words",
+    "h.warn": "What this console does not do",
+    "svc.ok": "service connected", "svc.bad": "service not responding", "svc.wait": "connecting…",
+    "chain.off": "chain check off", "chain.idle": "chain check ready (BSC, read-only)", "chain.ok": "chain check agrees · nothing deployed", "chain.err": "chain node unavailable, local verdict only", "chain.dis": "chain check DISAGREES",
+    "up": "up {t}",
+    "t.circuit": "deciding circuit", "t.circuit.s": "{nand} NAND + {latch} LATCH · all 8,388,608 rows checked",
+    "t.tick": "one tick", "t.tick.s": "circuit clock, advances only when a proposal drives it",
+    "t.refr": "refractory", "t.refr.s": "nothing authorised for {t} ticks after one (P1, proven)",
+    "t.gap": "min spacing", "t.gap.s": "two authorisations can never be closer",
+    "t.agents": "agents", "t.agents.s": "each counts its own ticks",
+    "t.recent": "recent verdicts", "t.allow": "allowed", "t.block": "blocked", "t.reject": "rejected", "t.recent.s": "last {n} entries",
+    "a.name": "agent", "a.ticks": "ticks driven", "a.auth": "authorised", "a.last": "last authorised", "a.since": "since last", "a.refr": "refractory left",
+    "a.none": "No proposals yet. Use the form below, or follow \"How to connect\".",
+    "a.never": "never", "a.ago": "{t} ago", "a.now": "just now",
+    "a.refr.left": "{n} tick{s} = {ms} (circuit clock)", "a.refr.over": "over", "a.refr.none": "—",
+    "f.agent": "agent name", "f.agent.hint": "any string; the same name shares one circuit state and one rate limit",
+    "f.reason": "reason", "f.reason.hint": "recorded, never weighed",
+    "f.lv": "l/v (ms) — looming object's size-to-speed ratio", "f.lv.hint": "Smaller is more threatening: 20 ms is a head-on charge, 300 ms a distant slow drift. Range 5–400.",
+    "f.az": "azimuth (°)", "f.az.hint": "negative = left, positive = right, 0 = dead ahead. Range −90…90.",
+    "f.hold": "hold_ticks (optional)", "f.hold.hint": "Empty: stop at the first takeoff, one verdict per proposal. 120 (= {ms120}): keep feeding the same stimulus for 120 ticks and the rate limit shows — about 11 authorisations, the closest exactly 8 ticks = {ms8} apart. Max 400.",
+    "f.go": "Ask the circuit", "f.presets": "presets:",
+    "p.charge": "head-on charge", "p.left": "closing from the left", "p.drift": "distant drift", "p.stress": "stress the limit (120 ticks)",
+    "r.charge": "head-on charge", "r.left": "closing in from the left", "r.drift": "a distant, slow one", "r.stress": "push the rate limit",
+    "l.sending": "sent, waiting for the circuit…", "l.neterr": "could not send: {e}",
+    "c.http": "HTTP (any language; one call, one verdict):",
+    "c.tg": "Telegram relay (bot_telegram.py; forwards only, holds no authority):",
+    "c.f.auth": "<code>authorised</code> whether the circuit allowed it; <code>action</code> what was authorised (short/long-mode takeoff)",
+    "c.f.ticks": "<code>ticks_used</code> ticks the circuit ran; <code>authorisations</code> how many this call; <code>smallest_gap</code> closest two, in ticks",
+    "c.f.chain": "<code>chain.agrees</code> whether the public node's read-only re-evaluation matched (<code>chain.error</code> when the node is unreachable; the verdict is unaffected)",
+    "c.f.err": "an out-of-range proposal is rejected before the circuit sees it: HTTP 400 with the reason in <code>error</code>",
+    "v.allow": "ALLOWED", "v.block": "BLOCKED", "v.reject": "REJECTED",
+    "e.stim": "l/v {lv} ms · az {az}°",
+    "e.action": "{action}", "e.at": "authorised on tick {n}", "e.since": "{n} ticks = {ms} after the previous authorisation",
+    "e.held": "held {n} ticks ({ms}): {k} authorisations, closest {gap} ticks = {gapms} apart",
+    "e.held1": "held {n} ticks ({ms}): 1 authorisation",
+    "e.hold": "circuit ran {n} ticks ({ms}) and held throughout; nothing authorised",
+    "e.holdheld": "held {n} ticks ({ms}); circuit held throughout, nothing authorised",
+    "e.reject": "never reached the circuit, out of range: {err}",
+    "e.chain.ok": "BSC (chain {id}) read-only re-check agrees, nothing deployed", "e.chain.dis": "BSC (chain {id}) DISAGREES: node computed motor {m}", "e.chain.err": "chain check unavailable: {err}",
+    "e.none": "No decisions yet.",
+    "act.0": "hold", "act.1": "raising wings", "act.2": "short-mode takeoff", "act.3": "long-mode takeoff",
+    "P1": "After an authorisation nothing can be authorised for the next <b>7 ticks = {ms7}</b>, whatever the agent asks; two authorisations are never closer than 8 ticks = {ms8}. A rate limit by proof, not by code.",
+    "P2": "The expensive action (<b>long-mode takeoff</b>) only follows four consecutive commitment ticks of raising wings.",
+    "P3": "While not standing, or during the refractory period, the answer is always <b>hold</b> — there are states in which nothing is authorised at all.",
+    "props.foot": "Every row of the circuit (all 8,388,608 input × state combinations) is checked, and five temporal properties are each proven two independent ways. They bound <b>how often and in what order</b>; they say nothing about whether the agent is honest, or who acts on an authorisation.",
+    "w1": "No wallet, no private key; nothing is signed and nothing is broadcast.",
+    "w2": "The chain check is a single read-only eth_call: nothing is deployed, no gas is spent, no address of yours appears.",
+    "w3": "An authorisation is a verdict about a proposal, not an action. What the action is and who carries it out lie outside this program.",
+    "w4": "The console enforces nothing of its own: every refusal comes from the circuit's proofs. This page only records and shows.",
+    "foot": "Local service · stdlib HTTP · one static file · no external dependencies. Language choice is kept in this browser only.",
+  },
+};
+const ACTION_KEY = { "hold": "act.0", "raising wings": "act.1", "short-mode takeoff": "act.2", "long-mode takeoff": "act.3" };
+
+let lang = "zh";
+try { lang = localStorage.getItem("reflex.lang") || (navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en"); } catch (e) { /* storage unavailable: session default only */ }
+function t(key, vars) {
+  let s = (T[lang] && T[lang][key]) ?? T.en[key] ?? key;
+  if (vars) for (const k in vars) s = s.split(`{${k}}`).join(vars[k]);
+  return s;
+}
+function setLang(l) {
+  lang = l;
+  try { localStorage.setItem("reflex.lang", l); } catch (e) { /* fine */ }
+  document.documentElement.lang = l === "zh" ? "zh-CN" : "en";
+  document.querySelectorAll("[data-lang]").forEach((b) => b.classList.toggle("on", b.dataset.lang === l));
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const k = el.dataset.i18n;
+    if (k === "f.hold.hint") el.innerHTML = t(k, { ms120: ms(120), ms8: ms(8) });
+    else el.textContent = t(k);
+  });
+  renderStatic();
+  if (STATE) render(STATE);
+  if (LAST) showLast(LAST);
+  if (typeof liveTick === "function") liveTick();
+}
+document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
+
+// ---------- units ----------
+let TICK_MS = 5;
+const fmtMs = (v) => (v >= 1000 ? `${(v / 1000).toLocaleString(undefined, { maximumFractionDigits: 2 })} s` : `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} ms`);
+const ms = (ticks) => fmtMs(ticks * TICK_MS);
+const locale = () => (lang === "zh" ? "zh-CN" : "en-GB");
+const clock = (unix) => new Date(unix * 1000).toLocaleTimeString(locale(), { hour12: false });
+function ago(sec) {
+  if (sec < 2) return t("a.now");
+  const u = sec < 60 ? [Math.floor(sec), "s"] : sec < 3600 ? [Math.floor(sec / 60), "min"] : [Math.floor(sec / 3600), "h"];
+  return t("a.ago", { t: `${u[0]} ${u[1]}` });
+}
+function dur(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
+  return h ? `${h}h ${m}m` : m ? `${m}m ${s}s` : `${s}s`;
+}
+
+// ---------- static blocks ----------
+function renderStatic() {
+  const origin = location.origin;
+  $("curl").innerHTML =
+`<span class="c"># ${lang === "zh" ? "提议一次" : "propose once"}</span>
+curl -s ${esc(origin)}/api/propose -H 'content-type: application/json' \\
+  -d '{"agent":"my-model","l_over_v_ms":40,"azimuth_deg":-60,"reason":"closing in"}'
+<span class="c"># ${lang === "zh" ? "同一刺激连喂 120 拍，看限速" : "hold the stimulus 120 ticks to see the rate limit"}</span>
+curl -s ${esc(origin)}/api/propose -H 'content-type: application/json' \\
+  -d '{"agent":"my-model","l_over_v_ms":20,"azimuth_deg":0,"hold_ticks":120}'
+<span class="c"># ${lang === "zh" ? "电路与各 agent 的状态" : "circuit and per-agent state"}</span>
+curl -s ${esc(origin)}/api/state`;
+  $("tg").innerHTML =
+`/propose &lt;l/v ms&gt; &lt;azimuth deg&gt; [why]   <span class="c">${lang === "zh" ? "问电路" : "ask the circuit"}</span>
+/state                                <span class="c">${lang === "zh" ? "各 agent 的不应期倒数" : "refractory countdown per agent"}</span>
+<span class="c">TELEGRAM_TOKEN=… CONSOLE_URL=${esc(origin)} python bot_telegram.py</span>`;
+  $("fields").innerHTML = ["c.f.auth", "c.f.ticks", "c.f.chain", "c.f.err"].map((k) => `<li>${t(k)}</li>`).join("");
+  $("props").innerHTML = ["P1", "P2", "P3"].map((p) => `<div><code>${p}</code><span>${t(p, { ms7: ms(7), ms8: ms(8) })}</span></div>`).join("") +
+    `<div><span></span><span class="muted">${t("props.foot")}</span></div>`;
+  $("warn").innerHTML = ["w1", "w2", "w3", "w4"].map((k) => `<div><span>${t(k)}</span></div>`).join("");
+  $("foot").textContent = t("foot");
+}
+
+// ---------- live state ----------
+let STATE = null, LAST = null, lastOk = 0;
+const OPENED = Date.now();  // "connecting…" only until the first poll has had its chance
+function showLast(e) {
+  LAST = e;
+  $("last").innerHTML = entryHtml(e).replace(/^<div class="e/, '<div style="padding:0;border:0;background:none" class="e');
+}
+
+function chainStatus(s) {
+  if (!s.chain || !s.chain.enabled) return ["", "chain.off"];
+  const e = s.transcript.find((x) => x.chain);
+  if (!e) return ["", "chain.idle"];
+  if (e.chain.error) return ["amber", "chain.err"];
+  return e.chain.agrees ? ["ok", "chain.ok"] : ["bad", "chain.dis"];
+}
 
 function render(s) {
-  const c = s.circuit;
-  $("circuit").textContent = `${c.name} · ${c.nand} NAND + ${c.latch} LATCH · sha256 ${c.sha256.slice(0, 16)}… · refractory ${s.refractory_ticks} ticks (proven)`;
-  $("agents").querySelector("tbody").innerHTML = s.agents.length
-    ? "<tr><th>agent</th><th>ticks</th><th>authorised</th><th>since last</th><th>refractory left</th></tr>" +
-      s.agents.map((a) => `<tr><td>${a.agent}</td><td class="mono">${a.ticks}</td><td class="mono">${a.authorisations}</td>` +
-        `<td class="mono">${a.ticks_since_authorisation ?? "—"}</td>` +
-        `<td class="mono">${a.refractory_ticks_left ?? "—"}</td></tr>`).join("")
-    : `<tr><td class="muted">no proposals yet</td></tr>`;
-  $("log").innerHTML = s.transcript.map((e) => {
-    const cls = e.error ? "err" : e.authorised ? "ok" : "no";
-    const when = new Date(e.at * 1000).toLocaleTimeString();
-    const gap = e.ticks_since_previous_authorisation != null ? `, ${e.ticks_since_previous_authorisation} ticks after the last` : "";
-    const times = e.authorised && e.authorisations > 1 ? ` ×${e.authorisations}` : "";
-    const held = e.held_ticks ? ` over ${e.held_ticks} ticks` : "";
-    const closest = e.smallest_gap != null ? `, closest ${e.smallest_gap} ticks apart` : gap;
-    const head = e.error ? `refused: ${e.error}`
-      : `${e.authorised ? "AUTHORISED" + times : "refused"} — ${e.action}${held}${e.authorised ? closest : ""}`;
-    const chain = !e.chain ? ""
-      : e.chain.error ? ` <span class="muted">· no chain check (${e.chain.error})</span>`
-      : e.chain.agrees ? ` <span class="chain">· chain ${e.chain.chain_id} agrees, nothing deployed</span>`
-      : ` <span class="disagree">· chain ${e.chain.chain_id} DISAGREES (motor ${e.chain.motor})</span>`;
-    return `<li class="${cls}"><i></i><span><span class="mono">${when}</span> ${e.agent} · l/v ${e.l_over_v_ms} ms · az ${e.azimuth_deg}° — ${head}` +
-           `${chain}${e.reason ? ` <span class="muted">(${e.reason})</span>` : ""}</span></li>`;
-  }).join("");
+  STATE = s;
+  TICK_MS = Number(s.tick_ms) || TICK_MS;
+  const c = s.circuit, R = s.refractory_ticks;
+  $("circuit").textContent = `${c.name} · sha256 ${c.sha256.slice(0, 12)}…`;
+  const [cc, ck] = chainStatus(s);
+  $("chain-dot").className = `dot ${cc}`; $("chain").textContent = t(ck);
+  if (s.started_at) $("uptime").textContent = t("up", { t: dur(Date.now() / 1000 - s.started_at) });
+
+  const tr = s.transcript;
+  const nAllow = tr.filter((e) => e.authorised).length, nRej = tr.filter((e) => e.error).length, nBlock = tr.length - nAllow - nRej;
+  $("tiles").innerHTML = [
+    ["t.circuit", `<span class="txt">${esc(c.name)}</span>`, t("t.circuit.s", { nand: c.nand, latch: c.latch })],
+    ["t.tick", `${TICK_MS}<small>ms</small>`, t("t.tick.s")],
+    ["t.refr", `${R}<small>${lang === "zh" ? "拍" : "ticks"}</small> = ${ms(R)}`, t("t.refr.s", { t: R })],
+    ["t.gap", `${R + 1}<small>${lang === "zh" ? "拍" : "ticks"}</small> = ${ms(R + 1)}`, t("t.gap.s")],
+    ["t.agents", s.agents.length, t("t.agents.s")],
+    ["t.recent", `<span class="ok">${nAllow}</span> <small>/</small> ${nBlock} <small>/</small> <span class="bad">${nRej}</span>`, `${t("t.allow")} / ${t("t.block")} / ${t("t.reject")} · ${t("t.recent.s", { n: tr.length })}`],
+  ].map(([k, v, sub]) => `<div class="tile"><div class="k">${t(k)}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join("");
+
+  const tb = $("agents").querySelector("tbody");
+  if (!s.agents.length) tb.innerHTML = `<tr><td class="muted">${t("a.none")}</td></tr>`;
+  else tb.innerHTML = `<tr>${["a.name", "a.ticks", "a.auth", "a.last", "a.since", "a.refr"].map((k) => `<th>${t(k)}</th>`).join("")}</tr>` +
+    s.agents.map((a) => {
+      const left = a.refractory_ticks_left, since = a.ticks_since_authorisation;
+      const bar = `<span class="refr">${Array.from({ length: R }, (_, i) => `<i class="${left != null && i < left ? "on" : ""}"></i>`).join("")}</span>`;
+      const refr = left == null ? t("a.refr.none") : left === 0 ? t("a.refr.over") : t("a.refr.left", { n: left, ms: ms(left), s: left === 1 ? "" : "s" });
+      const L = (k) => `data-l="${t(k)}"`;
+      return `<tr><td>${esc(a.agent)}</td><td class="num" ${L("a.ticks")}>${a.ticks} <span class="muted">= ${ms(a.ticks)}</span></td><td class="num" ${L("a.auth")}>${a.authorisations}</td>` +
+        `<td class="num" ${L("a.last")} data-at="${a.last_authorised_at ?? ""}">${a.last_authorised_at ? ago(Date.now() / 1000 - a.last_authorised_at) : `<span class="muted">${t("a.never")}</span>`}</td>` +
+        `<td class="num" ${L("a.since")}>${since == null ? "—" : `${since} <span class="muted">= ${ms(since)}</span>`}</td>` +
+        `<td class="num" ${L("a.refr")}><span>${bar}<span class="${left ? "amber" : "muted"}">${refr}</span></span></td></tr>`;
+    }).join("");
+
+  $("log-sub").textContent = t("t.recent.s", { n: tr.length });
+  $("log").innerHTML = tr.length ? tr.map(entryHtml).join("") : `<div class="muted">${t("e.none")}</div>`;
+}
+
+function entryHtml(e) {
+  const cls = e.error ? "err" : e.authorised ? "ok" : "no";
+  const verdict = t(e.error ? "v.reject" : e.authorised ? "v.allow" : "v.block");
+  const lines = [];
+  if (e.error) lines.push(t("e.reject", { err: esc(e.error) }));
+  else if (e.authorised) {
+    const act = `<b>${t(ACTION_KEY[e.action] || e.action)}</b>`;
+    if (e.held_ticks) lines.push(`${act} · ` + (e.authorisations > 1
+      ? t("e.held", { n: e.held_ticks, ms: ms(e.held_ticks), k: e.authorisations, gap: e.smallest_gap, gapms: ms(e.smallest_gap) })
+      : t("e.held1", { n: e.held_ticks, ms: ms(e.held_ticks) })));
+    else lines.push(`${act} · ${t("e.at", { n: e.ticks_used })}`);
+    // with a hold, the smallest gap already says how close the authorisations came
+    if (e.ticks_since_previous_authorisation != null && !(e.held_ticks && e.authorisations > 1)) lines.push(t("e.since", { n: e.ticks_since_previous_authorisation, ms: ms(e.ticks_since_previous_authorisation) }));
+  } else lines.push(t(e.held_ticks ? "e.holdheld" : "e.hold", { n: e.ticks_used, ms: ms(e.ticks_used) }));
+  if (e.chain) lines.push(e.chain.error ? `<span class="amber">${t("e.chain.err", { err: esc(e.chain.error) })}</span>`
+    : e.chain.agrees ? `<span class="ok">${t("e.chain.ok", { id: e.chain.chain_id })}</span>`
+    : `<span class="bad">${t("e.chain.dis", { id: e.chain.chain_id, m: e.chain.motor })}</span>`);
+  const stim = e.l_over_v_ms != null ? t("e.stim", { lv: esc(e.l_over_v_ms), az: esc(e.azimuth_deg) }) : "";
+  return `<div class="e ${cls}"><div class="t">${clock(e.at)}</div><div>` +
+    `<div class="h"><span class="verdict">${verdict}</span><span class="agent">${esc(e.agent)}</span><span class="stim">${stim}</span>` +
+    (e.reason ? `<span class="reason">${esc(e.reason)}</span>` : "") + `</div>` +
+    `<div class="d">${lines.join(" · ")}</div></div></div>`;
 }
 
 async function refresh() {
-  try { render(await (await fetch("/api/state")).json()); } catch (e) { /* the service may be restarting */ }
+  try {
+    const r = await fetch("/api/state", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    render(await r.json());
+    lastOk = Date.now();
+  } catch (e) { /* the service may be restarting; the header dot says so */ }
+  liveTick();
+}
+function liveTick() {
+  const now = Date.now();
+  const alive = now - lastOk < 6000, settled = lastOk || now - OPENED > 6000;
+  $("svc-dot").className = `dot ${settled ? (alive ? "ok" : "bad") : ""}`;
+  $("svc").textContent = t(settled ? (alive ? "svc.ok" : "svc.bad") : "svc.wait");
+  $("clock").textContent = new Date(now).toLocaleTimeString(locale(), { hour12: false });
+  document.querySelectorAll("[data-at]").forEach((td) => { if (td.dataset.at) td.textContent = ago(now / 1000 - Number(td.dataset.at)); });
+  if (STATE && STATE.started_at) $("uptime").textContent = t("up", { t: dur(now / 1000 - STATE.started_at) });
 }
 
+// ---------- propose ----------
+document.querySelectorAll("[data-preset]").forEach((b) => b.addEventListener("click", () => {
+  const [lv, az, hold, r] = b.dataset.preset.split(",");
+  $("lv").value = lv; $("az").value = az; $("hold").value = hold; $("reason").value = t("r." + r);
+}));
 $("form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
-  const body = { agent: $("agent").value, l_over_v_ms: Number($("lv").value), azimuth_deg: Number($("az").value), reason: $("reason").value };
-  await fetch("/api/propose", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const body = { agent: $("agent").value || "console", l_over_v_ms: Number($("lv").value), azimuth_deg: Number($("az").value), reason: $("reason").value };
+  if ($("hold").value !== "") body.hold_ticks = Number($("hold").value);
+  $("go").disabled = true; $("last").innerHTML = `<span class="muted">${t("l.sending")}</span>`;
+  try {
+    const r = await fetch("/api/propose", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    showLast(await r.json());
+  } catch (err) { $("last").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
+  $("go").disabled = false;
   refresh();
 });
 
+setLang(lang);
 refresh();
 setInterval(refresh, 2000);
+setInterval(liveTick, 1000);
 </script>
+</html>
