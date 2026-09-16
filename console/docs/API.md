@@ -243,18 +243,51 @@ a person reads and an agent that could write it could also lift the ceiling it w
 ## Stop everything · `POST /api/stop-all` / `POST /api/resume-all`
 
 Operator token. Optional `note` (≤ 200) and `source` (≤ 20, default `"page"`); returns
-`{"stopped": true|false, "agents": [...], "count": n, "source": "..."}`. Writes `blocked` for
-every agent the console knows, one tool entry each, carrying the `source` so Activity can say
-where the stop came from. It **latches**: resuming is a second, deliberate act — the page makes
-the person type the word, and a refusal of `"blocked is high"` offers no confirm, because no
-confirm can lift a block.
+`{"stopped": true|false, "operator_stop": true|false, "agents": [...], "count": n, "source": "..."}`.
 
-`resume-all` also resets every agent's **shared halt** state. A `halt` circuit installed with
-`sticky_block` waits for "a confirm" to lift; the person's resume is that act, and arming a
-confirm bit here could approve an irreversible call waiting in a class, so the halt's state is
-reset instead — the same thing installing a halt circuit does to every agent (wrap-up,
-2026-09-16). An agent first seen *after* the button was pressed is not blocked by it (the page
-counts *n of m*); pressing again catches up with it.
+**`stop-all` sets the operator-stop latch** (2026-09-17). While it is on, **every**
+`POST /api/request` is refused before any circuit is asked — from every agent, the names known
+at press time and any first seen afterwards (a renamed agent included), in every class, whether
+that class has a circuit installed, denied, or none at all. The refusal entry is
+`granted: false`, `blocked: 1`, `halt: null`, `operator_stop: true`, with
+`why: ["stopped: a person pressed stop-all, and every request is refused until a person resumes"]`;
+`class_installed` still says whether the class was ever gated. Nothing behind the wall moves:
+no circuit ticks, no cooldown advances, nothing armed is consumed, so whoever resumes finds the
+circuits exactly where they were. The latch is **persisted** with the rules (`operator_stop` in
+`policies.json`) and comes back after a restart or a crash; a file whose `operator_stop` is not
+an object with a boolean `on` stops the console rather than being guessed at.
+
+It also writes `blocked` for every agent the console knows, one tool entry each carrying the
+`source`, so the per-name level on the switches panel agrees with the latch — but that write is
+no longer what makes the stop hold. Before the latch, it was all there was, and the red-team
+pass renamed an agent past it (granted on tick 4 while the page showed "stopped"); the UX pass
+found an ungated class walking through one (`blocked` was read through no circuit). Both are
+closed by deciding the stop before the circuits. The cost, stated plainly: **a session started
+during a stop is refused until someone resumes** — the correct trade for a panic button, and it
+will surprise whoever starts a fresh agent mid-incident.
+
+Each press writes one transcript entry `{"kind": "stop", "stopped": true|false, "source", "agents":
+[...], "note"?}` before the per-name ones, so the press is on the record even when no agent is
+known. `GET /api/state` gains `"operator_stop": {"on": bool, "since": ts|null, "source": str|null}`;
+the page reads that rather than counting blocked names. A `pending[]` item for a request refused
+by the latch has `bit: null`, `waiting_on_time: true` and no code: nothing a person can write
+lifts it but the resume.
+
+`resume-all` clears the latch, lowers every known agent's `blocked`, and resets every agent's
+**shared halt** state. A `halt` circuit installed with `sticky_block` waits for "a confirm" to
+lift; the person's resume is that act, and arming a confirm bit here could approve an
+irreversible call waiting in a class, so the halt's state is reset instead — the same thing
+installing a halt circuit does to every agent (wrap-up, 2026-09-16).
+
+Per-name `blocked` (`POST /api/tool {"blocked": 1}`) stays for surgical blocks of one agent, and
+`REFLEX_REQUIRE_AGENT_TOKEN=1` with `c3s token bind` stays for deployments that nail names down.
+
+**`pending[]` and the shared halt** (same date): when the shared halt refuses, the class's circuit
+also reports `blocked is high` because the halt made it so. `pending[]` used to read the class's
+words and list the call as waiting with no `bit` and no `code` — a dead end. It now reads the
+halt's own words: a halt that a confirm lifts (`halted until a confirm lifts it`, `halted: N
+ticks without a heartbeat`) carries `bit: "confirm"` and a code; a halt holding because the
+person's own `blocked` is high still carries none, since only lifting the block helps.
 
 ## Tool classes · `GET /api/classes` / `POST /api/classes`
 

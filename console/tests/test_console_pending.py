@@ -287,11 +287,14 @@ def test_stop_all_blocks_every_known_agent_and_records_one_entry_each(url, bound
         boundary.request(name, 1, "x")
     before = len(console.TRANSCRIPTS)
     status, body = call(url, "/api/stop-all", {})
-    assert status == 200 and body == {"stopped": True, "agents": ["a", "b", "c"], "count": 3, "source": "page"}
+    assert status == 200 and body == {"stopped": True, "operator_stop": True, "agents": ["a", "b", "c"], "count": 3, "source": "page"}
     assert all(a["armed"]["blocked"] == 1 for a in boundary.status()["agents"])
-    written = [e for e in list(console.TRANSCRIPTS)[:len(console.TRANSCRIPTS) - before] if e["kind"] == "tool"]
+    new = list(console.TRANSCRIPTS)[:len(console.TRANSCRIPTS) - before]
+    written = [e for e in new if e["kind"] == "tool"]
     assert len(written) == 3 and {e["agent"] for e in written} == {"a", "b", "c"}
     assert all(e["source"] == "page" for e in written)
+    press = [e for e in new if e["kind"] == "stop"]
+    assert len(press) == 1 and press[0]["stopped"] is True and press[0]["agents"] == ["a", "b", "c"]  # the press itself is on the record
     assert all(not boundary.request(n, 1, "x")["granted"] for n in ("a", "b", "c"))
 
 
@@ -308,23 +311,90 @@ def test_the_block_latches_until_resume_all_and_both_need_the_token(url, boundar
     assert console.TRANSCRIPTS[1]["note"] == "drill over"  # [0] is the request just made
 
 
-def test_an_agent_first_seen_after_the_stop_is_not_blocked_by_it(url, boundary):
+def test_an_agent_first_seen_after_the_stop_is_refused_by_it(url, boundary):
+    """This test used to assert the opposite — that an agent first seen after the press was
+    NOT blocked, "which is why the page counts N of M". That assertion described the
+    implementation (stop-all wrote `blocked` for the names it knew) and called it the
+    behaviour. The red team then renamed an agent past the button and was granted on tick 4
+    while the page said "stopped" (docs/REDTEAM-2026-09-17.md). A stop that a new name
+    walks out of is not a stop: the button now sets a latch that refuses every request,
+    from any name, before a circuit is asked, until a person resumes. The cost is stated in
+    the commit: a session started during a stop is refused until someone resumes."""
     boundary.request("old", 1, "x")
     call(url, "/api/stop-all", {})
-    assert boundary.request("new", 1, "x")["granted"]  # which is why the page counts N of M
-    blocked = [a["agent"] for a in boundary.status()["agents"] if a["armed"]["blocked"]]
-    assert blocked == ["old"]
-    call(url, "/api/stop-all", {})  # pressed again: it catches up with the newcomer
-    assert not boundary.request("new", 1, "x")["granted"]
+    r = boundary.request("new", 1, "x")
+    assert not r["granted"] and r["why"] == [console.OPERATOR_STOP_SAYS] and r["operator_stop"] is True
+    assert r["blocked"] == 1 and r["halt"] is None  # no circuit was asked
+    assert boundary.status()["operator_stop"]["on"] is True
+    # It waits, and nothing a person can write lifts it — only the resume.
+    it = next(p for p in boundary.status()["pending"] if p["agent"] == "new")
+    assert it["bit"] is None and it["waiting_on_time"] is True and "code" not in it
+    call(url, "/api/resume-all", {})
+    assert boundary.status()["operator_stop"]["on"] is False
+    assert boundary.request("new", 1, "x")["granted"]
+
+
+def test_a_stop_refuses_an_ungated_class_and_moves_no_circuit(url, boundary):
+    """The UX pass measured this: on a default console only `exec` has a circuit, so after
+    stop-all a `files` call was still granted (an ungated class read `blocked` through
+    nothing) while the page said the next request would be refused. The latch is decided
+    before any circuit, so what is installed does not matter — and nothing behind the wall
+    moves: no cooldown advances, no latch changes, nothing armed is consumed."""
+    boundary.request("old", 1, "x")
+    exec_ticks = boundary.agents["old"]["classes"]["exec"]["ticks"]
+    boundary.arm("old", {"confirm": 1})
+    call(url, "/api/stop-all", {})
+    r = boundary.request("old", 1, "[files] trash", "files")
+    assert not r["granted"] and r["class_installed"] is False and r["why"] == [console.OPERATOR_STOP_SAYS]
+    r = boundary.request("old", 1, "x", "exec")
+    assert not r["granted"]
+    assert boundary.agents["old"]["classes"]["exec"]["ticks"] == exec_ticks  # the circuit was not ticked
+    assert boundary.agents["old"]["armed"]["confirm"] == 1                    # and the person's confirm was not spent
+
+
+def test_stop_all_with_nobody_known_still_stops_everything(url, boundary):
+    status, body = call(url, "/api/stop-all", {})
+    assert status == 200 and body["count"] == 0 and body["operator_stop"] is True
+    assert not boundary.request("first-ever", 1, "x")["granted"]
+    assert console.TRANSCRIPTS[1]["kind"] == "stop"  # the press is on the record even with nobody to block
+
+
+def test_the_operator_stop_survives_a_restart(tmp_path):
+    state = tmp_path / "policies.json"
+    plain = Policy(forbid_when_blocked=True)  # no commitment rule, so a first request can be granted
+    first = console.Boundary(plain, state)
+    first.request("a", 1, "x")
+    first.stop_all(True, "page")
+    again = console.Boundary(plain, state)
+    assert again.operator_stop["on"] is True and again.operator_stop["source"] == "page"
+    assert not again.request("renamed-after-the-crash", 1, "x")["granted"]
+    again.stop_all(False, "page")
+    third = console.Boundary(plain, state)
+    assert third.operator_stop["on"] is False
+    assert third.request("renamed-after-the-crash", 1, "x")["granted"]
+
+
+@pytest.mark.parametrize("stop", ['"no"', '{"on": "false"}', '{"on": 1}', '[]'])
+def test_a_mangled_stop_latch_refuses_to_start_rather_than_guess(tmp_path, stop):
+    """bool("false") is True: a corrupt field must not decide either way about whether
+    the person said stop, so the loader refuses it as it refuses unreadable rules."""
+    state = tmp_path / "policies.json"
+    state.write_text('{"classes": {}, "agents": {}, "operator_stop": %s}' % stop)
+    with pytest.raises(SystemExit) as e:
+        console.Boundary(console.FLY_DEFAULT, state)
+    assert "operator_stop" in str(e.value)
 
 
 def test_resume_all_also_lifts_a_sticky_halt(url, boundary):
     """A sticky halt waits for "a confirm"; but the person's resume is that act. Arming a
     confirm to lift it would hand the same bit to a call waiting in a class, so resume
-    resets the halt state instead — what installing the halt circuit does to everyone."""
+    resets the halt state instead — what installing the halt circuit does to everyone.
+
+    The halt is latched here with a per-name block rather than stop-all: under the
+    operator stop no circuit ticks, so the press itself no longer latches anything."""
     boundary.install("halt", Policy(sticky_block=True, forbid_when_blocked=True))
     boundary.request("a", 1, "x")
-    call(url, "/api/stop-all", {})
+    boundary.arm("a", {"blocked": 1})
     assert not boundary.request("a", 1, "x")["granted"]           # blocked, and the halt latched
     boundary.arm("a", {"blocked": 0})
     r = boundary.request("a", 1, "x")
@@ -333,3 +403,22 @@ def test_resume_all_also_lifts_a_sticky_halt(url, boundary):
     assert status == 200 and body["stopped"] is False
     r = boundary.request("a", 1, "x")
     assert r["granted"] and r["halt"]["granted"] is True, r["why"]
+
+
+def test_a_halt_refusal_offers_the_confirm_that_lifts_it(boundary):
+    """When the shared halt refuses, the class's circuit also says "blocked is high" — the
+    halt made it so. Reading the class's words made every halted call a dead end on the
+    page: listed as waiting for a person, with no bit and no code, and no button that could
+    lift it. The halt's own words say a confirm lifts it, so the item carries that."""
+    boundary.install("halt", Policy(heartbeat_ticks=1, forbid_when_blocked=True))
+    boundary.request("quiet", 1, "x")
+    r = boundary.request("quiet", 1, "x")
+    assert not r["granted"] and r["halt"]["granted"] is False and any(w.startswith(console.BLOCKED_SAYS) for w in r["why"])
+    it = next(p for p in boundary.status()["pending"] if p["agent"] == "quiet")
+    assert it["bit"] == "confirm" and it["waiting_on_time"] is False and len(it["code"]) == 2
+    # But a halt that is holding because the person's own block is high is not lifted by a
+    # confirm; that one still waits on the person lifting the block.
+    boundary.arm("quiet", {"blocked": 1})
+    boundary.request("quiet", 1, "x")
+    it = next(p for p in boundary.status()["pending"] if p["agent"] == "quiet")
+    assert it["bit"] is None and it["waiting_on_time"] is True

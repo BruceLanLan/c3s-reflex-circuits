@@ -87,25 +87,28 @@ def test_an_agent_cannot_write_its_own_person_bit_even_via_a_host_alias():
 # -- the pinned gap: rename past the stop button -----------------------------------------
 
 def test_a_name_first_seen_after_stop_all_walks_out_from_under_it():
-    """PINS THE GAP in docs/REDTEAM-2026-09-17.md. `stop_all` blocks only the names known at
-    press time, so a renamed agent is not blocked. When the global-stop latch lands, the
-    `blocked == 0` assertion below flips — update it then, and the report's design item is done.
+    """PINNED THE GAP in docs/REDTEAM-2026-09-17.md, and now pins its closure. `stop_all`
+    used to block only the names known at press time, so a renamed agent was not blocked;
+    this test asserted `blocked == 0` for the newcomer so that it would announce the fix.
+    The global operator-stop latch landed (console.Boundary.operator_stop): the assertion
+    is flipped as the original docstring asked, and the name is kept so the history reads.
     """
     old = _name()
     code, _ = _agent_req(old)
     assert code == 200
     code, stopped = _req("/api/stop-all", {"token": TOKEN})
-    assert code == 200 and old in stopped["agents"]
+    assert code == 200 and old in stopped["agents"] and stopped["operator_stop"] is True
 
     # the known name is caught
     code, after = _agent_req(old)
     assert after["blocked"] == 1
 
-    # a name first seen only now is NOT caught (the gap)
+    # a name first seen only now is caught too: the latch is not a list of names
     new = _name()
     code, fresh = _agent_req(new)
     assert code == 200
-    assert fresh["blocked"] == 0, "gap closed — a new name is now blocked by stop-all; update this test"
+    assert fresh["blocked"] == 1 and fresh["granted"] is False and fresh.get("operator_stop") is True, \
+        "the gap is open again — a new name walked out from under stop-all"
 
     # cleanup: lift the block we set (also resets the shared halt, which is fine on a test console)
     _req("/api/resume-all", {"token": TOKEN})

@@ -101,6 +101,13 @@ PERSON_RESOLVES = (
 # circuit that reads it refuses whatever else arrives, so an entry saying so waits for a
 # person to lift the block, not for a confirm. It carries no code.
 BLOCKED_SAYS = "blocked is high"
+# The other refusal no confirm can lift: a person pressed stop-all. It is not a rule and it
+# is not compiled — it is the person withdrawing consent — so it is decided before any
+# circuit is asked, for every agent (known or first seen now) and every class (a circuit
+# installed, denied or absent). The red team showed a renamed agent walking out from under a
+# per-name stop; the UX pass showed an ungated class walking straight through one. A stop
+# that depends on which names are known or which circuits are installed is not a stop.
+OPERATOR_STOP_SAYS = "stopped: a person pressed stop-all, and every request is refused until a person resumes"
 
 # I-1: the shapes `effect` may take. The console never interprets an effect — it stores it
 # and every consumer escapes it — so the only thing checked here is the shape.
@@ -721,11 +728,19 @@ class Boundary:
         # dropped when it stops waiting. Not a secret and not persisted: it exists so that
         # approving means reading the digits off the same screen the request is on.
         self.codes: dict[tuple[str, str, str], str] = {}
+        # The big red button's latch. A level, like `blocked`, and unlike `blocked` it is
+        # not a bit any circuit reads: while it is on, `request` refuses before it asks one.
+        # Persisted with the rules, because a panic stop that a crash or a restart lifts is
+        # not a panic stop.
+        self.operator_stop: dict = {"on": False, "since": None, "source": None}
         self.state_file = state_file
         saved = self._load()
         if saved is None:
             self.install(DEFAULT_CLASS, default_exec)
             return
+        if saved.get("operator_stop"):
+            self.operator_stop = {"on": bool(saved["operator_stop"]["on"]), "since": saved["operator_stop"].get("since"),
+                                  "source": saved["operator_stop"].get("source")}
         for cls, entry in saved["classes"].items():  # recompiled and re-proven, not trusted from disk
             if entry.get("deny_all"):
                 self._switch(cls, Compiled.denied(), save=False)
@@ -763,6 +778,12 @@ class Boundary:
                 raise ValueError(f"unknown class in {sorted(classes)}")
             if not isinstance(data.get("agents", {}), dict):
                 raise ValueError("agents is not an object")
+            # The stop latch must come back exactly as it was left. A field that is there
+            # and is not a real boolean is refused, not coerced: bool("false") is True, and
+            # a mangled file must not decide either way about whether the person said stop.
+            stop = data.get("operator_stop")
+            if stop is not None and not (isinstance(stop, dict) and isinstance(stop.get("on"), bool)):
+                raise ValueError(f"operator_stop is not an object with a boolean 'on': {stop!r}")
             return data
         except Exception as e:
             raise SystemExit(f"cannot read the saved rules in {self.state_file} ({e}); refusing to start "
@@ -789,8 +810,9 @@ class Boundary:
                        "classes": {c: dict(cs, netlist=prints[c]) for c, cs in a["classes"].items() if prints[c]}}
                 for name, a in keep
             }
+            operator_stop = dict(self.operator_stop)
         body = json.dumps({"format": "c3s.console.policies/1", "saved_at": time.time(), "classes": classes,
-                           "agents": agents}, indent=2)
+                           "agents": agents, "operator_stop": operator_stop}, indent=2)
         with self.save_lock:  # request threads save concurrently; one writer at a time
             self.state_file.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.state_file.with_suffix(".tmp")
@@ -902,6 +924,10 @@ class Boundary:
         """One tick: the agent asks, the shared halt circuit answers first, then the
         class's circuit. Both verdicts are recorded; the class's is the decision.
 
+        Unless a person has pressed stop-all. Then nothing is asked: the request is refused
+        before any circuit, whoever the agent is and whatever the class, and the entry says
+        so in the person's words (`OPERATOR_STOP_SAYS`, `operator_stop: true`).
+
         `task` (W3/I-6) is a label and nothing else. It is not read by any circuit, does
         not reach `_tick`, and is written onto the entry after the verdict exists — so a
         call that names a job is judged exactly as the same call without one."""
@@ -913,84 +939,127 @@ class Boundary:
             a["ticks"] += 1
             a["seen"] = time.time()
             armed = a["armed"]
-            # A present device is a heartbeat for every agent: a halt policy with a
-            # heartbeat rule stops them all when it is unplugged or goes quiet.
-            if self.heartbeat_source is not None and self.heartbeat_source():
-                armed["heartbeat"] = 1
-            # A bound confirm is not this call's: this tick reads it as absent and leaves it armed.
-            held = {bit: armed[bit] for bit, reason_for in a["bound"].items() if armed[bit] and reason_for != reason}
-            for bit in held:
-                armed[bit] = 0
-            for bit in a["bound"].keys() - held.keys():
-                if armed[bit]:
-                    a["bound"].pop(bit, None)  # delivered to its call; spent below with the rest
-            decisive: dict[str, tuple] = {}
-
-            halt_entry = None
-            halt_ok = 1
-            halt_c = self.policies[HALT]
-            if halt_c is not None and not halt_c.deny_all:
-                h_grant, h_inp, h_why, h_dec, _ = self._tick(halt_c, a["classes"][HALT], armed, 1, armed["blocked"])
-                halt_ok = h_grant
-                halt_entry = {"granted": bool(h_grant), "why": h_why, "inputs": h_inp}
-                decisive[HALT] = h_dec
-
-            compiled = self.policies[cls]
-            cs = a["classes"][cls]
-            blocked = int(armed["blocked"] or not halt_ok)
-            gap = None
-            if compiled is None:
-                # Not gated: no circuit for this class, so nothing to refuse with — unless
-                # the shared halt did.
-                grant, inp, why = int(halt_ok), {"request": 1, "intent": intent, "blocked": blocked, "confirm": armed["confirm"]}, []
-                cs["ticks"] += 1
-            elif compiled.deny_all:
-                grant, inp, why = 0, {"request": 1, "intent": intent, "blocked": blocked, "confirm": armed["confirm"]}, [
-                    "class denied outright: no circuit grants here"]
-                cs["ticks"] += 1
+            if self.operator_stop["on"]:
+                # A person said stop. No circuit is asked and none moves: nothing is
+                # consumed, no cooldown advances, no latch changes — the request meets a
+                # wall, and everything behind the wall is exactly where it was for whoever
+                # resumes. `class_installed` still says whether the class was ever gated,
+                # because that is still true and a person may want to see it; it grants
+                # nothing here.
+                compiled = self.policies[cls]
+                entry = {
+                    "at": time.time(),
+                    "kind": "request",
+                    "agent": name,
+                    "class": cls,
+                    "class_installed": compiled is not None,
+                    "deny_all": bool(compiled is not None and compiled.deny_all),
+                    "inputs": {"request": 1, "intent": intent, "blocked": 1, "confirm": armed["confirm"]},
+                    "intent": intent,
+                    "blocked": 1,
+                    "confirm": armed["confirm"],
+                    "reason": reason,
+                    "granted": False,
+                    "tick": a["ticks"],
+                    "class_tick": a["classes"][cls]["ticks"],
+                    "ticks_since_previous_grant": None,
+                    "why": [OPERATOR_STOP_SAYS],
+                    "confirm_waiting_for": [],
+                    "halt": None,
+                    "operator_stop": True,
+                    **({"effect": effect} if effect is not None else {}),
+                    **({"task": task} if task else {}),
+                    "_decisive": {},
+                }
+                TRANSCRIPTS.appendleft(entry)
             else:
-                grant, inp, why, dec, gap = self._tick(compiled, a["classes"][cls], armed, intent, blocked)
-                decisive[cls] = dec
-            if halt_entry is not None and not halt_ok:
-                why = [f"halted (shared halt circuit): {'; '.join(halt_entry['why']) or 'no grant'}"] + why
-                grant = 0
-
-            for bit in CONSUMED_BY_A_TICK:
-                armed[bit] = 0
-            armed.update(held)
-            entry = {
-                "at": time.time(),
-                "kind": "request",
-                "agent": name,
-                "class": cls,
-                "class_installed": compiled is not None,
-                "deny_all": bool(compiled is not None and compiled.deny_all),
-                "inputs": inp,
-                "intent": inp.get("intent", intent),
-                "blocked": inp.get("blocked", blocked),
-                "confirm": inp.get("confirm", 0),
-                "reason": reason,
-                "granted": bool(grant),
-                "tick": a["ticks"],
-                "class_tick": cs["ticks"],
-                "ticks_since_previous_grant": gap,
-                "why": why,
-                # A person approved a different version of this agent's call; saying which
-                # lets the agent resend exactly that instead of rewording it again.
-                "confirm_waiting_for": [a["bound"][b] for b in held if b in a["bound"]] if not grant else [],
-                "halt": halt_entry,
-                # Carried through untouched (I-1): the adapter's description of what this
-                # call would do, for the card a person reads. It decided nothing.
-                **({"effect": effect} if effect is not None else {}),
-                # I-6: which job this call belongs to, for the person reading the thread.
-                # Written after the verdict above; no circuit ever saw it.
-                **({"task": task} if task else {}),
-                # Carried out of the lock so the chain re-evaluates the circuits that
-                # actually decided, not whichever are installed by the time it asks.
-                "_decisive": decisive,
-            }
-            TRANSCRIPTS.appendleft(entry)
+                entry = self._tick_the_circuits(a, name, intent, reason, cls, effect, task)
         self._save()
+        return entry
+
+    def _tick_the_circuits(self, a: dict, name: str, intent: int, reason: str, cls: str,
+                           effect: dict | None, task: str | None) -> dict:
+        """The tick itself, once no person has said stop: the shared halt circuit answers
+        first, then the class's circuit. Called with the lock held; appends the entry to the
+        transcript and returns it, and saves nothing (the caller does, outside the lock)."""
+        armed = a["armed"]
+        # A present device is a heartbeat for every agent: a halt policy with a
+        # heartbeat rule stops them all when it is unplugged or goes quiet.
+        if self.heartbeat_source is not None and self.heartbeat_source():
+            armed["heartbeat"] = 1
+        # A bound confirm is not this call's: this tick reads it as absent and leaves it armed.
+        held = {bit: armed[bit] for bit, reason_for in a["bound"].items() if armed[bit] and reason_for != reason}
+        for bit in held:
+            armed[bit] = 0
+        for bit in a["bound"].keys() - held.keys():
+            if armed[bit]:
+                a["bound"].pop(bit, None)  # delivered to its call; spent below with the rest
+        decisive: dict[str, tuple] = {}
+
+        halt_entry = None
+        halt_ok = 1
+        halt_c = self.policies[HALT]
+        if halt_c is not None and not halt_c.deny_all:
+            h_grant, h_inp, h_why, h_dec, _ = self._tick(halt_c, a["classes"][HALT], armed, 1, armed["blocked"])
+            halt_ok = h_grant
+            halt_entry = {"granted": bool(h_grant), "why": h_why, "inputs": h_inp}
+            decisive[HALT] = h_dec
+
+        compiled = self.policies[cls]
+        cs = a["classes"][cls]
+        blocked = int(armed["blocked"] or not halt_ok)
+        gap = None
+        if compiled is None:
+            # Not gated: no circuit for this class, so nothing to refuse with — unless
+            # the shared halt did.
+            grant, inp, why = int(halt_ok), {"request": 1, "intent": intent, "blocked": blocked, "confirm": armed["confirm"]}, []
+            cs["ticks"] += 1
+        elif compiled.deny_all:
+            grant, inp, why = 0, {"request": 1, "intent": intent, "blocked": blocked, "confirm": armed["confirm"]}, [
+                "class denied outright: no circuit grants here"]
+            cs["ticks"] += 1
+        else:
+            grant, inp, why, dec, gap = self._tick(compiled, a["classes"][cls], armed, intent, blocked)
+            decisive[cls] = dec
+        if halt_entry is not None and not halt_ok:
+            why = [f"halted (shared halt circuit): {'; '.join(halt_entry['why']) or 'no grant'}"] + why
+            grant = 0
+
+        for bit in CONSUMED_BY_A_TICK:
+            armed[bit] = 0
+        armed.update(held)
+        entry = {
+            "at": time.time(),
+            "kind": "request",
+            "agent": name,
+            "class": cls,
+            "class_installed": compiled is not None,
+            "deny_all": bool(compiled is not None and compiled.deny_all),
+            "inputs": inp,
+            "intent": inp.get("intent", intent),
+            "blocked": inp.get("blocked", blocked),
+            "confirm": inp.get("confirm", 0),
+            "reason": reason,
+            "granted": bool(grant),
+            "tick": a["ticks"],
+            "class_tick": cs["ticks"],
+            "ticks_since_previous_grant": gap,
+            "why": why,
+            # A person approved a different version of this agent's call; saying which
+            # lets the agent resend exactly that instead of rewording it again.
+            "confirm_waiting_for": [a["bound"][b] for b in held if b in a["bound"]] if not grant else [],
+            "halt": halt_entry,
+            # Carried through untouched (I-1): the adapter's description of what this
+            # call would do, for the card a person reads. It decided nothing.
+            **({"effect": effect} if effect is not None else {}),
+            # I-6: which job this call belongs to, for the person reading the thread.
+            # Written after the verdict above; no circuit ever saw it.
+            **({"task": task} if task else {}),
+            # Carried out of the lock so the chain re-evaluates the circuits that
+            # actually decided, not whichever are installed by the time it asks.
+            "_decisive": decisive,
+        }
+        TRANSCRIPTS.appendleft(entry)
         return entry
 
     # -- reporting ---------------------------------------------------------------
@@ -1044,7 +1113,21 @@ class Boundary:
                 continue
             why = list(e.get("why") or [])
             bit = None
-            if not any(w.startswith(BLOCKED_SAYS) for w in why):
+            halt = e.get("halt")
+            if e.get("operator_stop"):
+                pass  # a person said stop; no bit lifts that, only resume-all
+            elif halt and not halt.get("granted"):
+                # The shared halt refused, and the class's circuit then said "blocked is
+                # high" because the halt made it so — not because a person blocked this
+                # agent. Reading the class's words here made every halted call a dead end
+                # on the page: something waiting for a person that no button could lift.
+                # The halt's own words say what would lift it: a confirm, unless the
+                # person's own `blocked` is what is holding the halt down.
+                h_why = list(halt.get("why") or [])
+                own_block = int((halt.get("inputs") or {}).get("blocked", 0)) or any(w.startswith(BLOCKED_SAYS) for w in h_why)
+                if not own_block and any(w.startswith("halted") for w in h_why):
+                    bit = "confirm"
+            elif not any(w.startswith(BLOCKED_SAYS) for w in why):
                 for w in why:
                     bit = next((b for rx, b in PERSON_RESOLVES if rx.search(w)), None)
                     if bit:
@@ -1085,26 +1168,42 @@ class Boundary:
             return self.codes.get((name, reason, bit))
 
     def stop_all(self, stop: bool, source: str = "page", note: str | None = None) -> list[str]:
-        """The big red button: `blocked` for every agent the console knows, one entry each.
+        """The big red button, and the deliberate way back.
 
-        `blocked` is a level, so this latches — it stays where it was put until a person
-        lowers it deliberately. An agent first seen *after* the button was pressed is not
-        blocked by it, which is why the page counts how many of how many are blocked.
+        Pressing it sets the operator-stop latch: from that moment every request from every
+        agent — the names known now, a name first seen later, an agent that renamed itself —
+        in every class, gated or not, is refused before any circuit is asked, until a person
+        resumes. It also writes `blocked` for every agent the console knows, one entry each,
+        so the per-name level a person can read on the switches panel agrees with the latch;
+        that write is the old behaviour and is no longer what makes the stop hold. (It used
+        to be all there was, and the red team renamed an agent past it: `blocked` is
+        per-name, and a name nobody had seen had no bit to be high.)
 
-        Resuming also resets every agent's shared-halt state. A sticky halt circuit waits
-        for "a confirm" to lift; but resume-all *is* the person lifting it (token, and the
-        typed word on the page), and the confirm bit belongs to the calls in the classes —
-        arming one here could approve an irreversible call that was waiting. Resetting the
-        halt's state is what installing a halt circuit does to every agent anyway."""
+        Resuming clears the latch, lowers every known agent's `blocked`, and resets every
+        agent's shared-halt state. A sticky halt circuit waits for "a confirm" to lift; but
+        resume-all *is* the person lifting it (token, and the typed word on the page), and
+        the confirm bit belongs to the calls in the classes — arming one here could approve
+        an irreversible call that was waiting. Resetting the halt's state is what installing
+        a halt circuit does to every agent anyway.
+
+        Both directions write one `stop` entry to the transcript before the per-name ones,
+        so the press is on the record even when no agent is known yet."""
+        now = time.time()
         with self.lock:
             names = sorted(self.agents)
+            self.operator_stop = ({"on": True, "since": now, "source": source} if stop
+                                  else {"on": False, "since": None, "source": None})
+            press = {"at": now, "kind": "stop", "stopped": stop, "source": source, "agents": names}
+            if note:
+                press["note"] = note
+            TRANSCRIPTS.appendleft(press)
         for name in names:
             self.arm(name, {"blocked": 1 if stop else 0}, note=note)["source"] = source
         if not stop and names:
             with self.lock:
                 for name in names:
                     self.agents[name]["classes"][HALT] = _fresh_class_state()
-            self._save()
+        self._save()  # unconditionally: the latch must reach disk even with nobody known
         return names
 
     def status(self) -> dict:
@@ -1153,6 +1252,11 @@ class Boundary:
                 "halt_class": HALT,
                 "default_class": DEFAULT_CLASS,
                 "agents": agents,
+                # The big red button's latch. When `on`, every request from every agent —
+                # including any not in `agents` yet — is refused until resume-all. The page
+                # reads this rather than counting blocked names, because the count is not
+                # what says whether everything is stopped.
+                "operator_stop": dict(self.operator_stop),
                 # I-2: one list of what waits for a person, for the page, the device and
                 # the chat bot alike. Nothing downstream derives it again.
                 "pending": self._pending(),
@@ -2164,9 +2268,9 @@ class Handler(BaseHTTPRequestHandler):
             note = payload.get("note")
             source = str(payload.get("source", "page"))[:20] or "page"
             names = BOUNDARY.stop_all(stop, source, (str(note).strip()[:200] or None) if note else None)
-            print(f"{'stop-all' if stop else 'resume-all'}: blocked={int(stop)} for {len(names)} agent(s) "
-                  f"from {source} (a person pressed it)", flush=True)
-            self._json(200, {"stopped": stop, "agents": names, "count": len(names), "source": source})
+            print(f"{'stop-all' if stop else 'resume-all'}: operator stop {'ON — every request from every agent is refused' if stop else 'off'}; "
+                  f"blocked={int(stop)} for {len(names)} known agent(s), from {source} (a person pressed it)", flush=True)
+            self._json(200, {"stopped": stop, "operator_stop": stop, "agents": names, "count": len(names), "source": source})
         elif self.path == "/api/request":
             # Before anything ticks: a request under a bound name with the wrong token must
             # not spend that agent's confirm, move its cooldown, or count towards its
