@@ -102,7 +102,9 @@ Each layer answers a different question, and none can stand in for another.
 
 Behavioural fidelity, controls and the sealed test are in
 [docs/EVALUATION.md](docs/EVALUATION.md). What is simplified, assumed or not
-claimed is in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
+claimed is in [docs/LIMITATIONS.md](docs/LIMITATIONS.md). Putting the circuit in
+front of an agent's actions — what the proofs give such an arrangement, and the four
+things they do not — is [docs/AGENT.md](docs/AGENT.md).
 
 ## How it works
 
@@ -141,8 +143,8 @@ circuits/       every circuit as a manifest: metrics, SHA-256, netlist bytes, ev
 contracts/      NandMachine and ReflexCore (Solidity) with Foundry tests
 firmware/       Cardputer ADV firmware (PlatformIO) and the host driver for its test
 formal/         SystemVerilog property spec proven by Yosys induction
-docs/           connectome, teacher, circuits, properties, evaluation, firmware,
-                limitations, references; docs/demo/ is the web demo
+docs/           connectome, teacher, circuits, properties, evaluation, agent,
+                firmware, limitations, references; docs/demo/ is the web demo
 tests/          pytest suite
 ```
 
