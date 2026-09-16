@@ -345,6 +345,21 @@ def token_bind(agent: str, token: str) -> dict:
                     f"{agent!r} is now refused"}
 
 
+def token_list() -> dict:
+    """`c3s token list`: which names are bound, and since when. Never the hashes — a page
+    or a person needs to know *that* a name is bound, not what would match it. A store
+    that cannot be read is reported as such rather than as "nothing bound", for the same
+    reason `agent_bindings` raises: those are different states and one of them is the open
+    door."""
+    try:
+        bindings = agent_bindings()
+    except BindingsUnreadable as e:
+        return {"bound": [], "store_error": str(e), "file": str(AGENTS_FILE)}
+    return {"bound": [{"agent": name, "bound_at": rec.get("bound_at"), "unreadable": bool(rec.get("unreadable"))}
+                      for name, rec in sorted(bindings.items())],
+            "store_error": None, "file": str(AGENTS_FILE)}
+
+
 def token_rotate(agent: str) -> dict:
     """`c3s token rotate --agent <name>`: drop the binding so the next request rebinds.
 
