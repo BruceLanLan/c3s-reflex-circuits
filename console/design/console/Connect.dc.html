@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #15181C; color: #979CA3; font: 14px/1.5 system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+    a { color: #6FA8DC; text-decoration: none; } a:hover { color: #ECE7DC; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 8px; color: #979CA3; font-size: 13px; }
+    .nav-item.on { background: #2B3037; color: #ECE7DC; }
+    .nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .card { background: #1C2025; border: 1px solid #2B3037; border-radius: 10px; padding: 14px 16px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+    .h2 { margin: 0; font-size: 12px; letter-spacing: .04em; color: #979CA3; font-weight: 600; display: flex; gap: 10px; align-items: baseline; }
+    .h2 .sub { font-weight: 400; color: #5E646C; font-size: 12px; letter-spacing: 0; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #5E646C; margin-right: 6px; }
+    .dot.ok { background: #46C878; box-shadow: 0 0 6px rgba(70,200,120,.5); }
+    pre { margin: 0; padding: 10px 12px; background: #111417; border: 1px solid #2B3037; border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; line-height: 1.5; color: #ECE7DC; white-space: pre-wrap; overflow-wrap: anywhere; }
+    pre .c { color: #5E646C; } pre .t { color: #F2A541; }
+    .copy { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; border: 1px solid #2B3037; border-radius: 6px; padding: 2px 8px; color: #979CA3; }
+    .li { display: grid; grid-template-columns: 110px 1fr; gap: 10px; font-size: 12.5px; padding: 6px 0; border-top: 1px solid #23282e; }
+    .li b { color: #ECE7DC; font-weight: 500; }
+    .free { color: #46C878; } .gate { color: #F2A541; }
+    .step { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 12.5px; }
+    .step .n { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #5E646C; }
+    .step b { color: #ECE7DC; font-weight: 500; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #15181C; overflow: hidden;">
+
+  <div style="width: 220px; flex: none; background: #111417; border-right: 1px solid #2B3037; display: flex; flex-direction: column; gap: 4px; padding: 16px 12px;">
+    <div style="padding: 4px 12px 14px;">
+      <div style="color: #ECE7DC; font-weight: 600; font-size: 15px; letter-spacing: .01em;">C3S Circuit Agent</div>
+      <div class="mono" style="color: #5E646C; font-size: 11.5px; margin-top: 2px;">boundary console · 边界控制台</div>
+    </div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg><span>Overview · 总览</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M8 1.5 13.5 3.5v4c0 3.2-2.3 5.6-5.5 7-3.2-1.4-5.5-3.8-5.5-7v-4z"></path></svg><span>Boundaries · 边界</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M2 9h3.5l1 2h3l1-2H14"></path><path d="M3.5 3.5h9L14 9v3.5H2V9z"></path></svg><span>Approvals · 待确认</span><span class="mono" style="margin-left: auto; background: rgba(242,165,65,.14); color: #F2A541; border-radius: 4px; padding: 0 6px; font-size: 11px;">2</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M1.5 8h3l2-5 3 10 2-5h3"></path></svg><span>Activity · 流水</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.5"></rect><path d="M6 1.5v2.5M10 1.5v2.5M6 12v2.5M10 12v2.5M1.5 6h2.5M1.5 10h2.5M12 6h2.5M12 10h2.5"></path></svg><span>Agents</span></div>
+    <div class="nav-item on"><svg viewBox="0 0 16 16"><path d="M6.5 9.5 9.5 6.5"></path><path d="M7 4.5 8.5 3a2.5 2.5 0 0 1 3.5 3.5L10.5 8"></path><path d="M9 11.5 7.5 13a2.5 2.5 0 0 1-3.5-3.5L5.5 8"></path></svg><span>Connect · 接入</span></div>
+    <div style="flex: 1;"></div>
+    <div class="mono" style="padding: 0 12px; color: #5E646C; font-size: 11px; line-height: 1.6;">拍不是时间。<br>标志位是工具层的承诺。<br>链上只复算，不部署。</div>
+  </div>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+    <div style="height: 48px; flex: none; background: #111417; border-bottom: 1px solid #2B3037; display: flex; align-items: center; gap: 18px; padding: 0 24px; font-size: 12.5px;">
+      <div style="color: #ECE7DC; font-weight: 600; font-size: 14px;">接入 <span style="color: #5E646C; font-weight: 400; margin-left: 6px; font-size: 12.5px;">你的模型、你的工具、你的链——边界都在同一张电路上</span></div>
+      <span><i class="dot ok"></i>服务已连接 <span class="mono" style="color: #5E646C;">127.0.0.1:8765</span></span>
+      <div style="flex: 1;"></div>
+      <span style="display: inline-flex; border: 1px solid #2B3037; border-radius: 6px; overflow: hidden; font-size: 12px;"><span style="padding: 3px 9px; background: #2B3037; color: #ECE7DC;">中文</span><span style="padding: 3px 9px; color: #979CA3;">EN</span></span>
+    </div>
+
+    <div style="flex: 1; min-height: 0; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+        <div class="card">
+          <div class="h2">Claude Code 钩子 <span class="sub">Bash / Write / Edit / 所有 MCP 工具</span><span style="flex: 1;"></span><span class="copy">复制</span></div>
+          <pre>{ "hooks": { "PreToolUse": [ {
+    "matcher": "Bash|Write|Edit|mcp__.*",
+    "hooks": [ { "type": "command",
+      "command": "python3 …/adapters/claude_code_hook.py",
+      "timeout": 20 } ] } ],
+  "PostToolUse": [ { "matcher": "Bash|Write|Edit",
+    "hooks": [ { "type": "command",
+      "command": "python3 …/adapters/claude_code_post_hook.py" } ] } ] } }</pre>
+          <div style="font-size: 12px; color: #5E646C;">放行时钩子不出声，Claude Code 原有权限照旧；拒绝时 deny 并给规则原话。把它放进 agent 改不到的 settings 文件里。</div>
+        </div>
+        <div class="card">
+          <div class="h2">MCP 代理 <span class="sub">Claude Desktop · Cursor · 任何 MCP 客户端</span><span style="flex: 1;"></span><span class="copy">复制</span></div>
+          <pre>{ "mcpServers": { "filesystem": {
+    "command": "python3",
+    "args": [ "…/adapters/mcp_proxy.py",
+      "--agent", "mcp:filesystem",
+      "--gate", "<span class="t">write_*</span>", "--gate", "<span class="t">delete_*</span>",
+      "--",
+      "npx", "-y", "@modelcontextprotocol/server-filesystem",
+      "/Users/me/projects" ] } } }</pre>
+          <div style="font-size: 12px; color: #5E646C;">只拦 gate 到的 <span class="mono">tools/call</span>；其余原样转发。拒绝是带 <span class="mono">isError</span> 的工具结果，模型读得懂。</div>
+        </div>
+        <div class="card">
+          <div class="h2">Telegram <span class="sub">从聊天里问、看、确认</span></div>
+          <pre>TELEGRAM_TOKEN=…  CONSOLE_URL=http://127.0.0.1:8765
+TOOL_LAYER_CHATS=<span class="t">-1001234567890</span>
+python3 bot_telegram.py
+
+/ask [why]   /intent [why]   /rules   /state
+<span class="c"># 只有 TOOL_LAYER_CHATS 里的聊天能发：</span>
+/confirm     /block on|off</pre>
+          <div style="font-size: 12px; color: #5E646C;">agent 自己能打字的聊天窗口不能给它写 <span class="mono" style="color: #F2A541;">confirm</span>——那就不是边界了。</div>
+        </div>
+      </div>
+
+      <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="card">
+          <div class="h2">日常工具（经代理） <span class="sub">读免费，发/删要过电路</span></div>
+          <div style="display: flex; flex-direction: column;">
+            <div class="li"><b>Gmail</b><span><span class="free">读 · 搜 免费</span> · <span class="gate">send / trash / label 归 message 类</span>，<span class="mono">send_*</span> 标不可逆 → 要一次确认</span></div>
+            <div class="li"><b>Slack</b><span><span class="free">读频道 免费</span> · <span class="gate">post / react 归 message 类</span></span></div>
+            <div class="li"><b>Google Calendar</b><span><span class="free">查日程 免费</span> · <span class="gate">create / update / delete 归 message 类</span>，<span class="mono">delete_*</span> 不可逆</span></div>
+            <div class="li"><b>文件系统</b><span><span class="free">read / list 免费</span> · <span class="gate">write_* / move_* / delete_* 归 files 类</span></span></div>
+            <div class="li"><b>Shell / 代码</b><span>Claude Code 内建 Bash 走钩子 → <span class="gate">exec 类</span>；<span class="mono">rm · git push · --force · sudo</span> 标不可逆</span></div>
+          </div>
+          <div style="font-size: 12px; color: #5E646C; margin-top: auto;">类别→电路的映射在一个 agent 改不到的配置文件里。没接进代理的工具，电路看不见。</div>
+        </div>
+
+        <div class="card">
+          <div class="h2">链上（用户自部署） <span class="sub">opBNB Testnet · 5611</span></div>
+          <div class="step"><span class="n">1</span><span><b>编译电路</b> —— 在 Boundaries 里装好 spend 类规则；这里拿到网表字节与 <span class="mono">sha256</span>。</span></div>
+          <div class="step"><span class="n">2</span><span><b>部署</b> —— 页面生成的命令，在你自己的机器上用你自己的钥匙跑：</span></div>
+          <pre>forge create src/ReflexModule.sol:ReflexModule \
+  --rpc-url $OPBNB_TESTNET --private-key $YOUR_KEY --broadcast \
+  --constructor-args $NAND_MACHINE 0x<span class="c">&lt;netlist&gt;</span> 0x<span class="c">&lt;sha256&gt;</span> 6 9 $SAFE $SUPERVISOR</pre>
+          <div class="step"><span class="n">3</span><span><b>Safe</b> —— owner 发一笔 <span class="mono">enableModule(module)</span>。agent 不是 owner，只能调 <span class="mono">act(to, value, data)</span>；电路不放，Safe 不动。</span></div>
+          <div style="font-size: 12px; color: #ECE7DC; margin-top: auto;">维护者不部署任何合约、不持有钱包。</div>
+          <div style="font-size: 12px; color: #5E646C;">Safe 完全信任已启用的模块；监督者的钥匙才是真正的边界。</div>
+        </div>
+      </div>
+
+      <div style="font-size: 11.5px; color: #5E646C;">钩子/代理只管走过它们的通道；链上形态才是结构性的。</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

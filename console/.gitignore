@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+
+# Build artifacts from `sh install.sh` / `pip install .` — never part of a release.
+build/
+*.egg-info/
+.pytest_cache/
+# Screenshots and traces from browser automation.
+.playwright-mcp/
