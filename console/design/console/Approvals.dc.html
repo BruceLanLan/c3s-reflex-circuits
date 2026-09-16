@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #15181C; color: #979CA3; font: 14px/1.5 system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+    a { color: #6FA8DC; text-decoration: none; } a:hover { color: #ECE7DC; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 8px; color: #979CA3; font-size: 13px; }
+    .nav-item.on { background: #2B3037; color: #ECE7DC; }
+    .nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .card { background: #1C2025; border: 1px solid #2B3037; border-radius: 10px; padding: 14px 16px; min-width: 0; }
+    .h2 { margin: 0 0 10px; font-size: 12px; letter-spacing: .04em; color: #979CA3; font-weight: 600; display: flex; gap: 10px; align-items: baseline; }
+    .h2 .sub { font-weight: 400; color: #5E646C; font-size: 12px; letter-spacing: 0; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #5E646C; margin-right: 6px; }
+    .dot.ok { background: #46C878; box-shadow: 0 0 6px rgba(70,200,120,.5); }
+    .chip { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; padding: 1px 7px; border-radius: 4px; background: rgba(151,156,163,.14); color: #979CA3; }
+    .why { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; color: #ECE7DC; }
+    .why::before { content: "↳ "; color: #5E646C; }
+    .btn-go { border-radius: 8px; padding: 7px 16px; font-weight: 600; color: #121417; background: #F2A541; font-size: 13px; }
+    .btn-danger { border-radius: 8px; padding: 6px 14px; font-weight: 500; color: #E36A52; border: 1px solid rgba(227,106,82,.5); font-size: 13px; }
+    .off { opacity: .35; }
+    .tog { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #202529; border: 1px solid #2B3037; border-radius: 8px; font-size: 12.5px; }
+    .tog .sw { width: 30px; height: 16px; border-radius: 8px; background: #2B3037; position: relative; flex: none; }
+    .tog .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #979CA3; }
+    .tog .sw.on { background: #F2A541; } .tog .sw.on::after { left: 16px; background: #121417; }
+    .tog.dis { opacity: .35; border-style: dashed; }
+    .row { display: grid; grid-template-columns: 54px 1fr auto; gap: 10px; padding: 8px 10px; background: #202529; border: 1px solid #2B3037; border-left: 3px solid #46C878; border-radius: 6px; font-size: 13px; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #15181C; overflow: hidden;">
+
+  <div style="width: 220px; flex: none; background: #111417; border-right: 1px solid #2B3037; display: flex; flex-direction: column; gap: 4px; padding: 16px 12px;">
+    <div style="padding: 4px 12px 14px;">
+      <div style="color: #ECE7DC; font-weight: 600; font-size: 15px; letter-spacing: .01em;">C3S Circuit Agent</div>
+      <div class="mono" style="color: #5E646C; font-size: 11.5px; margin-top: 2px;">boundary console · 边界控制台</div>
+    </div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg><span>Overview · 总览</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M8 1.5 13.5 3.5v4c0 3.2-2.3 5.6-5.5 7-3.2-1.4-5.5-3.8-5.5-7v-4z"></path></svg><span>Boundaries · 边界</span></div>
+    <div class="nav-item on"><svg viewBox="0 0 16 16"><path d="M2 9h3.5l1 2h3l1-2H14"></path><path d="M3.5 3.5h9L14 9v3.5H2V9z"></path></svg><span>Approvals · 待确认</span><span class="mono" style="margin-left: auto; background: rgba(242,165,65,.14); color: #F2A541; border-radius: 4px; padding: 0 6px; font-size: 11px;">2</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M1.5 8h3l2-5 3 10 2-5h3"></path></svg><span>Activity · 流水</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.5"></rect><path d="M6 1.5v2.5M10 1.5v2.5M6 12v2.5M10 12v2.5M1.5 6h2.5M1.5 10h2.5M12 6h2.5M12 10h2.5"></path></svg><span>Agents</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M6.5 9.5 9.5 6.5"></path><path d="M7 4.5 8.5 3a2.5 2.5 0 0 1 3.5 3.5L10.5 8"></path><path d="M9 11.5 7.5 13a2.5 2.5 0 0 1-3.5-3.5L5.5 8"></path></svg><span>Connect · 接入</span></div>
+    <div style="flex: 1;"></div>
+    <div class="mono" style="padding: 0 12px; color: #5E646C; font-size: 11px; line-height: 1.6;">拍不是时间。<br>标志位是工具层的承诺。<br>链上只复算，不部署。</div>
+  </div>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+    <div style="height: 48px; flex: none; background: #111417; border-bottom: 1px solid #2B3037; display: flex; align-items: center; gap: 18px; padding: 0 24px; font-size: 12.5px;">
+      <div style="color: #ECE7DC; font-weight: 600; font-size: 14px;">待确认 <span style="color: #5E646C; font-weight: 400; margin-left: 6px; font-size: 12.5px;">这里是 <span class="mono" style="color: #F2A541;">confirm</span> 通道。模型碰不到这一页。</span></div>
+      <span><i class="dot ok"></i>服务已连接</span>
+      <span><i class="dot ok"></i>链上复核一致 · 未部署</span>
+      <div style="flex: 1;"></div>
+      <span style="display: inline-flex; border: 1px solid #2B3037; border-radius: 6px; overflow: hidden; font-size: 12px;"><span style="padding: 3px 9px; background: #2B3037; color: #ECE7DC;">中文</span><span style="padding: 3px 9px; color: #979CA3;">EN</span></span>
+    </div>
+
+    <div style="flex: 1; min-height: 0; padding: 24px; display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-content: start;">
+
+      <div style="display: flex; flex-direction: column; gap: 16px; min-width: 0;">
+        <div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="h2" style="margin: 0;">等一个人来点 <span class="sub">2 条 · 按到达顺序</span></div>
+
+          <div style="background: #202529; border: 1px solid #2B3037; border-left: 3px solid #F2A541; border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;">
+            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+              <div style="display: flex; gap: 10px; align-items: baseline;"><span style="color: #ECE7DC; font-weight: 600;">claude-code:dogfood2</span><span class="chip">exec</span><span class="mono" style="color: #5E646C;">tick 2 · 14:30:51</span></div>
+              <div class="mono" style="color: #ECE7DC;">Bash [irreversible]: rm -f notes.txt</div>
+              <div class="why">irreversible, and no unspent confirm</div>
+              <div style="font-size: 12px; color: #5E646C;">钩子按模式把这条 <span class="mono">rm</span> 标成不可逆；电路要一次未用掉的确认才放。确认只放这一次。</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch;">
+              <span class="btn-go" style="text-align: center;">确认一次</span>
+              <span class="btn-danger" style="text-align: center;">封锁该 agent</span>
+            </div>
+          </div>
+
+          <div style="background: #202529; border: 1px solid #2B3037; border-left: 3px solid #5E646C; border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;">
+            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+              <div style="display: flex; gap: 10px; align-items: baseline;"><span style="color: #ECE7DC; font-weight: 600;">mcp:server-filesystem</span><span class="chip">files</span><span class="mono" style="color: #5E646C;">tick 6 · 14:12:08</span></div>
+              <div class="mono" style="color: #ECE7DC;">write_file: path=…/fsroot/c.txt</div>
+              <div class="why">cooldown: 7 ticks left of 8</div>
+              <div style="font-size: 12px; color: #5E646C;">冷却不是确认能解的——只能等。列在这里是让你知道它在等。</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch;">
+              <span class="btn-go off" style="text-align: center;">确认一次</span>
+              <span class="btn-danger off" style="text-align: center;">封锁该 agent</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="h2" style="margin: 0;">最近已处理</div>
+          <div class="row"><span class="mono" style="color: #5E646C;">14:31</span><span><span style="color: #ECE7DC; font-weight: 600;">claude-code:dogfood2</span> <span class="chip">exec</span> · 人点了确认 · tick 3 已放行 · <span class="mono">Bash [irreversible]: rm -f notes.txt</span></span><span class="mono" style="color: #46C878;">chain ✓</span></div>
+          <div class="row"><span class="mono" style="color: #5E646C;">13:57</span><span><span style="color: #ECE7DC; font-weight: 600;">claude-code:dogfood</span> <span class="chip">files</span> · 3 拍冷却到期 · tick 4 已放行 · <span class="mono">Write: b.txt</span></span><span class="mono" style="color: #46C878;">chain ✓</span></div>
+          <div class="row" style="border-left-color: #F2A541;"><span class="mono" style="color: #5E646C;">13:51</span><span><span style="color: #ECE7DC; font-weight: 600;">claude-code:hooktest</span> <span class="chip">files</span> · 人封锁了它 · tick 7 被拒 <span class="mono">blocked is high; cooldown: 6 ticks left of 8</span></span><span class="mono" style="color: #46C878;">chain ✓</span></div>
+        </div>
+      </div>
+
+      <div class="card" style="display: flex; flex-direction: column; gap: 10px; align-self: start;">
+        <div class="h2" style="margin: 0;">工具层的其他开关 <span class="sub">按 agent</span></div>
+        <div style="font-size: 12.5px; color: #ECE7DC; font-weight: 600;">claude-code:dogfood2 <span class="chip" style="margin-left: 6px;">exec</span></div>
+        <div class="tog"><span><span style="color: #ECE7DC;">blocked</span><span style="display: block; font-size: 11.5px; color: #5E646C;">电平，持续到你放下</span></span><span class="sw"></span></div>
+        <div class="tog"><span><span style="color: #ECE7DC;">failed</span><span style="display: block; font-size: 11.5px; color: #5E646C;">PostToolUse 钩子自动置位；也可手动</span></span><span class="sw"></span></div>
+        <div class="tog dis"><span><span style="color: #ECE7DC;">heartbeat</span><span style="display: block; font-size: 11.5px; color: #5E646C;">这张电路不读它</span></span><span class="sw"></span></div>
+        <div class="tog dis"><span><span style="color: #ECE7DC;">confirm_b</span><span style="display: block; font-size: 11.5px; color: #5E646C;">这张电路不读它</span></span><span class="sw"></span></div>
+        <div style="font-size: 12px; color: #5E646C; margin-top: 4px;">灰掉的位是当前电路不读取的：面板不会提示一个电路忽略的输入。</div>
+        <div style="border-top: 1px solid #2B3037; padding-top: 10px; font-size: 12px; color: #5E646C;">Cardputer 插着时，设备上的 <span class="mono" style="color: #979CA3;">Enter</span> 就是这一页的"确认一次"，长按是 blocked。</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

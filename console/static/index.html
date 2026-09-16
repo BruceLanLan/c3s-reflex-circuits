@@ -1,0 +1,2261 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<title>C3S Circuit Agent · boundary console</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* C3S Circuit Agent · console — optimized stylesheet (UX pass, 2026-09-16)
+ *
+ * Drop-in replacement for the whole <style> block of static/index.html, including the second
+ * <style> that lives inside <section data-view="connect"> (remove that one when this lands).
+ * Every selector the page's JavaScript sets or reads is kept: .on .wait .warn .dis .halt .tool
+ * .ok .bad .amber .dim .no .err .spoof .policy .stat .cnt:empty .msg:empty .drill:empty
+ * .rules[data-off] .kind.* .rev.* .stopdock .stopbanner .stopbtn:disabled .pick.on .togl.dis
+ * .verdict-row.* .e.* .chain.* .c-agent .c-tool .t1 .num .mono .muted .link .pre .go .danger.
+ * New selectors (need markup, listed in ux-audit.md): .first .first-step .proof .stopbtn.holding
+ * .e.more .pend .eff .code-top .hint-once .agentless.
+ *
+ * Theme: DARK-FIRST. :root is the approved dark canvas; light is offered under
+ * prefers-color-scheme: light unless data-theme="dark", and data-theme="light" forces it.
+ * (Swap the two palette blocks to make light the default — nothing else changes.)
+ * Alpha overlays use rgba(var(--x-rgb), a) so both palettes share one component sheet.
+ */
+
+/* ---------- tokens ---------- */
+:root {
+  color-scheme: dark;
+  --bg: #15181C; --nav: #111417; --panel: #1C2025; --panel2: #202529; --field: #14171A;
+  --line: #2B3037; --line2: #23282E;
+  --text: #ECE7DC; --dim: #A2A7AE; --faint: #858C95;          /* faint raised from #5E646C (2.6:1) to 4.5:1 on --panel2 */
+  --ok: #46C878; --bad: #E36A52; --amber: #F2A541; --blue: #6FA8DC;
+  --agent: var(--blue); --tool: var(--amber);
+  --ok-rgb: 70,200,120; --bad-rgb: 227,106,82; --tool-rgb: 242,165,65; --agent-rgb: 111,168,220; --dim-rgb: 151,156,163;
+  --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #E36A52; --text-fill: #ECE7DC;
+  --on-fill: #121417; --on-text: #121417; --on-bad: #190E0B;   /* --on-text: the words on a --text-fill button; --on-fill: on the amber/blue ones */
+  --focus: var(--amber);
+  --shadow: 0 1px 0 rgba(0,0,0,.25);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #F3F1EB; --nav: #EBE8E0; --panel: #FFFFFF; --panel2: #F7F5EF; --field: #FFFFFF;
+    --line: #DAD6CC; --line2: #E6E2D9;
+    --text: #1B1F24; --dim: #4B525B; --faint: #6B727B;
+    --ok: #1F8A48; --bad: #B8412B; --amber: #9A5E0E; --blue: #2C6BA3;
+    --ok-rgb: 31,138,72; --bad-rgb: 184,65,43; --tool-rgb: 200,125,30; --agent-rgb: 44,107,163; --dim-rgb: 75,82,91;
+    --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #D9553B; --text-fill: #1B1F24;
+    --on-fill: #121417; --on-text: #F3F1EB; --on-bad: #FFF6F3;
+    --focus: #C8761A;
+    --shadow: 0 1px 2px rgba(20,20,20,.06);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #F3F1EB; --nav: #EBE8E0; --panel: #FFFFFF; --panel2: #F7F5EF; --field: #FFFFFF;
+  --line: #DAD6CC; --line2: #E6E2D9;
+  --text: #1B1F24; --dim: #4B525B; --faint: #6B727B;
+  --ok: #1F8A48; --bad: #B8412B; --amber: #9A5E0E; --blue: #2C6BA3;
+  --ok-rgb: 31,138,72; --bad-rgb: 184,65,43; --tool-rgb: 200,125,30; --agent-rgb: 44,107,163; --dim-rgb: 75,82,91;
+  --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #D9553B; --text-fill: #1B1F24;
+  --on-fill: #121417; --on-text: #F3F1EB; --on-bad: #FFF6F3;
+  --focus: #C8761A;
+  --shadow: 0 1px 2px rgba(20,20,20,.06);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #15181C; --nav: #111417; --panel: #1C2025; --panel2: #202529; --field: #14171A;
+  --line: #2B3037; --line2: #23282E;
+  --text: #ECE7DC; --dim: #A2A7AE; --faint: #858C95;
+  --ok: #46C878; --bad: #E36A52; --amber: #F2A541; --blue: #6FA8DC;
+  --ok-rgb: 70,200,120; --bad-rgb: 227,106,82; --tool-rgb: 242,165,65; --agent-rgb: 111,168,220; --dim-rgb: 151,156,163;
+  --tool-fill: #F2A541; --agent-fill: #6FA8DC; --bad-fill: #E36A52; --text-fill: #ECE7DC;
+  --on-fill: #121417; --on-text: #121417; --on-bad: #190E0B;
+  --focus: var(--amber);
+  --shadow: 0 1px 0 rgba(0,0,0,.25);
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }  /* a display: rule of ours must not outvote hidden */
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--dim); font: 14px/1.5 var(--sans); overflow-x: hidden; }
+a { color: var(--blue); text-decoration: none; }
+code, .mono { font-family: var(--mono); font-size: 12.5px; }
+.num { font-family: var(--mono); color: var(--text); font-variant-numeric: tabular-nums; }
+.muted { color: var(--faint); } .ok { color: var(--ok); } .bad { color: var(--bad); } .amber { color: var(--amber); }
+.c-agent { color: var(--agent); } .c-tool { color: var(--tool); }
+button { font: inherit; cursor: pointer; color: inherit; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+input, select, textarea { background: var(--field); border: 1px solid var(--line); color: var(--text); padding: 6px 8px; font: inherit; font-size: 13px; border-radius: 6px; min-width: 0; }
+input[type=number] { font-family: var(--mono); }
+textarea { width: 100%; resize: vertical; line-height: 1.5; }   /* the Tasks form's one free-text field */
+input:focus, select:focus, textarea:focus, button:focus-visible, .nav-item:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+::placeholder { color: var(--faint); }
+
+/* ---------- shell ---------- */
+.shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100vh; }
+nav { background: var(--nav); border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; padding: 16px 12px; position: sticky; top: 0; height: 100vh; }
+.brand { padding: 4px 12px 14px; }
+.brand b { display: block; color: var(--text); font-weight: 600; font-size: 15px; letter-spacing: .01em; }
+.brand small { display: block; font-family: var(--mono); color: var(--faint); font-size: 11.5px; margin-top: 2px; }
+.nav-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 8px; color: var(--dim); font-size: 13px; background: none; border: 0; text-align: left; width: 100%; }
+.nav-item:hover { color: var(--text); }
+.nav-item.on { background: var(--line); color: var(--text); }
+.nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.nav-item .cnt { margin-left: auto; font-family: var(--mono); font-size: 11px; background: rgba(var(--tool-rgb), .16); color: var(--tool); border-radius: 4px; padding: 0 6px; min-width: 18px; text-align: center; }
+.nav-item .cnt:empty { display: none; }
+.nav-foot { margin-top: auto; padding: 0 12px; font-family: var(--mono); color: var(--faint); font-size: 11px; line-height: 1.6; white-space: pre-line; }
+.page { min-width: 0; display: flex; flex-direction: column; }
+header { position: sticky; top: 0; z-index: 2; background: var(--nav); border-bottom: 1px solid var(--line); }
+.bar { min-height: 48px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 8px 24px; font-size: 12.5px; }
+.bar h1 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.bar h1 small { color: var(--faint); font-weight: 400; margin-left: 6px; font-size: 12.5px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); margin-right: 6px; }
+.dot.ok { background: var(--ok); box-shadow: 0 0 6px rgba(var(--ok-rgb), .5); } .dot.bad { background: var(--bad); } .dot.amber { background: var(--amber); }
+.spacer { flex: 1; }
+.lang { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.lang button { background: none; border: 0; color: var(--dim); padding: 3px 9px; font-size: 12px; }
+.lang button.on { background: var(--line); color: var(--text); }
+main { padding: 24px; display: grid; gap: 16px; align-content: start; }
+section[data-view] { display: none; }
+section[data-view].on { display: grid; gap: 16px; }
+.foot { font-size: 11.5px; color: var(--faint); }
+
+/* ---------- cards ---------- */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow); }
+.card.warn { border-color: rgba(var(--tool-rgb), .5); }
+.h2 { margin: 0; font-size: 12px; letter-spacing: .04em; color: var(--dim); font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.h2 .sub { font-weight: 400; color: var(--faint); font-size: 12px; letter-spacing: 0; }
+.h2 .right { margin-left: auto; }
+.grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.split { display: grid; grid-template-columns: 5fr 6fr; gap: 16px; }
+.split.b { grid-template-columns: 3fr 2fr; }
+.split.a { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+@media (max-width: 1000px) { .split, .split.b, .split.a, .grid3, .grid2 { grid-template-columns: 1fr; } }
+.stat .k { font-size: 11px; color: var(--faint); letter-spacing: .04em; }
+.stat .v { font-family: var(--mono); font-size: 22px; color: var(--text); line-height: 1.2; }
+.stat .v small { font-size: 13px; color: var(--dim); font-family: inherit; }
+.stat .d { font-size: 12.5px; color: var(--dim); overflow-wrap: anywhere; }
+.mini { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mini .nm { display: flex; gap: 8px; align-items: baseline; } .mini .nm b { color: var(--text); font-weight: 600; } .mini .nm span { color: var(--faint); font-size: 12px; }
+.mini .rl { font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+/* the proof line is the thing nobody else can claim: it reads as a sentence, not as a spec */
+.mini .ct { font-family: var(--mono); color: var(--text); margin-top: auto; font-size: 12px; }
+.mini .st { font-size: 13px; font-weight: 500; }
+.mini button { align-self: flex-start; }
+.chip { font-family: var(--mono); font-size: 11px; padding: 1px 7px; border-radius: 4px; background: rgba(var(--dim-rgb), .16); color: var(--dim); white-space: nowrap; }
+.chip.spend { color: var(--amber); } .chip.halt { color: var(--bad); }
+.badge { display: inline-block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; padding: 1px 6px; border-radius: 4px; border: 1px solid transparent; white-space: nowrap; vertical-align: 1px; }
+.badge.cost { color: var(--agent); border-color: rgba(var(--agent-rgb), .45); background: rgba(var(--agent-rgb), .08); }
+.badge.boundary, .badge.count { color: var(--tool); border-color: rgba(var(--tool-rgb), .45); background: rgba(var(--tool-rgb), .08); }
+.pre { background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 6px; padding: 4px 9px; font-size: 12px; }
+.pre:hover { color: var(--text); border-color: var(--faint); }
+.pre.tool { border-color: rgba(var(--tool-rgb), .5); color: var(--tool); }
+.pre.on { background: var(--line); color: var(--text); }
+.go { border: 0; border-radius: 8px; padding: 7px 16px; font-weight: 600; color: var(--on-text); background: var(--text-fill); }
+.go.tool { background: var(--tool-fill); color: var(--on-fill); } .go.agent { background: var(--agent-fill); color: var(--on-fill); }
+.danger { border-radius: 8px; padding: 6px 14px; font-weight: 500; color: var(--bad); border: 1px solid rgba(var(--bad-rgb), .5); background: none; }
+.link { background: none; border: 0; color: var(--faint); font-size: 12px; padding: 0; text-decoration: underline dotted; }
+.link:hover { color: var(--text); }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tab { padding: 6px 12px; border-radius: 6px; font-size: 13px; color: var(--dim); font-family: var(--mono); background: none; border: 0; }
+.tab.on { background: var(--line); color: var(--text); } .tab.halt { color: var(--amber); }
+.msg { font-size: 13px; padding: 8px 10px; border-radius: 6px; background: var(--panel2); border: 1px solid var(--line); overflow-wrap: anywhere; }
+.msg:empty { display: none; }
+.note { font-size: 12px; color: var(--faint); overflow-wrap: anywhere; }
+.note b, .lead b { color: var(--text); font-weight: 500; }
+.lead { font-size: 13px; color: var(--dim); margin: 0; }
+
+/* ---------- first run (new markup: #ov-first, see audit F7) ---------- */
+.first { display: grid; gap: 10px; border-color: rgba(var(--tool-rgb), .4); }
+.first .h2 { color: var(--text); font-size: 14px; letter-spacing: 0; }
+.first p { margin: 0; font-size: 13px; color: var(--dim); }
+.first-step { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 11px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.first-step .n { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--faint); color: var(--faint); font-family: var(--mono); font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+.first-step.done .n { border-color: var(--ok); color: var(--ok); }
+.first-step.done .n::before { content: "✓"; } .first-step.done .n span { display: none; }
+.first-step.done { opacity: .75; }
+.first-step b { color: var(--text); font-weight: 600; display: block; }
+.first-step small { color: var(--dim); font-size: 12px; display: block; }
+.first-step .go, .first-step .pre { min-height: 36px; white-space: nowrap; }
+
+/* ---------- rule editor ---------- */
+.rules { display: grid; gap: 7px; }
+.rule { display: grid; grid-template-columns: 72px 1fr; gap: 6px 12px; align-items: start; padding: 7px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; }
+.rule input[type=number] { width: 100%; text-align: center; padding: 5px 6px; }
+.rule .tog { display: flex; justify-content: center; padding-top: 4px; }
+.rule .tog input { width: 16px; height: 16px; margin: 0; accent-color: var(--tool-fill); }
+.rule .name { color: var(--text); font-size: 13px; font-weight: 500; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.rule .name code { color: var(--faint); font-size: 11.5px; }
+.rule .hint { font-size: 12px; color: var(--dim); line-height: 1.4; }
+.rule .hint code { font-size: 11.5px; }
+.rule .hint.cost code { color: var(--agent); } .rule .hint.boundary code { color: var(--tool); }
+.rules[data-off] .rule { opacity: .4; }
+.denyall { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid rgba(var(--bad-rgb), .45); border-radius: 8px; font-size: 13px; color: var(--text); }
+.denyall input { width: 16px; height: 16px; margin: 0; accent-color: var(--bad-fill); }
+.denyall small { color: var(--dim); font-size: 12px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.domain { font-size: 12px; color: var(--faint); } .domain.warn { color: var(--amber); }
+
+/* ---------- evidence ---------- */
+.words { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.words li { display: grid; grid-template-columns: 14px 1fr; gap: 6px; font-size: 13px; color: var(--text); }
+.words li::before { content: "·"; color: var(--faint); }
+.words li .en { display: block; font-size: 11.5px; color: var(--faint); font-family: var(--mono); }
+.inputs { font-size: 12px; color: var(--faint); overflow-wrap: anywhere; }
+.inputs code { color: var(--dim); }
+.sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: -1px; margin: 0 4px 0 6px; }
+.verdict-row { display: grid; grid-template-columns: 24px 1fr; gap: 8px; padding: 10px 12px; border-radius: 8px; background: var(--panel2); border: 1px solid var(--line); border-left-width: 3px; }
+.verdict-row.ok { border-left-color: var(--ok); } .verdict-row.bad { border-left-color: var(--bad); } .verdict-row.dim { border-left-color: var(--faint); }
+.verdict-row .mark { font-family: var(--mono); font-weight: 700; font-size: 17px; line-height: 1.2; }
+.verdict-row.ok .mark { color: var(--ok); } .verdict-row.bad .mark { color: var(--bad); } .verdict-row.dim .mark { color: var(--faint); }
+.verdict-row .head { color: var(--text); font-weight: 600; font-size: 14px; }
+.verdict-row .body { font-size: 12.5px; color: var(--dim); margin-top: 3px; }
+.verdict-row .body b { color: var(--text); font-weight: 600; font-family: var(--mono); font-size: 12.5px; }
+/* one sentence of proof, set like a verdict (new markup: .proof, see audit F3) */
+.proof { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start; padding: 10px 12px; border-radius: 8px; background: rgba(var(--ok-rgb), .08); border: 1px solid rgba(var(--ok-rgb), .35); color: var(--text); font-size: 14px; line-height: 1.45; }
+.proof.bad { background: rgba(var(--bad-rgb), .08); border-color: rgba(var(--bad-rgb), .4); }
+.proof .mark { font-family: var(--mono); font-weight: 700; font-size: 17px; color: var(--ok); } .proof.bad .mark { color: var(--bad); }
+.proof b { font-family: var(--mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.proof small { display: block; color: var(--dim); font-size: 12px; margin-top: 2px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 8px; }
+.tile { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.tile .k { font-size: 11px; color: var(--faint); letter-spacing: .04em; }
+.tile .v { font-family: var(--mono); font-size: 15px; color: var(--text); line-height: 1.3; margin-top: 2px; white-space: nowrap; }
+.tile .v small { font-size: 11.5px; color: var(--dim); margin-left: 3px; }
+details { font-size: 12px; color: var(--faint); } summary { cursor: pointer; } summary:hover { color: var(--text); }
+pre { margin: 0; padding: 10px 12px; background: var(--nav); border: 1px solid var(--line); border-radius: 6px; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+pre .c { color: var(--faint); } pre .t { color: var(--tool); }
+
+/* ---------- approvals ---------- */
+/* Column order (CSS only, audit F1): what waits comes first; the stop card drops below it and
+   returns to the top only while a block is in force (its banner is visible). */
+section[data-view="approvals"] .split.a > div > .card:nth-child(1) { order: 2; }
+section[data-view="approvals"] .split.a > div > .card:nth-child(2) { order: 1; }
+section[data-view="approvals"] .split.a > div > .card:nth-child(3) { order: 3; }
+section[data-view="approvals"] .split.a > div > .card:has(.stopbanner:not([hidden])) { order: 0; }
+.pend { background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--tool); border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.pend.wait { border-left-color: var(--faint); }
+.pend .who { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; } .pend .who b { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+.pend .who .codeline { margin-left: auto; }             /* the digits sit at the right edge, where the eye lands after the button */
+.pend .call { font-family: var(--mono); color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
+.pend .btns { display: flex; flex-direction: column; gap: 8px; min-width: 190px; }
+.pend .btns button { white-space: nowrap; min-height: 44px; }
+.pend .btns .notein { width: 100%; min-height: 40px; order: 3; font-size: 13px; }   /* the note is an afterthought, not a field to fill in before pressing */
+.pend .btns .go { order: 1; font-size: 15px; } .pend .btns .danger { order: 2; }
+/* refusal hierarchy (audit F2): the person's sentence first, the circuit's words as the quote beneath */
+.pend .why + .note { color: var(--text); font-size: 13px; }
+.pend .note + .note { color: var(--faint); font-size: 11.5px; }
+.pend .why li { color: var(--dim); font-size: 12px; }
+@media (max-width: 700px) { .pend { grid-template-columns: 1fr; } .pend .btns { min-width: 0; } }
+
+/* the effect a person approves on (I-1): what the call would do, before the tool's words */
+.eff { display: grid; gap: 5px; padding: 9px 11px; border-radius: 8px; background: rgba(var(--tool-rgb), .07); border: 1px solid rgba(var(--tool-rgb), .3); }
+.eff .top { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.eff .sum { color: var(--text); font-size: 16px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.eff .meta { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+.eff .meta b { color: var(--text); font-weight: 600; }
+.eff .kv { grid-template-columns: minmax(0, 90px) minmax(0, 1fr); border-top-color: rgba(var(--tool-rgb), .2); }
+.eff .code-top { margin-left: auto; }                    /* optional markup: the code inside .eff .top */
+.kind { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--nav); color: var(--dim); white-space: nowrap; }
+.kind.pay, .kind.delete { color: var(--bad); border-color: rgba(var(--bad-rgb), .5); }
+.kind.send, .kind.write, .kind.move { color: var(--tool); border-color: rgba(var(--tool-rgb), .5); }
+.kind.read { color: var(--ok); border-color: rgba(var(--ok-rgb), .4); }
+.kind.exec { color: var(--agent); border-color: rgba(var(--agent-rgb), .5); }
+.rev { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.rev.no { color: var(--bad); background: rgba(var(--bad-rgb), .14); }
+.rev.yes { color: var(--ok); background: rgba(var(--ok-rgb), .12); }
+.rev.unk { color: var(--faint); background: rgba(var(--dim-rgb), .12); }
+.code { font-family: var(--mono); font-size: 20px; letter-spacing: .14em; color: var(--tool); background: rgba(var(--tool-rgb), .12); border: 1px solid rgba(var(--tool-rgb), .45); border-radius: 7px; padding: 0 9px; line-height: 1.6; font-variant-numeric: tabular-nums; }
+.codeline { display: inline-flex; gap: 7px; align-items: center; font-size: 12px; color: var(--faint); }
+.hint-once { font-size: 12px; color: var(--faint); }    /* the matching-code hint said once above the list, not on every card */
+
+/* the big red button, and the deliberate way back */
+.stopbtn { border: 0; border-radius: 10px; background: var(--bad-fill); color: var(--on-bad); font-weight: 700; font-size: 15px; min-height: 44px; padding: 9px 18px; position: relative; overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.stopbtn:disabled { background: rgba(var(--bad-rgb), .18); color: var(--bad); border: 1px solid rgba(var(--bad-rgb), .5); opacity: 1; cursor: default; }
+/* hold-to-stop (JS diff in audit F4): the fill rises over ~600 ms; a lifted finger cancels it */
+.stopbtn.holding::before { content: ""; position: absolute; inset: 0; background: rgba(0,0,0,.28); transform-origin: left; animation: stop-hold .6s linear forwards; }
+@keyframes stop-hold { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.stopbtn.armed { box-shadow: 0 0 0 3px rgba(var(--bad-rgb), .35); }
+.bar .stopbtn { min-height: 34px; padding: 4px 16px; font-size: 13px; margin: 0 12px 0 8px; }   /* isolation from the clock and the language toggle */
+.stopbanner { border: 1px solid rgba(var(--bad-rgb), .5); background: rgba(var(--bad-rgb), .1); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--text); }
+.drill { font-size: 12.5px; color: var(--dim); background: var(--panel2); border: 1px dashed var(--faint); border-radius: 8px; padding: 9px 11px; overflow-wrap: anywhere; }
+.drill:empty { display: none; }
+.resume { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.resume .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.resume input { flex: 1 1 150px; min-height: 44px; font-size: 16px; }
+.resume button { min-height: 44px; }
+.stopdock { display: none; }
+.stopdock .note { text-align: center; font-size: 11px; margin-top: 4px; }   /* "hold for half a second": the dock says it, the desktop button's title does */
+/* under the latch (or on a phone that may not stop) there is nothing to hold for: the hint goes with the button */
+.stopdock .stopbtn:disabled + .note, .card.warn .actions:has(.stopbtn:disabled) + .note { display: none; }
+.why { margin: 3px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.why li { font-family: var(--mono); font-size: 12px; color: var(--text); display: grid; grid-template-columns: 12px 1fr; gap: 4px; overflow-wrap: anywhere; }
+.why li::before { content: "↳"; color: var(--faint); }
+.togl { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; }
+.togl.dis { opacity: .45; border-style: dashed; }
+.togl .lbl b { color: var(--text); font-weight: 500; font-family: var(--mono); font-size: 12.5px; display: block; }
+.togl .lbl small { color: var(--faint); font-size: 11.5px; }
+.togl button { white-space: nowrap; }
+.handled { display: grid; gap: 6px; }
+#ap-toggles { display: grid; gap: 8px; }   /* was an inline style; it lives here so .agentless can turn it off */
+/* with no agent there is nothing to switch: the panel says so and hides the raw bits (new markup: .agentless on the card) */
+.agentless #ap-toggles, .agentless #ap-agent { display: none; }
+
+/* ---------- log ---------- */
+.log { display: grid; gap: 6px; }
+.e { display: grid; grid-template-columns: 62px 1fr; gap: 10px; padding: 7px 10px; background: var(--panel2); border: 1px solid var(--line); border-left-width: 3px; border-radius: 6px; font-size: 13px; min-width: 0; }
+.e.ok { border-left-color: var(--ok); } .e.no { border-left-color: var(--faint); } .e.tool { border-left-color: var(--tool); } .e.policy { border-left-color: var(--agent); } .e.err { border-left-color: var(--bad); }
+.e.spoof { border-left-color: var(--bad); border-left-style: double; } .e.spoof .verdict { background: rgba(var(--bad-rgb), .14); color: var(--bad); }
+.e .t { font-family: var(--mono); font-size: 12px; color: var(--faint); padding-top: 2px; }
+.e .h { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; min-width: 0; }
+.e .h .agent { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+.e .h .bits { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; } .e .h .bits .t1 { color: var(--tool); }
+.e .h .chain { margin-left: auto; font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.e .verdict { font-family: var(--mono); font-size: 11.5px; font-weight: 700; letter-spacing: .06em; padding: 1px 7px; border-radius: 4px; }
+.e.ok .verdict { background: rgba(var(--ok-rgb), .14); color: var(--ok); } .e.no .verdict { background: rgba(var(--dim-rgb), .16); color: var(--dim); }
+.e.tool .verdict { background: rgba(var(--tool-rgb), .14); color: var(--tool); } .e.policy .verdict { background: rgba(var(--agent-rgb), .14); color: var(--agent); } .e.err .verdict { background: rgba(var(--bad-rgb), .14); color: var(--bad); }
+.e .d { color: var(--dim); margin-top: 2px; font-size: 12.5px; overflow-wrap: anywhere; } .e .d b { color: var(--text); font-weight: 500; }
+.e .reason { color: var(--faint); font-style: italic; overflow-wrap: anywhere; }
+/* a run of identical refusals folds into one row (JS diff in audit F5) */
+.e.more { border-left-style: dotted; } .e.more .d { color: var(--faint); }
+.e.more .cnt { font-family: var(--mono); color: var(--text); background: rgba(var(--dim-rgb), .16); border-radius: 4px; padding: 0 6px; }
+@media (max-width: 480px) { .e { grid-template-columns: 1fr; gap: 2px; } }
+.tester { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12.5px; }
+.tester input[type=text] { width: 180px; max-width: 100%; }
+.tester label { display: flex; gap: 6px; align-items: center; }
+.tester label input[type=checkbox] { accent-color: var(--agent-fill); }
+
+/* ---------- tables ---------- */
+.wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: var(--faint); font-weight: 500; padding: 4px 10px 6px 0; border-bottom: 1px solid var(--line); white-space: nowrap; font-size: 12px; }
+td { padding: 6px 10px 6px 0; color: var(--text); vertical-align: top; }
+td.name { overflow-wrap: anywhere; max-width: 22ch; } td.num { white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
+tr + tr td { border-top: 1px solid var(--line2); }
+.kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; font-size: 12.5px; padding: 6px 0; border-top: 1px solid var(--line2); }
+.kv b { color: var(--text); font-weight: 500; } .kv .free { color: var(--ok); } .kv .gate { color: var(--tool); }
+.step { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 12.5px; }
+.step .n { font-family: var(--mono); color: var(--faint); } .step b { color: var(--text); font-weight: 500; }
+
+/* ---------- connect (was the second <style> inside the section) ---------- */
+.picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.pick { display: grid; gap: 3px; text-align: left; padding: 11px 13px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel2); color: var(--dim); min-height: 44px; }
+.pick:hover { border-color: var(--faint); color: var(--text); }
+.pick.on { border-color: var(--tool); background: rgba(var(--tool-rgb), .08); }
+.pick b { color: var(--text); font-weight: 600; font-size: 13.5px; }
+.pick small { font-size: 12px; color: var(--faint); line-height: 1.4; }
+.pick.on small { color: var(--dim); }
+.cnrow { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 12.5px; }
+.cnrow label { display: flex; gap: 6px; align-items: center; color: var(--faint); }
+.cnrow input[type=text] { width: 190px; max-width: 100%; }
+#cn-tools td { vertical-align: middle; }
+#cn-tools select { padding: 3px 6px; }
+#cn-tools input[type=checkbox] { width: 17px; height: 17px; margin: 0; accent-color: var(--tool-fill); }
+#cn-tools .src { font-size: 11.5px; }
+#cn-tools .locked { color: var(--faint); font-size: 11.5px; }
+.srcpat { font-family: var(--mono); font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
+
+/* ---------- tasks (the view in flight tonight; tokenised copy of its owner's rules) ---------- */
+.task { background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--agent); border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.task .top { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.task .said { color: var(--text); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.task .spent { font-family: var(--mono); font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+.task .spent .g { color: var(--ok); } .task .spent .r { color: var(--bad); }
+.task .btns { display: flex; flex-direction: column; gap: 8px; min-width: 140px; }
+.task .btns button { white-space: nowrap; min-height: 44px; }
+.tid { font-family: var(--mono); font-size: 11.5px; color: var(--agent); background: rgba(var(--agent-rgb), .12); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
+.e.task-e { border-left-color: var(--agent); border-left-style: dashed; } .e.task-e .verdict { background: rgba(var(--agent-rgb), .14); color: var(--agent); }
+@media (max-width: 700px) { .task { grid-template-columns: 1fr; } .task .btns { min-width: 0; } }
+
+/* ---------- narrow: tablet ---------- */
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  nav { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px; padding: 8px 8px 6px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .brand { padding: 0 8px 4px 6px; width: 100%; } .brand small { display: none; }
+  /* every tab keeps its name: icon above a short label (nav.* in zh become Chinese-only, see copy.md) */
+  .nav-item { width: auto; flex: 1 1 0; min-width: 48px; height: auto; min-height: 48px; flex-direction: column; justify-content: center; gap: 3px; padding: 5px 2px; }
+  .nav-item span.lab { display: block; font-size: 10.5px; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-item .cnt { position: absolute; margin: 0; transform: translate(14px, -22px); }
+  .nav-item { position: relative; }
+  .nav-foot { display: none; }
+  main, .bar { padding-left: 16px; padding-right: 16px; }
+}
+/* ---------- narrow: a real phone (390x844 iOS Safari, 360x800 Android Chrome) ----------
+   Every tap target is at least 44 px, text inputs are 16 px so Safari does not zoom, and the
+   stop button sits where a thumb already is — the bottom of the screen. */
+@media (max-width: 600px) {
+  header { position: sticky; }
+  .bar { gap: 4px 12px; padding: 6px 112px 6px 16px; position: relative; }   /* right gutter is the toggle's lane */
+  .bar h1 { flex: 1 1 100%; }                    /* the title on its own line, the three dots share the next */
+  .bar .lang { position: absolute; top: 8px; right: 16px; }   /* the toggle rides the title row instead of taking a third */
+  .lang button { min-height: 34px; padding: 0 12px; }
+  .bar h1 small { display: block; margin: 0; font-size: 11.5px; }
+  .bar > span:not(.lang):not(.spacer) { font-size: 11.5px; }
+  #clock { display: none; }                      /* the phone has a clock */
+  .bar .stopbtn { display: none; }
+  .stopdock { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--nav);
+              border-top: 1px solid var(--line); padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
+  .stopdock .stopbtn { width: 100%; min-height: 50px; font-size: 16px; }
+  main { padding-bottom: 108px; }                /* the dock: 8 + 50 + hint 20 + 8, plus room to breathe */
+  .cnrow input[type=text] { width: 100%; }
+  /* the dock is the stop on a phone; the card keeps the banner, the drill and the way back */
+  section[data-view="approvals"] .card.warn > .actions > .stopbtn { display: none; }
+  .pend .btns button, .pend .btns .notein { width: 100%; font-size: 16px; }
+  .pend .btns { flex-direction: column; }
+  .pend .btns .notein { font-size: 16px; }
+  input, select, textarea { font-size: 16px; } input, select { min-height: 44px; }
+  .nav-item, .pre, .link, .danger, .go, .tab { min-height: 44px; }
+  .togl { padding: 8px 10px; }
+  .tester input[type=text] { width: 100%; }
+  .code { font-size: 24px; }
+  .eff .sum { font-size: 17px; }
+  .grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }   /* four zeros in one column is a wall; two by two reads as a dashboard */
+  .stat { padding: 10px 12px; } .stat .v { font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .stopbtn.holding::before { animation-duration: .01s; } }
+</style>
+
+<div class="shell">
+<nav id="nav">
+  <div class="brand"><b>C3S Circuit Agent</b><small>boundary console · 边界控制台</small></div>
+  <button class="nav-item" data-view="overview"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg><span class="lab" data-i18n="nav.overview"></span></button>
+  <button class="nav-item" data-view="boundaries"><svg viewBox="0 0 16 16"><path d="M8 1.5 13.5 3.5v4c0 3.2-2.3 5.6-5.5 7-3.2-1.4-5.5-3.8-5.5-7v-4z"></path></svg><span class="lab" data-i18n="nav.boundaries"></span></button>
+  <button class="nav-item" data-view="approvals"><svg viewBox="0 0 16 16"><path d="M2 9h3.5l1 2h3l1-2H14"></path><path d="M3.5 3.5h9L14 9v3.5H2V9z"></path></svg><span class="lab" data-i18n="nav.approvals"></span><span class="cnt" id="nav-pending"></span></button>
+  <button class="nav-item" data-view="tasks"><svg viewBox="0 0 16 16"><path d="M5 2.5h6a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z"></path><path d="M6.5 6h3M6.5 8.5h3M6.5 11h2"></path></svg><span class="lab" data-i18n="nav.tasks"></span><span class="cnt" id="nav-tasks"></span></button>
+  <button class="nav-item" data-view="activity"><svg viewBox="0 0 16 16"><path d="M1.5 8h3l2-5 3 10 2-5h3"></path></svg><span class="lab" data-i18n="nav.activity"></span></button>
+  <button class="nav-item" data-view="agents"><svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.5"></rect><path d="M6 1.5v2.5M10 1.5v2.5M6 12v2.5M10 12v2.5M1.5 6h2.5M1.5 10h2.5M12 6h2.5M12 10h2.5"></path></svg><span class="lab" data-i18n="nav.agents"></span></button>
+  <button class="nav-item" data-view="connect"><svg viewBox="0 0 16 16"><path d="M6.5 9.5 9.5 6.5"></path><path d="M7 4.5 8.5 3a2.5 2.5 0 0 1 3.5 3.5L10.5 8"></path><path d="M9 11.5 7.5 13a2.5 2.5 0 0 1-3.5-3.5L5.5 8"></path></svg><span class="lab" data-i18n="nav.connect"></span></button>
+  <div class="nav-foot" data-i18n="nav.foot"></div>
+</nav>
+
+<div class="page">
+<header><div class="bar">
+  <h1><span id="title"></span><small id="subtitle"></small></h1>
+  <span><i class="dot" id="svc-dot"></i><span id="svc"></span></span>
+  <span class="mono muted" id="viewer-badge" hidden></span>
+  <span><i class="dot" id="chain-dot"></i><span id="chain"></span></span>
+  <span><i class="dot" id="models-dot"></i><span id="models"></span></span>
+  <span class="spacer"></span>
+  <button class="stopbtn" id="stop-all" type="button"></button>
+  <span class="mono muted" id="clock"></span>
+  <span class="lang"><button data-lang="zh">中文</button><button data-lang="en">EN</button></span>
+</div></header>
+
+<main>
+<!-- ===== Overview ===== -->
+<section data-view="overview">
+  <!-- First run: the three steps, with the ones already done ticked; gone once all three are. -->
+  <div class="card first" id="ov-first" hidden>
+    <div class="h2" data-i18n="first.title"></div>
+    <p data-i18n="first.lead"></p>
+    <div class="first-step" data-step="rules"><span class="n"><span>1</span></span><div><b data-i18n="first.s1"></b><small data-i18n="first.s1.d"></small></div><button class="go tool" type="button" data-go="boundaries" data-i18n="first.go1"></button></div>
+    <div class="first-step" data-step="connect"><span class="n"><span>2</span></span><div><b data-i18n="first.s2"></b><small data-i18n="first.s2.d"></small></div><button class="pre" type="button" data-go="connect" data-i18n="first.go2"></button></div>
+    <div class="first-step" data-step="probe"><span class="n"><span>3</span></span><div><b data-i18n="first.s3"></b><small data-i18n="first.s3.d"></small></div><button class="pre" type="button" data-go="connect" data-i18n="first.go3"></button></div>
+  </div>
+  <div class="grid4" id="ov-stats"></div>
+  <div class="split">
+    <div class="card"><div class="h2"><span data-i18n="ov.circuits"></span><span class="sub" data-i18n="ov.circuits.sub"></span></div><div class="grid2" id="ov-classes"></div><div class="note" id="ov-halt"></div></div>
+    <div class="card"><div class="h2"><span data-i18n="ov.recent"></span><span class="sub" data-i18n="ov.recent.sub"></span></div><div class="log" id="ov-recent"></div></div>
+  </div>
+  <div class="foot" data-i18n="honest.line"></div>
+</section>
+
+<!-- ===== Boundaries ===== -->
+<section data-view="boundaries">
+  <div class="tabs" id="b-tabs"></div>
+  <div class="split b">
+    <form class="card" id="rules" autocomplete="off">
+      <div class="h2"><span data-i18n="b.blocks"></span><span class="sub" data-i18n="b.blocks.sub"></span></div>
+      <div class="tabs" id="b-templates"><span class="muted" style="font-size:12px" data-i18n="b.templates"></span></div>
+      <div class="denyall" id="denyall-row"><input type="checkbox" id="r-denyall"><span><span data-i18n="b.denyall"></span> <small data-i18n="b.denyall.hint"></small></span></div>
+      <div class="rules" id="rule-list">
+        <div class="rule"><input id="r-gap" type="number" min="0" max="255" step="1" required><div><div class="name"><span data-i18n="r.gap"></span><code>min_gap_ticks</code><span class="badge count" data-i18n="bd.count"></span></div><div class="hint count" data-i18n="r.gap.hint"></div></div></div>
+        <div class="rule"><input id="r-commit" type="number" min="0" max="255" step="1" required><div><div class="name"><span data-i18n="r.commit"></span><code>commit_ticks</code><span class="badge cost" data-i18n="bd.cost"></span></div><div class="hint cost" data-i18n="r.commit.hint"></div></div></div>
+        <div class="rule"><div class="tog"><input id="r-blocked" type="checkbox"></div><div><div class="name"><span data-i18n="r.blocked"></span><code>forbid_when_blocked</code><span class="badge boundary" data-i18n="bd.boundary"></span></div><div class="hint boundary" data-i18n="r.blocked.hint"></div></div></div>
+        <div class="rule"><input id="r-max" type="number" min="0" max="255" step="1" required><div><div class="name"><span data-i18n="r.max"></span><code>max_grants</code><span class="badge count" data-i18n="bd.count"></span></div><div class="hint count" data-i18n="r.max.hint"></div></div></div>
+        <div class="rule"><input id="r-confirm" type="number" min="0" max="255" step="1" required><div><div class="name"><span data-i18n="r.confirm"></span><code>confirm_window_ticks</code><span class="badge boundary" data-i18n="bd.boundary"></span></div><div class="hint boundary" data-i18n="r.confirm.hint"></div></div></div>
+        <div class="rule"><div class="tog"><input id="r-sticky" type="checkbox"></div><div><div class="name"><span data-i18n="r.sticky"></span><code>sticky_block</code><span class="badge boundary" data-i18n="bd.boundary"></span></div><div class="hint boundary" data-i18n="r.sticky.hint"></div></div></div>
+        <div class="rule"><input id="r-heartbeat" type="number" min="0" max="255" step="1" required><div><div class="name"><span data-i18n="r.heartbeat"></span><code>heartbeat_ticks</code><span class="badge boundary" data-i18n="bd.boundary"></span></div><div class="hint boundary" data-i18n="r.heartbeat.hint"></div></div></div>
+        <div class="rule"><div class="tog"><input id="r-irrev" type="checkbox"></div><div><div class="name"><span data-i18n="r.irrev"></span><code>confirm_per_irreversible</code><span class="badge boundary" data-i18n="bd.boundary"></span></div><div class="hint boundary" data-i18n="r.irrev.hint"></div></div></div>
+        <div class="rule"><input id="r-trip" type="number" min="0" max="255" step="1" required><div><div class="name"><span data-i18n="r.trip"></span><code>trip_after_failures</code><span class="badge boundary" data-i18n="bd.boundary"></span></div><div class="hint boundary" data-i18n="r.trip.hint"></div></div></div>
+        <div class="rule"><div class="tog"><input id="r-twokey" type="checkbox"></div><div><div class="name"><span data-i18n="r.twokey"></span><code>two_key</code><span class="badge boundary" data-i18n="bd.boundary"></span></div><div class="hint boundary" data-i18n="r.twokey.hint"></div></div></div>
+      </div>
+      <div class="domain" id="domain"></div>
+      <div class="actions">
+        <button class="go" type="submit" id="install" data-i18n="b.install"></button>
+        <span class="note" id="install-note"></span>
+        <span class="spacer"></span>
+        <button class="link" type="button" id="r-reload" data-i18n="b.reload"></button>
+        <button class="link" type="button" id="r-remove" data-i18n="b.remove"></button>
+      </div>
+      <div class="msg" id="install-msg"></div>
+    </form>
+    <div class="card" id="evidence">
+      <div class="h2"><span data-i18n="ev.title"></span><span class="sub" data-i18n="ev.sub"></span></div>
+      <div id="ev-body"></div>
+      <div class="note" data-i18n="ev.cross"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Approvals ===== -->
+<section data-view="approvals">
+  <p class="lead" id="ap-lead"></p>
+  <div class="split a">
+    <div style="display:grid;gap:16px;min-width:0">
+      <div class="card warn">
+        <div class="h2"><span data-i18n="ap.stop.title"></span><span class="sub" data-i18n="ap.stop.sub"></span></div>
+        <div class="stopbanner" id="ap-stop-banner" hidden></div>
+        <div class="actions">
+          <button class="stopbtn" id="stop-big" type="button"></button>
+          <button class="pre" id="stop-drill" type="button" data-i18n="ap.drill"></button>
+        </div>
+        <div class="note" data-i18n="ap.stop.hint"></div>
+        <div class="drill" id="ap-drill"></div>
+        <div class="resume" id="ap-resume" hidden>
+          <div class="note" id="ap-resume-hint"></div>
+          <div class="row">
+            <button class="pre" id="resume-open" type="button" data-i18n="ap.resume.open"></button>
+            <input type="text" id="resume-word" autocomplete="off" spellcheck="false" maxlength="24" hidden>
+            <button class="danger" id="resume-go" type="button" disabled hidden data-i18n="ap.resume.go"></button>
+          </div>
+        </div>
+        <div class="msg" id="ap-stop-msg"></div>
+      </div>
+      <div class="card"><div class="h2"><span data-i18n="ap.pending"></span><span class="sub" id="ap-pending-sub"></span></div><div class="hint-once" id="ap-hint-once" data-i18n="ap.hint.once" hidden></div><div id="ap-list" style="display:grid;gap:10px"></div></div>
+      <div class="card"><div class="h2"><span data-i18n="ap.handled"></span></div><div class="handled" id="ap-handled"></div></div>
+    </div>
+    <div class="card">
+      <div class="h2"><span data-i18n="ap.switches"></span><span class="sub" data-i18n="ap.switches.sub"></span></div>
+      <select id="ap-agent"></select>
+      <div id="ap-toggles"></div>
+      <div class="note" data-i18n="ap.grey"></div>
+      <div class="note" style="border-top:1px solid var(--line);padding-top:10px" data-i18n="ap.cardputer"></div>
+      <div class="msg" id="ap-msg"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Tasks ===== -->
+<!-- A job a person hands the agent. The calls it is made of are still judged one at a
+     time by the circuits — filing a job grants nothing — so this view is an account, not
+     a control: what was asked for, what it has spent, and the one act that is a person's
+     (closing it). -->
+<section data-view="tasks">
+  <p class="lead" id="tk-lead"></p>
+  <div class="split a">
+    <div style="display:grid;gap:16px;min-width:0">
+      <div class="card"><div class="h2"><span data-i18n="tk.open"></span><span class="sub" id="tk-open-sub"></span></div><div id="tk-list" style="display:grid;gap:10px"></div></div>
+      <div class="card"><div class="h2"><span data-i18n="tk.done"></span><span class="sub" data-i18n="tk.done.sub"></span></div><div class="wrap"><table id="tk-closed"><tbody></tbody></table></div></div>
+    </div>
+    <form class="card" id="tk-file" autocomplete="off">
+      <div class="h2"><span data-i18n="tk.file"></span><span class="sub" data-i18n="tk.file.sub"></span></div>
+      <textarea id="tk-text" maxlength="600" rows="4" spellcheck="false"></textarea>
+      <div class="note" data-i18n="tk.text.note"></div>
+      <div class="h2" style="margin-top:4px"><span data-i18n="tk.expects"></span></div>
+      <div class="tester" id="tk-classes"></div>
+      <div class="note" data-i18n="tk.expects.note"></div>
+      <div class="tester" style="margin-top:4px">
+        <label><input type="checkbox" id="tk-cap-on"><span data-i18n="tk.cap"></span></label>
+        <input type="number" id="tk-cap" min="1" max="999" step="1" value="5" style="width:80px" disabled>
+      </div>
+      <div class="note" data-i18n="tk.cap.note"></div>
+      <div class="actions"><button class="go" type="submit" id="tk-go" data-i18n="tk.go"></button></div>
+      <div class="msg" id="tk-msg"></div>
+      <div class="note" style="border-top:1px solid var(--line);padding-top:10px" data-i18n="tk.grants.nothing"></div>
+    </form>
+  </div>
+</section>
+
+<!-- ===== Activity ===== -->
+<section data-view="activity">
+  <div class="card">
+    <div class="h2"><span data-i18n="ac.tester"></span><span class="sub" data-i18n="ac.tester.sub"></span></div>
+    <form class="tester" id="req">
+      <input type="text" id="agent" value="console" maxlength="40" placeholder="agent">
+      <select id="req-class"></select>
+      <label><input id="intent" type="checkbox" checked><span data-i18n="ac.intent"></span></label>
+      <input type="text" id="reason" maxlength="160" style="width:220px" placeholder="reason">
+      <button class="go agent" type="submit" id="send" data-i18n="ac.send"></button>
+    </form>
+    <div class="msg" id="last"></div>
+  </div>
+  <div class="card">
+    <div class="h2"><span data-i18n="ac.log"></span><span class="sub" id="ac-sub"></span></div>
+    <div class="tabs" id="ac-filters"></div>
+    <div class="log" id="ac-log"></div>
+  </div>
+</section>
+
+<!-- ===== Agents ===== -->
+<section data-view="agents">
+  <div class="card"><div class="h2"><span data-i18n="ag.title"></span><span class="sub" data-i18n="ag.sub"></span></div><div class="wrap"><table id="agents"><tbody></tbody></table></div></div>
+</section>
+
+<!-- ===== Connect ===== -->
+<section data-view="connect">
+  <!-- W2: the first screen is a question — what do you use? — and then one way in. -->
+  <div class="card">
+    <div class="h2"><span data-i18n="cn.pick"></span><span class="sub" data-i18n="cn.pick.sub"></span></div>
+    <div class="picks">
+      <button class="pick" type="button" data-pick="claude"><b>Claude Code</b><small data-i18n="cn.pick.claude"></small></button>
+      <button class="pick" type="button" data-pick="mcp"><b data-i18n="cn.pick.mcp.t"></b><small data-i18n="cn.pick.mcp"></small></button>
+      <button class="pick" type="button" data-pick="bnb"><b>BNBAgent SDK</b><small data-i18n="cn.pick.bnb"></small></button>
+    </div>
+    <div class="note" data-i18n="cn.pick.note"></div>
+  </div>
+
+  <div class="card" id="cn-panel-claude" hidden>
+    <div class="h2"><span data-i18n="cn.cc.title"></span><span class="sub" id="cn-cc-file"></span><button class="pre right" type="button" data-copy="cn-cc-block" data-i18n="cn.copy"></button></div>
+    <div class="cnrow"><label data-i18n="cn.cc.agent"></label><input type="text" id="cn-cc-agent" value="claude-code:mine" spellcheck="false"><span class="note" data-i18n="cn.cc.agent.note"></span></div>
+    <pre id="cn-cc-block"></pre>
+    <div class="actions">
+      <button class="pre" type="button" id="cn-cc-write" hidden data-i18n="cn.cc.write"></button>
+      <span class="note" id="cn-cc-msg"></span>
+    </div>
+    <pre id="cn-cc-diff" hidden></pre>
+    <div class="actions" id="cn-cc-confirm" hidden>
+      <button class="go tool" type="button" id="cn-cc-go" data-i18n="cn.cc.go"></button>
+      <button class="link" type="button" id="cn-cc-cancel" data-i18n="cn.cc.cancel"></button>
+    </div>
+    <div class="note" data-i18n="cn.cc.note2"></div>
+  </div>
+
+  <div class="card" id="cn-panel-mcp" hidden>
+    <div class="h2"><span data-i18n="cn.mcp.title"></span><span class="sub" data-i18n="cn.mcp.sub"></span><button class="pre right" type="button" data-copy="cn-mcp-block" data-i18n="cn.copy"></button></div>
+    <div class="cnrow">
+      <label data-i18n="cn.mcp.name"></label><input type="text" id="cn-mcp-name" value="filesystem" spellcheck="false">
+      <label data-i18n="cn.mcp.cmd"></label><input type="text" id="cn-mcp-cmd" value="npx -y @modelcontextprotocol/server-filesystem /Users/me/projects" spellcheck="false">
+      <label data-i18n="cn.mcp.cls"></label><select id="cn-mcp-class"></select>
+    </div>
+    <pre id="cn-mcp-block"></pre>
+    <div class="note" id="cn-mcp-gates"></div>
+    <div class="note" data-i18n="cn.mcp.note"></div>
+  </div>
+
+  <div class="card" id="cn-panel-bnb" hidden>
+    <div class="h2"><span data-i18n="cn.bnb.title"></span><span class="sub" data-i18n="cn.bnb.sub"></span><button class="pre right" type="button" data-copy="cn-bnb-block" data-i18n="cn.copy"></button></div>
+    <pre id="cn-bnb-env"></pre>
+    <pre id="cn-bnb-block"></pre>
+    <div class="note" data-i18n="cn.bnb.note"></div>
+  </div>
+
+  <div class="card" id="cn-probe-card" hidden>
+    <div class="h2"><span data-i18n="cn.probe.title"></span><span class="sub" data-i18n="cn.probe.sub"></span></div>
+    <div class="actions"><button class="go tool" type="button" id="cn-probe" data-i18n="cn.probe.go"></button><span class="note" id="cn-probe-msg"></span></div>
+    <div id="cn-probe-out"></div>
+    <div class="note" data-i18n="cn.probe.note"></div>
+  </div>
+
+  <div class="card">
+    <div class="h2"><span data-i18n="tools.title"></span><span class="sub" id="cn-tools-count"></span><button class="pre right" type="button" id="cn-tools-reload" data-i18n="tools.reload"></button></div>
+    <p class="lead" id="cn-tools-lead"></p>
+    <div class="wrap"><table id="cn-tools">
+      <thead><tr><th data-i18n="tools.h.tool"></th><th data-i18n="tools.h.class"></th><th data-i18n="tools.h.irrev"></th><th data-i18n="tools.h.src"></th><th data-i18n="tools.h.seen"></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="actions"><button class="go tool" type="button" id="cn-tools-save" data-i18n="tools.save"></button><span class="note" id="cn-tools-msg"></span></div>
+    <div class="note" id="cn-tools-files"></div>
+    <div class="note" data-i18n="tools.promise"></div>
+  </div>
+
+  <div class="grid3">
+    <div class="card"><div class="h2"><span>Telegram</span><span class="sub" data-i18n="cn.tg.sub"></span><button class="pre right" type="button" data-copy="cn-tg" data-i18n="cn.copy"></button></div><pre id="cn-tg"></pre><div class="note" data-i18n="cn.tg.note"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="h2"><span data-i18n="cn.daily"></span><span class="sub" data-i18n="cn.daily.sub"></span></div><div id="cn-daily"></div><div class="note" data-i18n="cn.daily.note"></div></div>
+    <div class="card">
+      <div class="h2"><span data-i18n="cn.chain"></span><span class="sub">opBNB Testnet 5611 · BSC Testnet 97</span><select id="cn-class" class="right"></select></div>
+      <div class="step"><span class="n">1</span><span data-i18n="cn.s1"></span></div>
+      <div class="step"><span class="n">2</span><span data-i18n="cn.s2"></span></div>
+      <pre id="cn-forge"></pre>
+      <div class="step"><span class="n">3</span><span data-i18n="cn.s3"></span></div>
+      <div class="note" style="color:var(--text)" data-i18n="cn.noone"></div>
+      <div class="note" data-i18n="cn.trust"></div>
+      <div class="actions"><button class="pre" type="button" data-copy="cn-forge" data-i18n="cn.copy"></button><span class="note" id="cn-forge-note"></span></div>
+      <div class="step"><span class="n">4</span><span data-i18n="cn.s4"></span></div>
+      <div class="actions"><button class="pre" type="button" id="cn-manifest-go" data-i18n="cn.manifest.go"></button><button class="pre" type="button" data-copy="cn-manifest" data-i18n="cn.copy"></button><span class="note" id="cn-manifest-note"></span></div>
+      <pre id="cn-manifest" hidden></pre>
+    </div>
+  </div>
+  <div class="card"><div class="h2"><span data-i18n="cn.curl"></span></div><pre id="cn-curl"></pre></div>
+  <div class="foot" data-i18n="cn.foot"></div>
+</section>
+</main>
+<!-- On a phone the stop is where the thumb already is; on a desktop it is in the top bar. -->
+<div class="stopdock"><button class="stopbtn" id="stop-all-2" type="button"></button><div class="note" data-i18n="ap.stop.hint"></div></div>
+</div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const N = (v) => Number(v) || 0;
+const VIEWS = ["overview", "boundaries", "approvals", "tasks", "activity", "agents", "connect"];
+const TOOL_CLASSES = ["spend", "message", "exec", "files"], HALT = "halt", ALL_CLASSES = TOOL_CLASSES.concat([HALT]);
+const TOOL_BITS = ["blocked", "confirm", "irreversible", "failed", "heartbeat", "confirm_b"];
+const AGENT_BITS = ["request", "intent"];
+
+// ---------- text ----------
+const T = {
+  zh: {
+    // phone tabs are 53 px wide: a bilingual label would be cut to "Overvie…", so zh is Chinese only
+    "nav.overview": "总览", "nav.boundaries": "边界", "nav.approvals": "待确认", "nav.tasks": "任务", "nav.activity": "流水", "nav.agents": "Agents", "nav.connect": "接入",
+    "nav.foot": "拍数的是调用，不是时间。\n不可逆由工具层判定。\n链上只复算，不部署。",
+    "title.overview": "总览", "sub.overview": "", "title.boundaries": "边界", "sub.boundaries": "规则 → 电路 → 逐行核对 → 遍历证明",
+    "title.approvals": "待确认", "sub.approvals": "", "title.tasks": "任务", "sub.tasks": "交一件事给它做；每次调用照旧一条一条过电路", "title.activity": "流水", "sub.activity": "每条决策都带电路原话与链上复算",
+    "title.agents": "Agents", "sub.agents": "一个名字，四张电路各一份状态", "title.connect": "接入", "sub.connect": "你的模型、你的工具、你的链——边界都在同一张电路上",
+    "svc.ok": "服务已连接", "svc.bad": "服务无响应", "svc.wait": "连接中…", "svc.denied": "无权读取：在电脑上跑 `c3s pair` 重新配对这台手机",
+    "tok.viewer.badge": "手机视图（只读 + 确认/封锁）", "tok.viewer.no": "这台手机拿的是查看令牌：能看、能确认屏幕上的调用、能封锁——不能装规则、不能全停/解除、不能解封。这些要在电脑上做。",
+    "tok.viewer.have": "我有操作者令牌", "tok.viewer.switches": "手机只能对屏幕上有匹配码的调用按确认或封锁；这些裸开关是操作者的。",
+    "chain.off": "链上复核已关闭", "chain.idle": "链上复核就绪（BSC 只读，未部署）", "chain.ok": "链上复核一致 · 未部署", "chain.pend": "链上复核进行中", "chain.err": "链上节点不可用，仅本地裁决", "chain.dis": "链上复核不一致！",
+    "models.n": "{n} 个模型已接入", "models.none": "还没有模型接入 · 去「接入」",
+    "honest.line": "「拍」数的是调用次数，不是时间；哪些工具算不可逆是工具层说的；链上只复算、不部署。",
+    "cls.spend": "花钱", "cls.message": "发消息", "cls.exec": "执行", "cls.files": "文件", "cls.halt": "停机（共享）",
+    "cls.spend.what": "转账、支付、下单、签名", "cls.message.what": "发消息、发邮件、发帖", "cls.exec.what": "跑命令、调工具——没归类的都到这里", "cls.files.what": "写、改、删、移动文件", "cls.halt.what": "每次请求先过它；它不放，四类全见 blocked",
+    // overview
+    "ov.models": "已接入模型", "ov.models.d": "按 agent 名的前缀数", "ov.models.none": "还没有请求进来",
+    "ov.circ": "电路", "ov.circ.unit": "张", "ov.circ.ok": "每一行都核过 · 每条规则都成立", "ov.circ.bad": "有规则不成立", "ov.circ.none": "只有 exec 一张（默认）",
+    "ov.dec": "最近决策", "ov.dec.d": "流水最近 {n} 条 · 放行 {g} · 拒绝 {r}",
+    "ov.pend": "待确认", "ov.pend.d": "在等你点头，模型点不了", "ov.pend.none": "没有等人的请求",
+    "ov.circuits": "四条反射弧", "ov.circuits.sub": "一类工具一条：花钱、发消息、执行、文件",
+    "ov.recent": "最近决策", "ov.recent.sub": "每条都带电路原话与链上复算",
+    // "not limited" is the true reading of an unruled class; Stop everything is a latch in front of every class, so it does reach this one
+    "ov.deny": "整类拒绝 · 没有电路会放行", "ov.none": "还没有规则：这类工具现在不设限，只有「全部停下」拦得住它。", "ov.install": "给它定规则 →", "ov.holds": "✓ 每一行都核过，每条规则都成立", "ov.fails": "✗ 有规则不成立",
+    "ov.halt.on": "共享停机电路：{rules} — {nand} NAND + {latch} LATCH · {rows} 行", "ov.halt.off": "没有装共享停机：手动停下一个 agent（blocked）放下就恢复，不会记住；「全部停下」不受影响，它是一道闩。要「停过就不自动恢复」或心跳，用模板「停机+心跳」装上。",
+    "ov.rows": "{rows} 行全部核过 · {nand} NAND + {latch} LATCH",
+    // boundaries
+    "b.blocks": "规则", "b.blocks.sub": "十条；蓝色标签的规则 agent 自己能付出代价绕开，橙色的它绕不开", "b.templates": "模板",
+    "b.tab.hint": "这张电路管 {cls} 类工具：{what}",
+    "b.denyall": "这类工具一律拒绝", "b.denyall.hint": "要「永远不许」就勾这个。下面的数字里 0 表示「不限」，不是零次。",
+    "b.install": "生效", "b.reload": "读回已装的", "b.remove": "移除这张电路",
+    "b.note": "重编译、逐行核对、遍历证明；这一类下每个 agent 的计数归零。", "b.note.deny": "不编译任何电路：这一类每个请求都直接拒绝。",
+    "b.domain": "编译后 {inputs} 个输入 + {state} 位状态 · 需逐行核对 2^{bits} = {rows} 行", "b.domain.warn": "超过 26 位的穷举上限，服务端会拒绝这组规则。",
+    "b.installing": "编译中…", "b.installed": "{cls} 的规则已生效：{rows} 行全部核过，{holds}（{nand} NAND + {latch} LATCH，{ms} ms）。", "b.denied": "已设置：{cls} 整类拒绝。", "b.removed": "已移除 {cls} 的电路：这一类不再设限。",
+    "b.refused": "未安装（HTTP {code}）：{err}", "b.neterr": "发不出去：{e}", "holds": "每条规则成立", "fails": "有规则不成立",
+    "tp.nomoney": "不能转钱", "tp.nodelete": "不能删文件", "tp.msgconfirm": "发消息要人确认", "tp.breaker": "连续失败就停", "tp.fly": "果蝇反射弧（出处）", "tp.halt": "停机+心跳", "tp.spend": "花钱：限次+双钥",
+    "bd.cost": "代价", "bd.boundary": "边界", "bd.count": "边界 · 计数",
+    "r.gap": "两次放行至少隔几次调用", "r.gap.hint": "两次放行之间至少隔这么多拍。0 = 不限。只数放行次数，无论 agent 怎么做都约束它。",
+    "r.commit": "放行前要连续表态几次", "r.commit.hint": "放行前需要连续多少拍 intent 为高。0 = 不要求。落在 <code>intent</code> 上——agent 自己写的，所以这是它随时可以付的代价。",
+    "r.blocked": "停下时一律不放", "r.blocked.hint": "落在 <code>blocked</code> 上——只能来自 agent 写不到的工具层。无记忆：放下就恢复。",
+    "r.max": "总共最多放行几次", "r.max.hint": "累计放行到这个数之后再也不放。<b>0 = 不限</b>（要「永不」请用上面的整类拒绝）。",
+    "r.confirm": "一次确认管几次调用", "r.confirm.hint": "一次 <code>confirm</code> 在接下来这么多拍内有效；填 1 = 每次放行都要当拍确认。0 = 不要求。花钱不用它：一次确认放多次是错的形状。",
+    "r.sticky": "停下后不自动恢复，要有人确认", "r.sticky.hint": "<code>blocked</code> 一旦为高就停机；放下也不恢复，只有一次 <code>confirm</code> 才解除（解除那一拍本身不放行）。",
+    "r.heartbeat": "连续几次调用没有心跳就停下", "r.heartbeat.hint": "连续这么多拍 <code>heartbeat</code> 为低就同样停机，直到一次 confirm。0 = 不要求。",
+    "r.irrev": "收不回的动作每次都要人确认", "r.irrev.hint": "<code>irreversible</code> 为高的请求必须有一次尚未用掉的 <code>confirm</code> 才放行，放行即用掉；可逆请求不需要也不消耗。钩子按模式（rm、git push、--force…）标不可逆。",
+    "r.trip": "连续失败几次就停下", "r.trip.hint": "连续这么多拍 <code>failed</code> 为高就跳闸（熔断），之后一律不放，直到一次 confirm 复位。0 = 不要求。PostToolUse 钩子上报失败。",
+    "r.twokey": "两个人都点头才放", "r.twokey.hint": "每次放行都要两把钥匙都到过（或当拍到），放行即同时用掉。落在 <code>confirm</code> 与 <code>confirm_b</code> 上——两个人各一把。",
+    // evidence
+    "ev.title": "这组规则的证据", "ev.sub": "编译 · 逐行核对 · 遍历证明",
+    "ev.none": "这一类没有电路：不设限。装一张，这里就会出现它的证据。", "ev.deny": "这一类没有电路。每个请求都直接拒绝——不需要证明，因为没有任何东西会放行。",
+    "ev.inputs": "电路读取的输入位：", "ev.inputs.agent": "agent 写", "ev.inputs.tool": "工具层",
+    "ev.proof": "<b>{rows}</b> 行全部核过；<b>{reach}</b> 个可达状态里每条规则都成立。", "ev.proof.sub": "{nand} NAND + {latch} LATCH · 编译加检查 {ms} ms",
+    "ev.proof.no": "有一项没通过：往下看是哪一行。",
+    "ev.match": "电路与规则原文逐行一致", "ev.match.no": "电路与规则原文不一致",
+    "ev.match.body": "同一组规则用纯 Python 再写一遍，对定义域全部 <b>{rows}</b> 行（{inputs} 个输入 + {state} 位状态 = 2^{bits}）逐行比较输出和下一状态。",
+    "ev.holds": "每个可达状态里每条规则都成立", "ev.holds.no": "有规则不成立",
+    "ev.holds.body": "从开机状态出发，把 <b>{reach}</b> 个能到达的状态（共 {poss} 个可能）下的每一种输入都走了一遍，一共 <b>{proven}</b> 行，逐条规则数违规：全部为零。",
+    "tl.nand": "NAND", "tl.latch": "LATCH", "tl.bytes": "字节", "tl.depth": "深度", "tl.ms": "编译+检查",
+    "ev.viol": "违规计数：", "viol.rate_limit": "限速", "viol.commitment": "承诺", "viol.forbidden": "禁放", "viol.budget": "上限", "viol.confirm_window": "确认窗口", "viol.halted": "停机", "viol.one_shot": "一次性确认", "viol.breaker": "熔断", "viol.two_key": "双钥",
+    "ev.netlist": "网表（{bytes} 字节，链上复核送的就是这段）",
+    "ev.cross": "跨类别的约束（如「花钱后 3 拍内不发消息」）这里不验证。",
+    // approvals
+    "ap.lead": "这些调用在等你点头。模型看不到、也按不了这一页。你确认的只是那一条：agent 原样重发它，反射弧才放行；它先发别的，不会用掉你的确认。",
+    "ap.pending": "等你点头", "ap.pending.sub": "{n} 条 · 按到达顺序", "ap.none": "没有等人的请求。",
+    "ap.confirm": "确认这一条", "ap.confirm_b": "给出第二把钥匙", "ap.block": "停下这个 agent",
+    "ap.approved": "已批准这一次调用", "ap.approved.note": "确认只对上面这一次调用有效，等 agent 原样重发；它先发别的调用不会用掉这次确认。",
+    // every refusal's sentence says the consequence, then the next step — including "do nothing"
+    "ap.wait.note": "这条不需要你做什么：它在等冷却或上限，agent 自己重发就行。列在这里只是让你知道。",
+    "ap.irrev.note": "这一步做了就收不回来，所以反射弧要你先点头。确认只放行这一条；不想放，就什么也不点，或停下这个 agent。",
+    "ap.halt.note": "共享停机把它停了（被封锁过，或太久没有心跳）。点确认只是解除停机，这一条本身要它再发一次。", "ap.break.note": "它连续失败太多次，反射弧把它停了。点确认就是「让它再试」；不确定就先看流水里它失败了什么。", "ap.win.note": "需要一次当拍的 confirm。", "ap.key.note": "这一条要两个人各点一次。你按下的是第一把钥匙；第二把（confirm_b）由另一个人在他的屏幕上给。",
+    "ap.handled": "最近已处理", "ap.handled.none": "还没有处理记录。", "ap.h.tool": "人写了 {bits}", "ap.h.then": "之后 tick {n} {v}",
+    "ap.needs.note": "电路要一个人写一位才放行。", "ap.blocked.note": "这个 agent 正停着，它的每一条都会被拒。只点确认没有用：先让它恢复——只恢复它，用手动开关里 blocked 的「放下」；全部恢复，用「恢复全部」。",
+    "ap.code": "核对码", "ap.hint.once": "每张卡右上的两位数是那条请求的号码；确认按钮上带同样的两位数，对得上，你批的就是它。在 Telegram 里批准要把这两位数一起发。",
+    "ap.note": "备注（可选）", "ap.h.note": "备注：{note}",
+    "ap.stop.title": "全部停下", "ap.stop.sub": "按住半秒，所有 agent 的所有请求立刻被拒——认识的、还没出现的都算；恢复要另外做一次明确动作",
+    "ap.stop": "全部停下", "ap.stop.all": "已全部停下 · 含尚未出现的 agent", "ap.stop.some": "全部停下（已手动停下 {m}/{n}）",
+    "ap.stop.hold": "按住不放", "ap.stop.hint": "按住半秒才会停下，防止误触。",
+    "ap.stop.done": "已全部停下：所有请求一律被拒，直到有人恢复——包括还没出现过的 agent。这里认识的 {n} 个 agent 也已逐个停下。",
+    "ap.stopped.banner": "已全部停下：任何 agent 的任何请求都会被拒——这里认识的 {n} 个，以及之后才出现或改了名的——直到你在下面点「恢复全部」。它不会自己恢复，重启也不会松。",
+    "ap.blocked.banner": "{m}/{n} 个 agent 被手动停下；红键没有按下——不在这份名单里的 agent 仍在运行。",
+    "ap.stop.note": "有人按了全部停下。只有「恢复全部」（下面，或 `c3s stop-all --resume`）能放开它；点确认帮不上。",
+    "ap.drill": "演练 / Test", "ap.drill.none": "现在还没有 agent；按下去也会拒掉之后出现的任何 agent。（演练，什么都没有改变。）",
+    "ap.drill.out": "演练：按下去会拒掉所有 agent 的所有请求——这 {n} 个已知的（{list}）以及之后才出现的。现在什么都没有改变。",
+    "ap.resume.open": "恢复全部", "ap.resume.word": "解除", "ap.resume.go": "确认恢复",
+    "ap.resume.ask": "恢复要三步：点「恢复全部」，输入 {word}，再确认。故意比停下麻烦。",
+    "ap.resume.done": "已恢复：请求重新由电路决定；{n} 个已知 agent 也已放开。",
+    "eff.read": "读取 read", "eff.send": "发出 send", "eff.delete": "删除 delete", "eff.move": "移动 move", "eff.write": "写入 write", "eff.pay": "付款 pay", "eff.exec": "执行 exec",
+    "eff.rev": "可逆", "eff.irrev": "不可逆", "eff.unknown": "可逆性未知", "eff.more": "其他字段",
+    "ap.switches": "手动开关（高级）", "ap.switches.sub": "按 agent",
+    "ap.grey": "灰掉的开关这个 agent 的反射弧不读，按了也没用，所以不给按。",
+    "ap.cardputer": "Cardputer 插着并用 REFLEX_CARDPUTER=1 启动后台时：设备菜单 3 就是这一页，Enter 是「确认这一条」，b/u 停下/恢复该 agent，s 是「全部停下」。设备拔掉时，装了心跳规则的共享停机会让所有 agent 停下。",
+    "sw.blocked": "电平，持续到你放下", "sw.confirm": "一次；下一次请求用掉", "sw.irreversible": "标注下一次动作不可逆", "sw.failed": "上报一次失败（钩子会自动）", "sw.heartbeat": "打一次心跳", "sw.confirm_b": "第二个人的钥匙",
+    "sw.on": "拉高", "sw.off": "放下", "sw.once": "给一次", "sw.unread": "这个 agent 的电路不读它",
+    "ap.done": "已写 {agent}：{bits}", "ap.noagent": "还没有 agent 接进来——去「接入」页接一个。",
+    // first run (overview)
+    "first.title": "三步接上你的第一个 agent",
+    "first.lead": "这是你 agent 的反射弧：你写规则，规则编成电路并逐行验证；agent 每一次调用先过它。你拿着确认和停下两把钥匙。",
+    "first.s1": "定规则", "first.s1.d": "从模板挑一个：不能转钱、删文件要人确认、发消息要人确认。", "first.go1": "去定规则",
+    "first.s2": "接上你的模型", "first.s2.d": "Claude Code、任何 MCP 客户端，或 BNBAgent 钱包——选一个，复制一段配置。", "first.go2": "去接入",
+    "first.s3": "看它拒绝一次", "first.s3.d": "在「接入」页发一条探测，第一眼就看见边界在。", "first.go3": "发一条探测",
+    // tasks (I-6)
+    "tk.lead": "任务是<b>你交给它的一件事</b>，也是你之后按这条线读回来的凭据。任务本身<b>不是权限</b>：它做的每次调用照旧一条一条过电路，该确认的还得你确认。",
+    "tk.file": "交一件事", "tk.file.sub": "只有你能交，也只有你能关",
+    "tk.text.note": "用你自己的话写。适配器会读到这段文字，知道自己在做哪件事。",
+    "tk.expects": "预计会用到", "tk.expects.note": "只是你的说明，<b>不是闸门</b>：真正裁决的是那一类工具自己的电路。写下来，是为了它真用了别的类时你一眼看得出。",
+    "tk.cap": "最多放行", "tk.cap.note": "到这个数就自动关掉这件事——是一道刹车，不是一条规则：它只会让调用更早被拒，永远不会让谁多放一次。真正的上限请在「边界」里装 max_grants。",
+    "tk.go": "交给它", "tk.grants.nothing": "交一件事不会放行任何东西：这一页只是账，电路才是边界。",
+    "tk.open": "在做的事", "tk.open.sub": "{n} 件", "tk.open.none": "现在没有在做的事。交一件给它 →",
+    "tk.done": "关掉的事", "tk.done.sub": "关掉之后，再拿这个编号来的调用会被拒", "tk.done.none": "还没有关掉过任何事。",
+    "tk.spent": "放行 <span class=\"g\">{g}</span> · 拒绝 <span class=\"r\">{r}</span>",
+    "tk.spent.none": "还没有一次调用挂在这件事上",
+    "tk.cap.left": "还剩 {n} 次（共 {m} 次）", "tk.cap.none": "没有上限",
+    "tk.expects.says": "说会用：{cls}", "tk.expects.any": "没说会用哪类",
+    "tk.used": "实际用了：{cls}", "tk.close": "关掉这件事", "tk.closing": "关掉中…",
+    "tk.closed.by.person": "由你关掉", "tk.closed.by.limit": "到了 {n} 次放行，自动关掉",
+    "tk.filed": "{time} 交的", "tk.note": "备注：{note}",
+    "tk.th.id": "编号", "tk.th.text": "交的是什么", "tk.th.spent": "放行/拒绝", "tk.th.why": "怎么关的", "tk.th.at": "关掉时间",
+    "tk.filed.ok": "已交：{id}。适配器下一次调用就能带上它。", "tk.closed.ok": "{id} 已关掉：再拿这个编号来的调用会被拒。",
+    "tk.need.text": "先写一句：这件事是什么。", "tk.belongs": "属于任务",
+    // activity
+    "ac.tester": "发一条请求", "ac.tester.sub": "演示用：从这里发出的请求是你替 agent 按的，不算真边界", "ac.intent": "intent 为高", "ac.send": "发出（1 拍）",
+    "ac.log": "决策流水", "ac.sub": "最近 {n} 条 · 放行 {g} · 拒绝 {r}", "ac.none": "还没有记录。",
+    "ac.more": "同一个 agent 连续 {n} 条同样的拒绝 · 展开", "ac.more.ok": "同一个 agent 连续 {n} 条同样的放行 · 展开", "ac.less": "收起",
+    "f.all": "全部", "f.granted": "放行", "f.refused": "拒绝", "f.tool": "工具层", "f.policy": "规则",
+    "v.grant": "放行", "v.refuse": "拒绝", "v.tool": "工具层", "v.policy": "规则", "v.spoof": "冒名", "v.task": "任务", "v.stop": "全停",
+    "e.stop.on": "有人按了全部停下：所有 agent 的所有请求一律被拒（当时认识 {n} 个），直到解除。", "e.stop.off": "有人解除了全停：请求重新由电路决定（{n} 个已知 agent 放开）。", "e.stop.from": "来自 {source}",
+    "e.task.filed": "你交了一件事", "e.task.closed": "这件事关掉了", "e.task.cap": "上限 {n} 次放行",
+    "e.spoof.missing": "这个名字已绑定令牌，请求却没带令牌 —— 没问任何电路就拒了。", "e.spoof.wrong": "这个名字已绑定令牌，请求带的不是它的令牌 —— 没问任何电路就拒了。",
+    "e.tick": "第 {n} 拍", "e.gap": "距上次放行 {n} 拍", "e.why": "为什么拒绝（反射弧原话）：", "e.granted": "每条检查都过，电路输出 grant = 1。",
+    "e.ungated": "这一类没有电路：未设限。", "e.halt.no": "共享停机电路拒绝", "e.halt.ok": "共享停机电路放行",
+    "e.chain.ok": "BSC（链 {id}）只读复核一致 · 未部署，无钱包", "e.chain.dis": "BSC（链 {id}）复核不一致：节点算出 grant = {g}", "e.chain.err": "链上复核不可用：{err}（裁决不受影响）",
+    "e.tool": "写入 {bits}", "e.policy": "{cls}：{rules}", "e.policy.s": "{nand} NAND + {latch} LATCH · 核对 {rows} 行 · {holds}", "e.policy.none": "{cls}：移除电路，不再设限",
+    "l.sending": "已发出，等电路…", "l.neterr": "发不出去：{e}",
+    "tok.prompt": "这一步需要你的操作者令牌（确认、停下、改规则都要它，agent 拿不到）。它在后台启动时打印过，也在 ~/.c3s-circuit-agent/operator-token 里。粘贴一次，只存这个浏览器；只随它所守的写操作发出，读取从不带它。",
+    // agents
+    "ag.title": "接入的 agent", "ag.sub": "每个名字在每张电路上各有一份独立状态；一拍 = 该 agent 的一次请求",
+    "ag.none": "还没有任何请求。",
+    "ag.name": "agent", "ag.ticks": "拍", "ag.by": "各类 拍/放行", "ag.cool": "冷却", "ag.latch": "锁存状态", "ag.armed": "已备位", "ag.seen": "最近",
+    "ag.ready": "可放行", "ag.left": "{n} 拍", "ag.norule": "—", "ag.halted": "已停机", "ag.silence": "无心跳 {n} 拍", "ag.token": "有一次未用确认", "ag.tripped": "熔断已跳", "ag.fails": "连续失败 {n}", "ag.keys": "钥匙 A {a} · B {b}", "ag.streak": "intent 连续 {a}/{b}", "ag.used": "已用 {a}/{b}", "ag.clear": "正常",
+    // connect
+    "cn.copy": "复制", "cn.copied": "已复制", "cn.hook.sub": "Bash / Write / Edit / 所有 MCP 工具 · 两个钩子", "cn.hook.note": "放行时钩子不出声，Claude Code 原有权限照旧；拒绝时 deny 并给规则原话。PreToolUse 按模式给 irreversible 置位，PostToolUse 上报失败。把它放进 agent 改不到的 settings 文件里。",
+    "cn.proxy": "MCP 代理", "cn.proxy.sub": "Claude Desktop · Cursor · 任何 MCP 客户端", "cn.proxy.note": "只拦 gate 到的 tools/call，其余原样转发；--class 决定哪张电路裁决。拒绝是带 isError 的工具结果，模型读得懂。",
+    "cn.tg.sub": "从聊天里问、看、确认", "cn.tg.note": "agent 自己能打字的聊天窗口不能给它写 confirm——那就不是边界了。只有 TOOL_LAYER_CHATS 里的聊天能发 /confirm 与 /block。",
+    "cn.daily": "日常工具（经代理）", "cn.daily.sub": "读免费，发/删要过电路", "cn.daily.note": "类别→电路的映射在一个 agent 改不到的配置文件里。没接进代理的工具，电路看不见。",
+    "cn.chain": "链上（用户自部署）",
+    "cn.s4": "把这张电路发成 ERC-8004 边界清单：别人可以重新编译、逐行核对、在 BSC 上复算，然后给你的 agent 打分。",
+    "cn.manifest.go": "生成清单", "cn.manifest.busy": "正在编译、逐行核对、遍历证明…",
+    "cn.manifest.done": "{cls} 清单 · keccak256 {hash} · 下面就是要托管的字节，复制后不要重新排版，别人用 validate_boundary.py 复核",
+    "cn.s1": "<b>编译电路</b> —— 在 Boundaries 里装好这一类的规则；这里拿到网表字节与 sha256。",
+    "cn.s2": "<b>部署</b> —— 下面的命令在你自己的机器上、用你自己的钥匙跑：",
+    "cn.s3": "<b>Safe</b> —— owner 发一笔 <code>enableModule(module)</code>。agent 不是 owner，只能调 <code>act(to, value, data)</code>；电路不放，Safe 不动。",
+    "cn.noone": "维护者不部署任何合约、不持有钱包。", "cn.trust": "Safe 完全信任已启用的模块；监督者的钥匙才是真正的边界。拍是调用次数，不是时间。",
+    "cn.forge.none": "先在 Boundaries 里给 {cls} 装一张电路，这里才有网表可填。", "cn.forge.deny": "{cls} 是整类拒绝，没有电路可上链——链上对应的是：不给它任何模块。",
+    "cn.curl": "三个接口（任何能发 HTTP 的程序都能接）",
+    "cn.foot": "钩子/代理只管走过它们的通道；链上形态才是结构性的。",
+    "d.gmail": "读 · 搜 免费 · send / trash / label 归 message 类，send_* 要一次确认", "d.slack": "读频道 免费 · post / react 归 message 类", "d.cal": "查日程 免费 · create / update / delete 归 message 类", "d.fs": "read / list 免费 · write_* / move_* / delete_* 归 files 类", "d.sh": "Claude Code 内建 Bash 走钩子 → exec 类；rm · git push · --force · sudo 标不可逆",
+  },
+  en: {
+    "nav.overview": "Overview", "nav.boundaries": "Boundaries", "nav.approvals": "Approvals", "nav.tasks": "Tasks", "nav.activity": "Activity", "nav.agents": "Agents", "nav.connect": "Connect",
+    "nav.foot": "A tick is a call, not time.\nIrreversible is the tool layer's call.\nOn chain: replayed, never deployed.",
+    "title.overview": "Overview", "sub.overview": "", "title.boundaries": "Boundaries", "sub.boundaries": "rules → circuit → every row checked → every rule proven",
+    "title.approvals": "Approvals", "sub.approvals": "", "title.tasks": "Tasks", "sub.tasks": "hand it a job; its calls still go through the circuits one at a time", "title.activity": "Activity", "sub.activity": "every decision with the circuit's words and the chain re-check",
+    "title.agents": "Agents", "sub.agents": "one name, one state per circuit", "title.connect": "Connect", "sub.connect": "your model, your tools, your chain — the boundary is the same circuit",
+    "svc.ok": "service connected", "svc.bad": "service not responding", "svc.wait": "connecting…", "svc.denied": "not allowed to read: re-pair this phone with `c3s pair` on the console",
+    "tok.viewer.badge": "phone view (read + confirm/block)", "tok.viewer.no": "This phone holds a viewer token: it can read, confirm a call shown here, and block — not install rules, stop or resume everything, or unblock. Those happen on the console itself.",
+    "tok.viewer.have": "I have the operator token", "tok.viewer.switches": "A phone presses confirm or block only for a call with a code on this screen; these bare switches are the operator's.",
+    "chain.off": "chain check off", "chain.idle": "chain check ready (BSC, read-only, nothing deployed)", "chain.ok": "chain check agrees · nothing deployed", "chain.pend": "chain re-check running", "chain.err": "chain node unavailable, local verdict only", "chain.dis": "chain check DISAGREES",
+    "models.n": "{n} model(s) connected", "models.none": "no model connected yet · see Connect",
+    "honest.line": "A tick counts calls, not time; which tools count as irreversible is the tool layer's word; on chain everything is replayed, nothing deployed.",
+    "cls.spend": "spend", "cls.message": "message", "cls.exec": "exec", "cls.files": "files", "cls.halt": "halt (shared)",
+    "cls.spend.what": "transfers, payments, orders, signing", "cls.message.what": "messages, mail, posts", "cls.exec.what": "commands and tools — anything unclassified lands here", "cls.files.what": "write, edit, delete, move files", "cls.halt.what": "ticked first on every request; when it refuses, every class sees blocked",
+    "ov.models": "models connected", "ov.models.d": "distinct agent-name prefixes", "ov.models.none": "no requests yet",
+    "ov.circ": "circuits", "ov.circ.unit": "", "ov.circ.ok": "every row checked · every rule holds", "ov.circ.bad": "a rule FAILS", "ov.circ.none": "only exec (default)",
+    "ov.dec": "recent decisions", "ov.dec.d": "last {n} in the log · {g} granted · {r} refused",
+    "ov.pend": "waiting for you", "ov.pend.d": "waiting for your nod; the model cannot press", "ov.pend.none": "nothing waiting",
+    "ov.circuits": "Four reflex arcs", "ov.circuits.sub": "one per kind of tool: spend, message, exec, files",
+    "ov.recent": "Recent decisions", "ov.recent.sub": "each with the circuit's words and the chain re-check",
+    "ov.deny": "class denied outright · no circuit grants here", "ov.none": "No rules yet: this kind of tool is not limited — only Stop everything reaches it.", "ov.install": "Set its rules →", "ov.holds": "✓ every row checked, every rule holds", "ov.fails": "✗ a rule FAILS",
+    "ov.halt.on": "Shared halt circuit: {rules} — {nand} NAND + {latch} LATCH · {rows} rows", "ov.halt.off": "No shared halt installed: stopping one agent by hand (blocked) lifts the moment it is lowered and is not remembered; Stop everything is unaffected — it is a latch. For \"once stopped, stays stopped\" or a heartbeat, install the \"halt + heartbeat\" template.",
+    "ov.rows": "{rows} rows, all checked · {nand} NAND + {latch} LATCH",
+    "b.blocks": "Rules", "b.blocks.sub": "ten of them; a blue tag means the agent can pay its way past, an orange tag means it cannot", "b.templates": "templates",
+    "b.tab.hint": "this circuit answers {cls} tools: {what}",
+    "b.denyall": "Refuse this kind of tool outright", "b.denyall.hint": "Tick this to mean never. In the numbers below, 0 means \"no limit\", not zero times.",
+    "b.install": "Apply", "b.reload": "reload what is installed", "b.remove": "remove this circuit",
+    "b.note": "recompiles, rechecks, reproves; every agent's counters for this class reset.", "b.note.deny": "compiles nothing: every request in this class is refused outright.",
+    "b.domain": "compiles to {inputs} inputs + {state} state bits · 2^{bits} = {rows} rows to check", "b.domain.warn": "over the 26-bit exhaustive limit; the service will refuse this set.",
+    "b.installing": "compiling…", "b.installed": "Rules for {cls} are live: {rows} rows checked, {holds} ({nand} NAND + {latch} LATCH, {ms} ms).", "b.denied": "Set: {cls} denied outright.", "b.removed": "Removed the {cls} circuit: the class is no longer gated.",
+    "b.refused": "Not installed (HTTP {code}): {err}", "b.neterr": "could not send: {e}", "holds": "every rule holds", "fails": "a rule FAILS",
+    "tp.nomoney": "no money out", "tp.nodelete": "no deleting files", "tp.msgconfirm": "every message confirmed", "tp.breaker": "stop after failures", "tp.fly": "fruit-fly reflex (the origin)", "tp.halt": "halt + heartbeat", "tp.spend": "spend: budget + two keys",
+    "bd.cost": "cost", "bd.boundary": "boundary", "bd.count": "boundary · counts grants",
+    "r.gap": "Calls between two grants, at least", "r.gap.hint": "At least this many ticks between two grants. 0 = off. Counts grants, reads no input: binds whatever the agent does.",
+    "r.commit": "Consecutive intents before a grant", "r.commit.hint": "A grant needs this many consecutive ticks with intent high first. 0 = off. Rests on <code>intent</code> — the agent writes it, so this is a cost it can always pay.",
+    "r.blocked": "Nothing while stopped", "r.blocked.hint": "Rests on <code>blocked</code> — from the tool layer only. Stateless: lowered, it lifts.",
+    "r.max": "Total grants allowed", "r.max.hint": "After this many grants nothing more is granted. <b>0 = unlimited</b> (for never, use deny-the-class above).",
+    "r.confirm": "Calls one confirm covers", "r.confirm.hint": "One <code>confirm</code> authorises the next this-many ticks; 1 = every grant needs a confirm on its own tick. 0 = off. Not for spending: one confirm for many grants is the wrong shape.",
+    "r.sticky": "Stays stopped until a person confirms", "r.sticky.hint": "A tick with <code>blocked</code> high halts the agent; lowering it does not lift the halt, only a <code>confirm</code> does (and that tick grants nothing).",
+    "r.heartbeat": "Stop after this many calls without a heartbeat", "r.heartbeat.hint": "This many consecutive ticks with <code>heartbeat</code> low halt the same way, until a confirm. 0 = off.",
+    "r.irrev": "Anything that cannot be undone needs a confirm each time", "r.irrev.hint": "A request with <code>irreversible</code> high is granted only with an unspent <code>confirm</code>, and spends it; reversible requests neither need nor spend one. The hook marks rm, git push, --force… irreversible.",
+    "r.trip": "Stop after this many failures in a row", "r.trip.hint": "This many consecutive ticks with <code>failed</code> high trip the breaker; nothing is granted until a confirm resets it. 0 = off. The PostToolUse hook reports failures.",
+    "r.twokey": "Two people must both confirm", "r.twokey.hint": "Every grant needs both keys (arrived, or arriving now) and spends both. Rests on <code>confirm</code> and <code>confirm_b</code> — one per person.",
+    "ev.title": "Proof for these rules", "ev.sub": "compiled · checked row by row · proven by search",
+    "ev.none": "No circuit for this class: not gated. Install one and its evidence appears here.", "ev.deny": "No circuit for this class. Every request is refused outright — nothing to prove, because nothing can grant.",
+    "ev.inputs": "inputs the circuit reads:", "ev.inputs.agent": "agent-written", "ev.inputs.tool": "tool layer",
+    "ev.proof": "All <b>{rows}</b> rows checked; every rule holds in each of the <b>{reach}</b> reachable states.", "ev.proof.sub": "{nand} NAND + {latch} LATCH · compiled and checked in {ms} ms",
+    "ev.proof.no": "One check did not pass: the rows below say which.",
+    "ev.match": "The circuit agrees with the rules on every row", "ev.match.no": "The circuit DIFFERS from the rules",
+    "ev.match.body": "The same rules written again in plain Python, compared with the circuit on all <b>{rows}</b> rows of its domain ({inputs} inputs + {state} state bits = 2^{bits}), output and next state alike.",
+    "ev.holds": "Every rule holds in every reachable state", "ev.holds.no": "A rule FAILS",
+    "ev.holds.body": "Starting from reset, every input was tried in each of the <b>{reach}</b> reachable states (of {poss} possible), <b>{proven}</b> rows in all, counting violations rule by rule: all zero.",
+    "tl.nand": "NAND", "tl.latch": "LATCH", "tl.bytes": "bytes", "tl.depth": "depth", "tl.ms": "compile + checks",
+    "ev.viol": "violations:", "viol.rate_limit": "rate limit", "viol.commitment": "commitment", "viol.forbidden": "forbidden", "viol.budget": "budget", "viol.confirm_window": "confirm window", "viol.halted": "halt", "viol.one_shot": "one-shot confirm", "viol.breaker": "breaker", "viol.two_key": "two keys",
+    "ev.netlist": "netlist ({bytes} bytes; this is what the chain check is sent)",
+    "ev.cross": "An invariant across classes (\"no message within 3 ticks of a payment\") is verified by nothing here.",
+    "ap.lead": "These calls are waiting for your nod. The model cannot see or press this page. A confirm covers one call only: the agent must send that exact call again for the reflex arc to grant it, and anything else it sends first does not spend it.",
+    "ap.pending": "Waiting for you", "ap.pending.sub": "{n} · in order of arrival", "ap.none": "Nothing waits on a person.",
+    "ap.confirm": "Confirm this one", "ap.confirm_b": "Give the second key", "ap.block": "Stop this agent",
+    "ap.approved": "approved for this call", "ap.approved.note": "The confirm is for the call above only and waits for the agent to send it again; anything else it sends first does not spend it.",
+    "ap.wait.note": "Nothing for you to do here: it is waiting on a cooldown or a limit and will pass when the agent sends again. Listed so you know.",
+    "ap.irrev.note": "This step cannot be undone, so the reflex arc wants your nod first. A confirm grants this one call only; if you do not want it, press nothing — or stop this agent.",
+    "ap.halt.note": "The shared halt stopped it (it was blocked, or went too long without a heartbeat). Confirming only lifts the halt; this call itself needs to be sent again.", "ap.break.note": "It failed too many times in a row, so the reflex arc stopped it. Confirming means \"let it try again\"; if unsure, look in Activity at what failed.", "ap.win.note": "Needs a confirm on the same tick.", "ap.key.note": "This one needs two people. Yours is the first key; the second (confirm_b) is given by the other person on their own screen.",
+    "ap.handled": "Recently handled", "ap.handled.none": "Nothing handled yet.", "ap.h.tool": "a person wrote {bits}", "ap.h.then": "then tick {n} {v}",
+    "ap.needs.note": "The circuit wants one bit from a person before it grants this.", "ap.blocked.note": "This agent is stopped and everything it asks is refused. A confirm alone does nothing: resume it first — this agent only, with \"lower\" on the blocked switch in Manual switches; every agent, with \"Resume everything\".",
+    "ap.code": "check code", "ap.hint.once": "The two digits on each card are that request's number; the confirm button carries the same two, so if they match you are approving that one. Approving from Telegram means sending those two digits too.",
+    "ap.note": "note (optional)", "ap.h.note": "note: {note}",
+    "ap.stop.title": "Stop everything", "ap.stop.sub": "hold for half a second and every request from every agent is refused, known or not yet seen; resuming is a separate, deliberate action",
+    "ap.stop": "Stop everything", "ap.stop.all": "everything stopped · including agents not seen yet", "ap.stop.some": "Stop everything ({m}/{n} stopped by hand)",
+    "ap.stop.hold": "Hold to stop", "ap.stop.hint": "Hold for half a second; a tap alone does nothing.",
+    "ap.stop.done": "Stopped everything: every request is refused until a person resumes — including from agents not seen yet. The {n} known agent(s) are also stopped one by one.",
+    "ap.stopped.banner": "Everything is stopped: every request from every agent is refused — the {n} known here, and any that appears or renames itself — until you press \"Resume everything\" below. It does not lift by itself, and it survives a restart.",
+    "ap.blocked.banner": "{m} of {n} agents are stopped by hand; the stop button is not pressed — an agent not on that list still runs.",
+    "ap.stop.note": "A person pressed stop. Only \"Resume everything\" (below, or `c3s stop-all --resume`) lifts this; a confirm cannot.",
+    "ap.drill": "Drill / Test", "ap.drill.none": "No agents known yet; pressing it would still refuse any that appears. (A drill: nothing changed.)",
+    "ap.drill.out": "Drill: pressing it refuses every request from every agent — these {n} known ({list}) and any that appears later. Nothing has changed.",
+    "ap.resume.open": "Resume everything", "ap.resume.word": "RESUME", "ap.resume.go": "Confirm resume",
+    "ap.resume.ask": "Resuming takes three steps: press \"Resume everything\", type {word}, then confirm. Deliberately harder than stopping.",
+    "ap.resume.done": "Resumed: requests are decided by the circuits again, and the {n} known agent(s) are released.",
+    "eff.read": "read", "eff.send": "send", "eff.delete": "delete", "eff.move": "move", "eff.write": "write", "eff.pay": "pay", "eff.exec": "exec",
+    "eff.rev": "reversible", "eff.irrev": "irreversible", "eff.unknown": "reversibility unknown", "eff.more": "other fields",
+    "ap.switches": "Manual switches (advanced)", "ap.switches.sub": "per agent",
+    "ap.grey": "A greyed switch is one this agent's reflex arc does not read; pressing it would do nothing, so it cannot be pressed.",
+    "ap.cardputer": "With a Cardputer plugged in and the console started with REFLEX_CARDPUTER=1: the device's agent page mirrors this one, Enter is \"Confirm this one\", b/u stop and resume that agent, s is \"Stop everything\". Unplug it and a shared halt with a heartbeat rule stops every agent.",
+    "sw.blocked": "a level; stays until lowered", "sw.confirm": "once; spent by the next request", "sw.irreversible": "mark the next action irreversible", "sw.failed": "report one failure (the hook does this)", "sw.heartbeat": "beat once", "sw.confirm_b": "the second person's key",
+    "sw.on": "raise", "sw.off": "lower", "sw.once": "give once", "sw.unread": "not read by this agent's circuits",
+    "ap.done": "wrote {agent}: {bits}", "ap.noagent": "No agent has connected yet — go to Connect.",
+    "first.title": "Three steps to your first agent",
+    "first.lead": "This is your agent's reflex arc: you write rules, they compile to a circuit that is checked row by row, and every call the agent makes passes through it first. You hold the confirm and stop keys.",
+    "first.s1": "Set the rules", "first.s1.d": "Pick a template: no money out, deletes need a person, messages need a person.", "first.go1": "Set rules",
+    "first.s2": "Connect your model", "first.s2.d": "Claude Code, any MCP client, or the BNBAgent wallet — pick one and paste one block.", "first.go2": "Connect",
+    "first.s3": "Watch it refuse once", "first.s3.d": "Send a probe from Connect and see the boundary answer.", "first.go3": "Send a probe",
+    // tasks (I-6)
+    "tk.lead": "A task is <b>one job you hand the agent</b>, and the thread you read it back along afterwards. A task is <b>not an authority</b>: every call it makes still goes through the circuits one at a time, and anything that needs your confirm still needs it.",
+    "tk.file": "Hand it a job", "tk.file.sub": "only you can file one, and only you can close one",
+    "tk.text.note": "In your own words. The adapter reads this text, so the agent knows which job it is on.",
+    "tk.expects": "Expected to need", "tk.expects.note": "Your description, <b>not a gate</b>: the class's own circuit is what decides. It is written down so that a job reaching for another class is something you can see.",
+    "tk.cap": "At most this many grants", "tk.cap.note": "Reaching it closes the job — a brake, not a rule: it can only make a call refused sooner, never grant one more. For a real ceiling install max_grants under Boundaries.",
+    "tk.go": "Hand it over", "tk.grants.nothing": "Filing a job grants nothing: this page is the account, the circuits are the boundary.",
+    "tk.open": "Open jobs", "tk.open.sub": "{n}", "tk.open.none": "Nothing open. Hand it a job →",
+    "tk.done": "Closed", "tk.done.sub": "once closed, a call naming that id is refused", "tk.done.none": "Nothing has been closed yet.",
+    "tk.spent": "granted <span class=\"g\">{g}</span> · refused <span class=\"r\">{r}</span>",
+    "tk.spent.none": "no call has named this job yet",
+    "tk.cap.left": "{n} of {m} grants left", "tk.cap.none": "no ceiling",
+    "tk.expects.says": "said it needs: {cls}", "tk.expects.any": "did not say which classes",
+    "tk.used": "actually used: {cls}", "tk.close": "Close this job", "tk.closing": "closing…",
+    "tk.closed.by.person": "you closed it", "tk.closed.by.limit": "closed itself at {n} grants",
+    "tk.filed": "filed {time}", "tk.note": "note: {note}",
+    "tk.th.id": "id", "tk.th.text": "the job", "tk.th.spent": "granted/refused", "tk.th.why": "how it closed", "tk.th.at": "closed",
+    "tk.filed.ok": "Filed {id}. The adapter can name it on its next call.", "tk.closed.ok": "{id} is closed: a call naming it is refused.",
+    "tk.need.text": "Say what the job is, in one line.", "tk.belongs": "part of",
+    "ac.tester": "Send a request", "ac.tester.sub": "for demos: a request sent from here is you pressing on the agent's behalf, so it proves nothing about the boundary", "ac.intent": "intent high", "ac.send": "Send (1 tick)",
+    "ac.log": "Decision log", "ac.sub": "last {n} · {g} granted · {r} refused", "ac.none": "No entries yet.",
+    "ac.more": "{n} identical refusals from the same agent in a row · expand", "ac.more.ok": "{n} identical grants from the same agent in a row · expand", "ac.less": "collapse",
+    "f.all": "all", "f.granted": "granted", "f.refused": "refused", "f.tool": "tool layer", "f.policy": "rules",
+    "v.grant": "GRANTED", "v.refuse": "REFUSED", "v.tool": "TOOL LAYER", "v.policy": "RULES", "v.spoof": "NOT ITS TOKEN", "v.task": "TASK", "v.stop": "STOP",
+    "e.stop.on": "a person pressed stop: every request from every agent is refused ({n} known at the time) until a person resumes.", "e.stop.off": "a person lifted the stop: requests are decided by the circuits again ({n} known agent(s) unblocked).", "e.stop.from": "from {source}",
+    "e.task.filed": "you filed a job", "e.task.closed": "the job was closed", "e.task.cap": "a ceiling of {n} grants",
+    "e.spoof.missing": "This name is bound to a token and the request sent none — refused before any circuit was asked.", "e.spoof.wrong": "This name is bound to a token and the request sent a different one — refused before any circuit was asked.",
+    "e.tick": "tick {n}", "e.gap": "{n} ticks since the previous grant", "e.why": "why it was refused (the reflex arc's own words):", "e.granted": "every check passed; the circuit output grant = 1.",
+    "e.ungated": "no circuit for this class: not gated.", "e.halt.no": "shared halt circuit refused", "e.halt.ok": "shared halt circuit granted",
+    "e.chain.ok": "BSC (chain {id}) read-only re-check agrees · nothing deployed, no wallet", "e.chain.dis": "BSC (chain {id}) DISAGREES: node computed grant = {g}", "e.chain.err": "chain check unavailable: {err} (verdict unaffected)",
+    "e.tool": "wrote {bits}", "e.policy": "{cls}: {rules}", "e.policy.s": "{nand} NAND + {latch} LATCH · {rows} rows checked · {holds}", "e.policy.none": "{cls}: circuit removed, no longer gated",
+    "l.sending": "sent, waiting for the circuit…", "l.neterr": "could not send: {e}",
+    "tok.prompt": "This needs your operator token (confirming, stopping and changing rules all need it; the agent never has it). It was printed when the console started and is in ~/.c3s-circuit-agent/operator-token. Paste it once; it stays in this browser and goes out only with the writes it gates, never on a read.",
+    "ag.title": "Connected agents", "ag.sub": "one independent state per circuit per name; a tick is one request from that agent",
+    "ag.none": "No requests yet.",
+    "ag.name": "agent", "ag.ticks": "ticks", "ag.by": "per class ticks/grants", "ag.cool": "cooldown", "ag.latch": "latches", "ag.armed": "armed", "ag.seen": "last seen",
+    "ag.ready": "ready", "ag.left": "{n} ticks", "ag.norule": "—", "ag.halted": "halted", "ag.silence": "{n} ticks without a heartbeat", "ag.token": "one unspent confirm", "ag.tripped": "breaker tripped", "ag.fails": "{n} consecutive failures", "ag.keys": "key A {a} · B {b}", "ag.streak": "intent streak {a}/{b}", "ag.used": "used {a}/{b}", "ag.clear": "clear",
+    "cn.copy": "copy", "cn.copied": "copied", "cn.hook.sub": "Bash / Write / Edit / every MCP tool · two hooks", "cn.hook.note": "A grant leaves Claude Code's own permission flow as it was; a refusal denies with the rule's words. PreToolUse arms irreversible by pattern, PostToolUse reports failures. Keep it in a settings file the agent cannot edit.",
+    "cn.proxy": "MCP proxy", "cn.proxy.sub": "Claude Desktop · Cursor · any MCP client", "cn.proxy.note": "Only gated tools/call are held; everything else passes verbatim; --class picks the deciding circuit. A refusal is a tool result with isError, which the model reads.",
+    "cn.tg.sub": "ask, look, confirm from a chat", "cn.tg.note": "A chat the agent itself can type into must not write confirm — that would not be a boundary. Only chats in TOOL_LAYER_CHATS may send /confirm and /block.",
+    "cn.daily": "Everyday tools (through the proxy)", "cn.daily.sub": "reading is free; sending and deleting pass the circuit", "cn.daily.note": "The class → circuit map lives in a config file the agent cannot edit. A tool not routed through the proxy is invisible to the circuit.",
+    "cn.chain": "On chain (you deploy it)",
+    "cn.s4": "Publish this circuit as an ERC-8004 boundary manifest: anyone can recompile it, check every row, replay it on BSC, and score your agent.",
+    "cn.manifest.go": "Build manifest", "cn.manifest.busy": "compiling, checking every row, proving…",
+    "cn.manifest.done": "{cls} manifest · keccak256 {hash} · below are the exact bytes to host — copy without reformatting; others re-check them with validate_boundary.py",
+    "cn.s1": "<b>Compile</b> — install this class's rules under Boundaries; the netlist bytes and sha256 land here.",
+    "cn.s2": "<b>Deploy</b> — run the commands below on your own machine with your own keys:",
+    "cn.s3": "<b>Safe</b> — the owner sends one <code>enableModule(module)</code>. The agent is not an owner; it can only call <code>act(to, value, data)</code>; when the circuit refuses, the Safe does not move.",
+    "cn.noone": "The maintainers deploy no contract and hold no wallet.", "cn.trust": "The Safe trusts an enabled module completely; the supervisor's key is the real boundary. Ticks are calls, not time.",
+    "cn.forge.none": "Install a circuit for {cls} under Boundaries first; then there is a netlist to fill in.", "cn.forge.deny": "{cls} is denied outright: there is no circuit to put on chain — the on-chain equivalent is giving it no module at all.",
+    "cn.curl": "Three endpoints (anything that speaks HTTP can plug in)",
+    "cn.foot": "Hooks and the proxy govern only the channels that pass through them; the on-chain form is the structural one.",
+    "d.gmail": "read · search free · send / trash / label → message class; send_* needs a confirm", "d.slack": "read channels free · post / react → message class", "d.cal": "list events free · create / update / delete → message class", "d.fs": "read / list free · write_* / move_* / delete_* → files class", "d.sh": "Claude Code's built-in Bash goes through the hook → exec class; rm · git push · --force · sudo are marked irreversible",
+  },
+};
+const HTML_KEYS = new Set(["r.commit.hint", "r.blocked.hint", "r.max.hint", "r.confirm.hint", "r.sticky.hint", "r.heartbeat.hint", "r.irrev.hint", "r.trip.hint", "r.twokey.hint",
+                           "ev.match.body", "ev.holds.body", "ev.proof", "ev.proof.sub", "ap.lead", "cn.s1", "cn.s2", "cn.s3", "e.tool", "ap.h.tool", "ap.done",
+                           "tk.lead", "tk.expects.note", "tk.grants.nothing"]);
+let lang = "zh";
+try { lang = localStorage.getItem("reflex.lang") || (navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en"); } catch (e) { /* storage unavailable */ }
+if (!T[lang]) lang = "zh";
+function t(key, vars) {
+  let s = (T[lang] && T[lang][key]) ?? T.en[key] ?? key;
+  if (vars) for (const k in vars) s = s.split(`{${k}}`).join(vars[k]);
+  return s;
+}
+const locale = () => (lang === "zh" ? "zh-CN" : "en-GB");
+const num = (v) => N(v).toLocaleString(locale());
+const clock = (unix) => new Date(N(unix) * 1000).toLocaleTimeString(locale(), { hour12: false });
+const clsLabel = (c) => lang === "zh" ? `${esc(c)} <span class="muted">${esc(t("cls." + c))}</span>` : esc(c);
+
+function setLang(l) {
+  lang = l;
+  try { localStorage.setItem("reflex.lang", l); } catch (e) { /* fine */ }
+  document.documentElement.lang = l === "zh" ? "zh-CN" : "en";
+  document.querySelectorAll("[data-lang]").forEach((b) => b.classList.toggle("on", b.dataset.lang === l));
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const k = el.dataset.i18n;
+    if (HTML_KEYS.has(k)) el.innerHTML = t(k); else el.textContent = t(k);
+  });
+  $("title").textContent = t("title." + view); $("subtitle").textContent = t("sub." + view);
+  renderStatic(); domainPreview(); showInstall();
+  if (STATE) render(STATE);
+  liveTick();
+}
+document.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
+
+// ---------- views ----------
+let view = "overview";
+function show(v) {
+  if (!VIEWS.includes(v)) v = "overview";
+  view = v;
+  if (location.hash !== "#" + v) history.replaceState(null, "", "#" + v);
+  document.querySelectorAll("section[data-view]").forEach((s) => s.classList.toggle("on", s.dataset.view === v));
+  document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("on", b.dataset.view === v));
+  $("title").textContent = t("title." + v); $("subtitle").textContent = t("sub." + v);
+  if (STATE) render(STATE);
+}
+document.querySelectorAll(".nav-item").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
+window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+// The "no model connected yet · see Connect" dot in the bar is the first thing an empty console
+// shows; it is also the way there.
+$("models").parentElement.style.cursor = "pointer";
+$("models").parentElement.addEventListener("click", () => show("connect"));
+
+// ---------- shared formatting ----------
+const ruleWordsZh = (s) => {
+  const out = [];
+  if (N(s.min_gap_ticks)) out.push(`任意 ${num(s.min_gap_ticks)} 拍内最多放行一次`);
+  if (N(s.commit_ticks)) out.push(`放行前需要连续 ${num(s.commit_ticks)} 拍 intent`);
+  if (s.forbid_when_blocked) out.push("blocked 为高时一律不放");
+  if (N(s.max_grants)) out.push(`累计最多放行 ${num(s.max_grants)} 次`);
+  if (N(s.confirm_window_ticks)) out.push(N(s.confirm_window_ticks) === 1 ? "每次放行都要当拍一次 confirm" : `放行前 ${num(s.confirm_window_ticks)} 拍内需有一次 confirm`);
+  if (s.sticky_block) out.push("blocked 一拉高就停机，直到一次 confirm 解除");
+  if (N(s.heartbeat_ticks)) out.push(`连续 ${num(s.heartbeat_ticks)} 拍无心跳就停机，直到一次 confirm 解除`);
+  if (s.confirm_per_irreversible) out.push("不可逆动作需要专属的一次 confirm，放行即用掉");
+  if (N(s.trip_after_failures)) out.push(`连续 ${num(s.trip_after_failures)} 次失败跳闸，直到一次 confirm 复位`);
+  if (s.two_key) out.push("放行需要 confirm 与 confirm_b 两把钥匙，放行即同时用掉");
+  return out.length ? out : ["每个请求都放行"];
+};
+const bitsHtml = (bits, names) => names.map((n) => `<span class="${N(bits[n]) ? "t1" : ""}">${esc(n)} ${N(bits[n])}</span>`).join(" · ");
+const armedHtml = (armed, names) => names.map((n) => `${esc(n)} = <b class="${N(armed[n]) ? "c-tool" : ""}">${N(armed[n])}</b>`).join(" · ");
+const policyOf = (c) => STATE && STATE.policies ? STATE.policies[c] : null;
+const isLive = (p) => !!(p && !p.deny_all);
+// Union of the inputs any installed circuit reads: what the tool-layer panel may usefully offer.
+function readInputs() {
+  const set = new Set(["request", "intent", "blocked", "confirm"]);
+  ALL_CLASSES.forEach((c) => { const p = policyOf(c); if (isLive(p)) (p.circuit.inputs || []).forEach((n) => set.add(n)); });
+  return set;
+}
+const shownBits = (armed) => { const r = readInputs(); return TOOL_BITS.filter((n) => r.has(n) || N(armed && armed[n])); };
+const chipFor = (c) => `<span class="chip ${esc(c)}">${esc(c)}</span>`;
+
+// What waits for a person comes from the console (I-2: `pending` in /api/state) — which
+// entries wait, which bit lifts each one, and its two-digit code. This page used to derive
+// that from the transcript, and so did the device and the chat bot: three copies of one
+// rule, which drifted. What is left here is splitting the list and choosing the words.
+function pendingItems(s) {
+  const list = s.pending || [];
+  return { pending: list.filter((p) => p.bit && !p.waiting_on_time), waiting: list.filter((p) => !p.bit || p.waiting_on_time) };
+}
+// Display only: which sentence explains this refusal. The verdict, the bit that lifts it
+// and the code are the console's.
+const NOTE_FOR = [
+  [/^two keys needed/, "ap.key.note"],
+  [/^irreversible/, "ap.irrev.note"],
+  [/^no confirmation/, "ap.win.note"],
+  [/^breaker tripped/, "ap.break.note"],
+  [/^halted/, "ap.halt.note"],
+];
+function itemNote(p) {
+  const why = p.why || [];
+  if (why.some((w) => String(w).startsWith("stopped:"))) return "ap.stop.note";  // the operator-stop latch
+  // The shared halt's own refusal also says "blocked is high" — that is the halt circuit's output,
+  // not a bit a person raised — so it is read before the blocked sentence (audit F6).
+  if (why.some((w) => String(w).startsWith("halted (shared halt circuit)"))) return "ap.halt.note";
+  if (why.some((w) => String(w).startsWith("blocked is high"))) return "ap.blocked.note";
+  // Rule order wins, not line order: a two-key call is also irreversible, and the second key is
+  // what the person needs to know about (audit F2).
+  for (const [re, key] of NOTE_FOR) if (why.some((w) => re.test(String(w)))) return key;
+  return p.bit && !p.waiting_on_time ? "ap.needs.note" : "ap.wait.note";
+}
+// The effect (I-1) is the agent's own text: every field goes through esc(), and `kind`
+// reaches a class name only through this list.
+const EFFECT_KINDS = ["read", "send", "delete", "move", "write", "pay", "exec"];
+const kindClass = (k) => (EFFECT_KINDS.includes(k) ? k : "other");
+const kindLabel = (k) => (EFFECT_KINDS.includes(k) ? t("eff." + k) : String(k || "?"));
+const revOf = (ef) => (ef.reversible === false ? ["no", "eff.irrev"] : ef.reversible === true ? ["yes", "eff.rev"] : ["unk", "eff.unknown"]);
+function effectCard(ef) {
+  const [cls, key] = revOf(ef);
+  const meta = [];
+  if (ef.amount || ef.asset) meta.push(`<b>${esc(ef.amount || "")}${ef.amount && ef.asset ? " " : ""}${esc(ef.asset || "")}</b>`);
+  if (ef.target) meta.push(`→ ${esc(ef.target)}`);
+  if (ef.path) meta.push(esc(ef.path));
+  const rows = ef.details && typeof ef.details === "object" && !Array.isArray(ef.details)
+    ? Object.keys(ef.details).slice(0, 8).map((k) => {
+        const v = ef.details[k];
+        return `<div class="kv"><b>${esc(k)}</b><span>${esc(v !== null && typeof v === "object" ? JSON.stringify(v) : v)}</span></div>`;
+      }).join("")
+    : "";
+  return `<div class="eff">
+    <div class="top"><span class="kind ${kindClass(ef.kind)}">${esc(kindLabel(ef.kind))}</span><span class="rev ${cls}">${t(key)}</span></div>
+    ${ef.summary ? `<div class="sum">${esc(ef.summary)}</div>` : ""}
+    ${meta.length ? `<div class="meta">${meta.join(" · ")}</div>` : ""}
+    ${rows ? `<details><summary>${t("eff.more")}</summary>${rows}</details>` : ""}</div>`;
+}
+function effectLine(ef) {
+  const out = [`<span class="kind ${kindClass(ef.kind)}">${esc(kindLabel(ef.kind))}</span>`];
+  if (ef.summary) out.push(`<b>${esc(ef.summary)}</b>`);
+  if (ef.target) out.push(`<span class="muted">→ ${esc(ef.target)}</span>`);
+  if (ef.amount || ef.asset) out.push(`<span class="mono">${esc(ef.amount || "")}${ef.amount && ef.asset ? " " : ""}${esc(ef.asset || "")}</span>`);
+  if (ef.path && !ef.summary) out.push(`<span class="mono">${esc(ef.path)}</span>`);
+  if (ef.reversible === false) out.push(`<span class="bad">${t("eff.irrev")}</span>`);
+  return out.join(" ");
+}
+function modelsConnected(s) {
+  const set = new Set();
+  s.agents.forEach((a) => set.add(a.agent.includes(":") ? a.agent.split(":")[0] : a.agent));
+  return [...set];
+}
+function chainStatus(s) {
+  if (!s.chain || !s.chain.enabled) return ["", "chain.off"];
+  const e = s.transcript.find((x) => x.kind === "request" && x.chain);
+  if (!e) return ["", "chain.idle"];
+  if (e.chain.pending) return ["", "chain.pend"];
+  if (e.chain.error) return ["amber", "chain.err"];
+  return e.chain.agrees ? ["ok", "chain.ok"] : ["bad", "chain.dis"];
+}
+
+// ---------- render ----------
+let STATE = null, lastOk = 0;
+const OPENED = Date.now();
+function render(s) {
+  STATE = s;
+  const [cc, ck] = chainStatus(s);
+  $("chain-dot").className = `dot ${cc}`; $("chain").textContent = t(ck);
+  const models = modelsConnected(s);
+  $("models-dot").className = `dot ${models.length ? "ok" : ""}`; $("models").textContent = models.length ? t("models.n", { n: models.length }) : t("models.none");
+  const { pending } = pendingItems(s);
+  $("nav-pending").textContent = pending.length ? String(pending.length) : "";
+  const open = s.tasks || [];
+  $("nav-tasks").textContent = open.length ? String(open.length) : "";
+  renderStop(s);  // the stop is on every screen, so its label follows the state everywhere
+  renderViewer();  // and so does what this page's token may do
+  if (view === "overview") renderOverview(s, models, pending);
+  else if (view === "boundaries") renderBoundaries(s);
+  else if (view === "approvals") renderApprovals(s);
+  else if (view === "tasks") renderTasks(s);
+  else if (view === "activity") renderActivity(s);
+  else if (view === "agents") renderAgents(s);
+  else if (view === "connect") renderConnect(s);
+}
+
+// -- overview --
+function renderOverview(s, models, pending) {
+  const reqs = s.transcript.filter((e) => e.kind === "request"), g = reqs.filter((e) => e.granted).length;
+  const live = TOOL_CLASSES.map(policyOf).filter(Boolean);
+  const holds = live.every((p) => p.deny_all || p.checked.every_rule_holds);
+  const stat = (k, v, d, warn) => `<div class="card stat${warn ? " warn" : ""}"><div class="k">${t(k)}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
+  $("ov-stats").innerHTML =
+    stat("ov.models", num(models.length), models.length ? esc(models.join(" · ")) : t("ov.models.none")) +
+    stat("ov.circ", `${num(live.length)}<small> ${t("ov.circ.unit")}</small>`, live.length ? `<span class="${holds ? "ok" : "bad"}">${t(holds ? "ov.circ.ok" : "ov.circ.bad")}</span>` : t("ov.circ.none")) +
+    stat("ov.dec", num(reqs.length), t("ov.dec.d", { n: num(reqs.length), g: num(g), r: num(reqs.length - g) })) +
+    stat("ov.pend", `<span class="${pending.length ? "amber" : ""}">${num(pending.length)}</span>`, pending.length ? t("ov.pend.d") : t("ov.pend.none"), pending.length > 0);
+  $("ov-classes").innerHTML = TOOL_CLASSES.map((c) => {
+    const p = policyOf(c);
+    let body;
+    if (!p) body = `<div class="rl muted">${t("ov.none")}</div><div class="ct muted">—</div><button class="link" type="button" data-go="boundaries" data-cls="${c}">${t("ov.install")}</button>`;
+    else if (p.deny_all) body = `<div class="rl bad">${t("ov.deny")}</div>`;
+    else body = `<div class="rl">${esc((lang === "zh" ? ruleWordsZh(p.settings) : p.rules).join("；"))}</div><div class="ct">${t("ov.rows", { nand: num(p.circuit.nand), latch: num(p.circuit.latch), rows: num(p.checked.rows) })}</div><div class="st ${p.checked.every_rule_holds ? "ok" : "bad"}">${t(p.checked.every_rule_holds ? "ov.holds" : "ov.fails")}</div>`;
+    return `<div class="mini"><div class="nm"><b>${esc(c)}</b><span>${esc(t("cls." + c))}</span></div>${body}</div>`;
+  }).join("");
+  const h = policyOf(HALT);
+  $("ov-halt").innerHTML = isLive(h) ? t("ov.halt.on", { rules: esc((lang === "zh" ? ruleWordsZh(h.settings) : h.rules).join("; ")), nand: num(h.circuit.nand), latch: num(h.circuit.latch), rows: num(h.checked.rows) }) : t("ov.halt.off");
+  $("ov-recent").innerHTML = s.transcript.length ? foldRuns(s.transcript).slice(0, 6).map((g) => runHtml(g, true)).join("") : `<div class="muted">${t("ac.none")}</div>`;
+  bindRuns($("ov-recent"));
+  $("ov-classes").querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => { selectClass(b.dataset.cls); show("boundaries"); }));
+  // First run: the three steps, with the ones already done ticked. Hidden once all three are.
+  // "Rules set" = any class other than exec has rules, or exec is no longer the default set.
+  const rulesDone = TOOL_CLASSES.some((c) => { const p = policyOf(c); return !!p && (p.deny_all || c !== "exec" || JSON.stringify(p.rules) !== JSON.stringify(s.default_rules || [])); });
+  const connectDone = models.some((m) => m !== "console" && m !== "probe");
+  const probeDone = s.transcript.some((e) => e.kind === "request" && !e.granted);
+  const first = $("ov-first");
+  first.hidden = rulesDone && connectDone && probeDone;
+  [["rules", rulesDone], ["connect", connectDone], ["probe", probeDone]].forEach(([k, d]) => first.querySelector(`[data-step="${k}"]`).classList.toggle("done", d));
+  first.querySelectorAll("[data-go]").forEach((b) => { b.onclick = () => show(b.dataset.go); });
+}
+
+// -- boundaries --
+const R = { gap: $("r-gap"), commit: $("r-commit"), blocked: $("r-blocked"), max: $("r-max"), confirm: $("r-confirm"),
+            sticky: $("r-sticky"), heartbeat: $("r-heartbeat"), irrev: $("r-irrev"), trip: $("r-trip"), twokey: $("r-twokey") };
+const TEMPLATES = [
+  ["tp.nomoney", "spend", null],
+  ["tp.nodelete", "files", { confirm_per_irreversible: true, forbid_when_blocked: true }],
+  ["tp.msgconfirm", "message", { confirm_per_irreversible: true, forbid_when_blocked: true }],
+  ["tp.breaker", "exec", { trip_after_failures: 3, forbid_when_blocked: true }],
+  ["tp.fly", "exec", { min_gap_ticks: 8, commit_ticks: 4, forbid_when_blocked: true }],
+  ["tp.spend", "spend", { min_gap_ticks: 8, max_grants: 7, confirm_per_irreversible: true, two_key: true, forbid_when_blocked: true }],
+  ["tp.halt", "halt", { sticky_block: true, heartbeat_ticks: 8, forbid_when_blocked: true }],
+];
+let BCLS = "exec", editorFor = null, INSTALL = null;
+const bitlen = (v) => { let n = 0; for (let x = Math.floor(v); x > 0; x >>= 1) n++; return n; };
+const width = (limit) => Math.max(1, bitlen(limit));
+function editorSettings() {
+  return { min_gap_ticks: N(R.gap.value), commit_ticks: N(R.commit.value), forbid_when_blocked: R.blocked.checked,
+           max_grants: N(R.max.value), confirm_window_ticks: N(R.confirm.value),
+           sticky_block: R.sticky.checked, heartbeat_ticks: N(R.heartbeat.value), confirm_per_irreversible: R.irrev.checked,
+           trip_after_failures: N(R.trip.value), two_key: R.twokey.checked };
+}
+// Mirrors Policy.layout() and Policy.input_names() so the row count is known before compiling.
+function domainOf(s) {
+  const state = (s.min_gap_ticks > 1 ? width(s.min_gap_ticks - 1) : 0) + (s.commit_ticks ? width(s.commit_ticks) : 0)
+              + (s.max_grants ? width(s.max_grants) : 0) + (s.confirm_window_ticks > 1 ? width(s.confirm_window_ticks - 1) : 0)
+              + ((s.sticky_block || s.heartbeat_ticks) ? 1 : 0) + (s.heartbeat_ticks > 1 ? width(s.heartbeat_ticks - 1) : 0)
+              + (s.confirm_per_irreversible ? 1 : 0) + (s.trip_after_failures > 1 ? width(s.trip_after_failures - 1) : 0)
+              + (s.trip_after_failures ? 1 : 0) + (s.two_key ? 2 : 0);
+  const inputs = 4 + (s.confirm_per_irreversible ? 1 : 0) + (s.trip_after_failures ? 1 : 0) + (s.heartbeat_ticks ? 1 : 0) + (s.two_key ? 1 : 0);
+  return { state, inputs };
+}
+function domainPreview() {
+  const deny = $("r-denyall").checked && BCLS !== HALT;
+  $("rule-list").toggleAttribute("data-off", deny);
+  Object.values(R).forEach((el) => { el.disabled = deny; });
+  $("install-note").textContent = t(deny ? "b.note.deny" : "b.note");
+  if (deny) { $("domain").textContent = ""; return; }
+  const { state, inputs } = domainOf(editorSettings());
+  const bits = inputs + state, over = bits > 26;
+  $("domain").className = `domain${over ? " warn" : ""}`;
+  $("domain").textContent = t("b.domain", { inputs, state, bits, rows: over ? "—" : num(2 ** bits) }) + (over ? ` ${t("b.domain.warn")}` : "");
+}
+function fillEditor(s, deny) {
+  s = s || {};
+  R.gap.value = N(s.min_gap_ticks); R.commit.value = N(s.commit_ticks); R.blocked.checked = !!s.forbid_when_blocked;
+  R.max.value = N(s.max_grants); R.confirm.value = N(s.confirm_window_ticks);
+  R.sticky.checked = !!s.sticky_block; R.heartbeat.value = N(s.heartbeat_ticks); R.irrev.checked = !!s.confirm_per_irreversible;
+  R.trip.value = N(s.trip_after_failures); R.twokey.checked = !!s.two_key;
+  $("r-denyall").checked = !!deny;
+  domainPreview();
+}
+function fillFromInstalled(c) {
+  const p = policyOf(c);
+  if (!p) fillEditor({}, false); else fillEditor(p.settings, p.deny_all);
+  editorFor = c;
+}
+function selectClass(c) {
+  BCLS = c; INSTALL = null; $("install-msg").textContent = "";
+  if (STATE) fillFromInstalled(c);
+  if (view === "boundaries" && STATE) renderBoundaries(STATE);
+}
+Object.values(R).forEach((el) => el.addEventListener("input", domainPreview));
+$("r-denyall").addEventListener("change", domainPreview);
+$("r-reload").addEventListener("click", () => { if (STATE) fillFromInstalled(BCLS); });
+$("r-remove").addEventListener("click", async () => {
+  if (BCLS === "exec") return;
+  INSTALL = { status: "sending" }; showInstall();
+  try {
+    const d = await post("/api/policy", { class: BCLS, remove: true }, { token: true });
+    INSTALL = d.error ? { status: "refused", error: d.error } : { status: 200, removed: true, cls: BCLS };
+  } catch (err) { INSTALL = { status: "neterr", error: err.message }; }
+  showInstall(); await refresh(); if (STATE) fillFromInstalled(BCLS);
+});
+function showInstall() {
+  const m = INSTALL;
+  if (!m) { $("install-msg").textContent = ""; return; }
+  if (m.status === "sending") $("install-msg").innerHTML = `<span class="muted">${t("b.installing")}</span>`;
+  else if (m.status === "neterr") $("install-msg").innerHTML = `<span class="bad">${t("b.neterr", { e: esc(m.error) })}</span>`;
+  else if (m.status !== 200) $("install-msg").innerHTML = `<span class="bad">${t("b.refused", { code: N(m.status), err: esc(m.error) })}</span>`;
+  else if (m.removed) $("install-msg").innerHTML = `<span class="ok">${t("b.removed", { cls: esc(m.cls) })}</span>`;
+  else if (m.summary.deny_all) $("install-msg").innerHTML = `<span class="ok">${t("b.denied", { cls: esc(m.summary.class) })}</span>`;
+  else {
+    const d = m.summary, ok = d.checked.every_rule_holds;
+    $("install-msg").innerHTML = `<span class="${ok ? "ok" : "bad"}">${t("b.installed", { cls: esc(d.class), nand: num(d.circuit.nand), latch: num(d.circuit.latch), rows: num(d.checked.rows), holds: t(ok ? "holds" : "fails"), ms: num(d.compiled_in_ms) })}</span>`;
+  }
+}
+$("rules").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("install").disabled = true; INSTALL = { status: "sending" }; showInstall();
+  const body = ($("r-denyall").checked && BCLS !== HALT) ? { class: BCLS, deny_all: true } : { class: BCLS, ...editorSettings() };
+  try {
+    const d = await post("/api/policy", body, { token: true });
+    INSTALL = d.error ? { status: "refused", error: d.error } : { status: 200, summary: d };
+  } catch (err) { INSTALL = { status: "neterr", error: err.message }; }
+  showInstall();
+  $("install").disabled = false;
+  await refresh(); if (STATE) fillFromInstalled(BCLS);
+});
+function renderBoundaries(s) {
+  if (editorFor !== BCLS) fillFromInstalled(BCLS);
+  $("b-tabs").innerHTML = ALL_CLASSES.map((c) => `<button type="button" class="tab${c === BCLS ? " on" : ""}${c === HALT ? " halt" : ""}" data-cls="${c}">${esc(c)}${lang === "zh" && c === HALT ? "（共享）" : ""}</button>`).join("")
+    + `<span class="spacer"></span><span class="note">${t("b.tab.hint", { cls: `<span class="mono" style="color:var(--text)">${esc(BCLS)}</span>`, what: esc(t("cls." + BCLS + ".what")) })}</span>`;
+  $("b-tabs").querySelectorAll("[data-cls]").forEach((b) => b.addEventListener("click", () => selectClass(b.dataset.cls)));
+  const tpl = $("b-templates");
+  tpl.querySelectorAll("button").forEach((b) => b.remove());
+  TEMPLATES.forEach(([k, c, st]) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = `pre${c === "spend" && !st ? " tool" : ""}`; b.textContent = t(k) + (c !== BCLS ? ` → ${c}` : "");
+    b.addEventListener("click", () => { BCLS = c; INSTALL = null; fillEditor(st || {}, !st); editorFor = c; renderBoundaries(STATE); });
+    tpl.appendChild(b);
+  });
+  $("denyall-row").style.display = BCLS === HALT ? "none" : "";
+  $("r-remove").style.display = BCLS === "exec" ? "none" : "";
+  domainPreview();
+  // evidence for what is installed in the selected class
+  const p = policyOf(BCLS), ev = $("ev-body");
+  if (!p) { ev.innerHTML = `<div class="verdict-row dim"><span class="mark">—</span><div><div class="head">${esc(BCLS)}</div><div class="body">${t("ev.none")}</div></div></div>`; return; }
+  if (p.deny_all) { ev.innerHTML = `<div class="verdict-row bad"><span class="mark">✗</span><div><div class="head">${esc(BCLS)} · ${t("ov.deny")}</div><div class="body">${t("ev.deny")}</div></div></div>`; return; }
+  const c = p.circuit, k = p.checked, zh = lang === "zh", words = zh ? ruleWordsZh(p.settings) : p.rules;
+  const agentW = c.agent_writable || AGENT_BITS, nIn = (c.inputs || []).length || 4;
+  const vrow = (ok, head, headNo, body) => `<div class="verdict-row ${ok ? "ok" : "bad"}"><span class="mark">${ok ? "✓" : "✗"}</span><div><div class="head">${t(ok ? head : headNo)}</div><div class="body">${body}</div></div></div>`;
+  const V = k.violations || {};
+  const proven = k.matches_reference && k.every_rule_holds;
+  ev.innerHTML = `<div style="display:grid;gap:10px">
+    <div class="proof${proven ? "" : " bad"}"><span class="mark">${proven ? "✓" : "✗"}</span><span>${proven ? t("ev.proof", { rows: num(k.rows), reach: num(k.reachable_states) }) : t("ev.proof.no")}<small>${t("ev.proof.sub", { nand: num(c.nand), latch: num(c.latch), ms: num(p.compiled_in_ms) })}</small></span></div>
+    <ul class="words">${words.map((w, i) => `<li><span>${esc(w)}${zh && p.rules[i] ? `<span class="en">${esc(p.rules[i])}</span>` : ""}</span></li>`).join("")}</ul>
+    <div class="inputs">${t("ev.inputs")} ${(c.inputs || []).map((n) => `<code class="${agentW.includes(n) ? "c-agent" : "c-tool"}">${esc(n)}</code>`).join(" ")}
+      <span class="muted"><i class="sw" style="background:var(--agent)"></i>${t("ev.inputs.agent")}<i class="sw" style="background:var(--tool)"></i>${t("ev.inputs.tool")}</span></div>
+    ${vrow(k.matches_reference, "ev.match", "ev.match.no", t("ev.match.body", { rows: num(k.rows), inputs: nIn, state: N(k.domain_bits) - nIn, bits: N(k.domain_bits) }))}
+    ${vrow(k.every_rule_holds, "ev.holds", "ev.holds.no", t("ev.holds.body", { reach: num(k.reachable_states), poss: num(k.states_possible), conf: num(k.configurations_visited), proven: num(k.rows_proven) }))}
+    <div class="tiles">${[["tl.nand", num(c.nand)], ["tl.latch", num(c.latch)], ["tl.bytes", num(c.bytes)], ["tl.depth", num(c.depth)], ["tl.ms", `${num(p.compiled_in_ms)}<small>ms</small>`]].map(([kk, v]) => `<div class="tile"><div class="k">${t(kk)}</div><div class="v">${v}</div></div>`).join("")}</div>
+    <div class="note">${t("ev.viol")} ${Object.keys(V).map((n) => `${esc(t("viol." + n))} <b class="${N(V[n]) ? "bad" : ""}" style="font-family:var(--mono)">${num(V[n])}</b>`).join(" · ")}</div>
+    <details><summary>${t("ev.netlist", { bytes: num(c.bytes) })}</summary><pre class="wrap">${esc(c.netlist)}</pre></details>
+  </div>`;
+}
+
+// -- approvals --
+let AP_AGENT = null;
+function renderApprovals(s) {
+  $("ap-lead").innerHTML = t("ap.lead");
+  const { pending, waiting } = pendingItems(s);
+  $("ap-pending-sub").textContent = t("ap.pending.sub", { n: num(pending.length + waiting.length) });
+  // One card per waiting call. It leads with what the call would *do* (the effect, I-1),
+  // because that is what a person can judge; the circuit's own words are underneath,
+  // unchanged. With no effect the card is exactly what it was before.
+  const item = (p, i) => {
+    const wait = !p.bit || p.waiting_on_time;
+    const bit = p.bit || "confirm";
+    const nid = `ap-note-${i}`;
+    const code = p.code ? `<span class="codeline">${t("ap.code")} <span class="code">${esc(p.code)}</span></span>` : "";
+    const btns = p.armed
+      ? `<span class="c-tool mono">${t("ap.approved")}</span>`
+      : wait
+      ? `<button class="go tool" type="button" disabled>${t("ap.confirm")}</button><button class="danger" type="button" disabled>${t("ap.block")}</button>`
+      : `<input class="notein" type="text" id="${nid}" maxlength="200" placeholder="${esc(t("ap.note"))}">
+         <button class="go tool" type="button" data-arm="${esc(bit)}" data-agent="${esc(p.agent)}" data-for="${esc(p.reason || "")}" data-code="${esc(p.code || "")}" data-note="${nid}">${t(bit === "confirm_b" ? "ap.confirm_b" : "ap.confirm")}${p.code ? ` · ${esc(p.code)}` : ""}</button>
+         <button class="danger" type="button" data-arm="blocked" data-agent="${esc(p.agent)}" data-code="${esc(p.code || "")}" data-note="${nid}">${t("ap.block")}</button>`;
+    return `<div class="pend${wait ? " wait" : ""}"><div style="display:grid;gap:5px;min-width:0">
+      ${p.effect ? effectCard(p.effect) : ""}
+      <div class="who"><b>${esc(p.agent)}</b>${chipFor(p.class || "exec")}${p.task ? `<span class="mono muted">${t("tk.belongs")} <span class="tid">${esc(p.task)}</span></span>` : ""}<span class="mono muted">tick ${num(p.tick)} · ${clock(p.at)}</span>${wait ? "" : code}</div>
+      ${p.reason ? `<div class="call">${esc(p.reason)}</div>` : ""}
+      <ul class="why">${(p.why || []).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>
+      <div class="note">${t(p.armed ? "ap.approved.note" : itemNote(p))}</div>
+      </div><div class="btns">${btns}</div></div>`;
+  };
+  const cards = pending.concat(waiting);
+  $("ap-list").innerHTML = cards.length ? cards.map(item).join("") : `<div class="muted">${t("ap.none")}</div>`;
+  $("ap-hint-once").hidden = !pending.some((p) => p.code && !p.armed);  // what the two digits are, said once above the list, not on every card
+  $("ap-list").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => {
+    const box = b.dataset.note ? $(b.dataset.note) : null;
+    arm(b.dataset.agent, b.dataset.arm, 1, b, b.dataset.for, b.dataset.code, box ? box.value : "");
+  }));
+  // recently handled: tool-layer writes, with what the next request of that agent did
+  const tr = s.transcript, handled = [];
+  tr.forEach((e, i) => {
+    if (e.kind !== "tool" || handled.length >= 6) return;
+    const written = TOOL_BITS.filter((n) => N((e.armed || {})[n]));
+    let then = null;
+    for (let j = i - 1; j >= 0; j--) if (tr[j].kind === "request" && tr[j].agent === e.agent) { then = tr[j]; break; }
+    handled.push(`<div class="e tool"><div class="t">${clock(e.at)}</div><div><div class="h"><span class="agent">${esc(e.agent)}</span><span class="bits">${t("ap.h.tool", { bits: written.length ? written.map(esc).join(", ") : "—" })}</span>${then ? `<span class="chain ${then.granted ? "ok" : "muted"}">${t("ap.h.then", { n: num(then.tick), v: t(then.granted ? "v.grant" : "v.refuse") })}${then.chain && !then.chain.error && !then.chain.pending ? (then.chain.agrees ? " · chain ✓" : " · chain ✗") : ""}</span>` : ""}</div>${e.note ? `<div class="d reason">${t("ap.h.note", { note: esc(e.note) })}</div>` : ""}</div></div>`);
+  });
+  $("ap-handled").innerHTML = handled.length ? handled.join("") : `<div class="muted">${t("ap.handled.none")}</div>`;
+  // switches per agent
+  const sel = $("ap-agent"), names = s.agents.map((a) => a.agent);
+  if (!AP_AGENT || !names.includes(AP_AGENT)) AP_AGENT = pending[0] ? pending[0].agent : names[0] || null;
+  sel.innerHTML = names.length ? names.map((n) => `<option value="${esc(n)}"${n === AP_AGENT ? " selected" : ""}>${esc(n)}</option>`).join("") : `<option>${t("ap.noagent")}</option>`;
+  sel.disabled = !names.length;
+  // With no agent there is nothing to switch: the card hides the raw bits and says where to go.
+  sel.closest(".card").classList.toggle("agentless", !names.length);
+  if (!names.length) $("ap-msg").innerHTML = `<span class="muted">${t("ap.noagent")}</span>`;
+  const a = s.agents.find((x) => x.agent === AP_AGENT), read = readInputs(), armed = (a && a.armed) || {};
+  $("ap-toggles").innerHTML = TOOL_BITS.map((bit) => {
+    const ok = read.has(bit), lvl = bit === "blocked";
+    const btn = !a ? "" : lvl
+      ? `<button class="pre tool" type="button" data-arm="blocked" data-v="${N(armed.blocked) ? 0 : 1}"${ok ? "" : " disabled"}>${t(N(armed.blocked) ? "sw.off" : "sw.on")}</button>`
+      : `<button class="pre tool" type="button" data-arm="${bit}" data-v="1"${ok ? "" : " disabled"}>${t("sw.once")}${N(armed[bit]) ? " · 1" : ""}</button>`;
+    return `<div class="togl${ok ? "" : " dis"}"><span class="lbl"><b>${esc(bit)}</b><small>${ok ? esc(t("sw." + bit)) : t("sw.unread")}</small></span>${btn}</div>`;
+  }).join("");
+  $("ap-toggles").querySelectorAll("[data-arm]").forEach((b) => b.addEventListener("click", () => arm(AP_AGENT, b.dataset.arm, N(b.dataset.v), b)));
+  if (viewerOnly()) {
+    // A phone's token presses only what it can see: a waiting call's confirm, or a block
+    // with that call's code. These bare switches send no code, so they are the operator's.
+    $("ap-toggles").querySelectorAll("button").forEach((b) => { b.disabled = true; b.title = t("tok.viewer.no"); });
+    $("ap-msg").innerHTML = `<span class="muted">${t("tok.viewer.switches")}</span>`;
+  }
+}
+$("ap-agent").addEventListener("change", () => { AP_AGENT = $("ap-agent").value; if (STATE) renderApprovals(STATE); });
+async function arm(agent, bit, v, btn, forReason, code, note) {
+  if (!agent) return;
+  if (btn) btn.disabled = true;
+  try {
+    // A confirm from a pending item is for that exact call; the console holds it for the
+    // request with the same reason and lets other calls tick past it. The two digits go
+    // with it: the console checks them, so approving means having read this screen.
+    const body = { agent, [bit]: v };
+    if (forReason && (bit === "confirm" || bit === "confirm_b")) {
+      body.for_reason = forReason;
+      if (code) body.code = code;
+    } else if (code && viewerOnly()) {
+      body.code = code;  // a phone blocks only an agent whose code it can read off this screen
+    }
+    if (note && String(note).trim()) body.note = String(note).trim().slice(0, 200);
+    const d = await post("/api/tool", body, { token: true });  // confirm/blocked/heartbeat need the operator token
+    $("ap-msg").innerHTML = d.error ? `<span class="bad">${esc(d.error)}</span>` : `<span class="c-tool">${t("ap.done", { agent: esc(agent), bits: armedHtml(d.armed || {}, shownBits(d.armed)) })}</span>`;
+  } catch (err) { $("ap-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
+  await refresh();
+}
+
+// -- tasks (I-6) --
+// A job a person handed the agent. The open ones ride along in /api/state — the same list
+// an adapter reads to know which job it is on — so they follow the poll like everything
+// else; the closed ones are fetched once and again after anything changes, because a
+// ledger nobody is looking at does not need polling.
+//
+// Nothing on this view can grant anything. The only button that writes is "close", and
+// closing only ever refuses calls that come afterwards.
+let TK_ALL = null, TK_BUSY = false;
+async function tkFetchAll() {
+  TK_BUSY = true;
+  try {
+    // The token goes on this read for the same reason /api/state carries it: over the LAN
+    // the console closes the ledger, because it is the person's own words about their work.
+    const r = await fetch("/api/tasks", { cache: "no-store", headers: readHeaders() });
+    if (!r.ok) throw new Error(r.status);
+    TK_ALL = (await r.json()).tasks || [];
+    tkRenderClosed();
+  } catch (e) { TK_ALL = null; }
+  TK_BUSY = false;
+}
+const tkTime = (unix) => new Date(N(unix) * 1000).toLocaleString(locale(), { hour12: false });
+const tkExpects = (tk) => ((tk.expects || []).length
+  ? t("tk.expects.says", { cls: (tk.expects || []).map(chipFor).join(" ") })
+  : `<span class="muted">${t("tk.expects.any")}</span>`);
+function tkSpentLine(tk) {
+  const used = Object.keys(tk.by_class || {});
+  if (!used.length && !N(tk.granted) && !N(tk.refused)) return `<span class="muted">${t("tk.spent.none")}</span>`;
+  const per = used.map((c) => `${chipFor(c)} <span class="g">${num(tk.by_class[c].granted)}</span>/<span class="r">${num(tk.by_class[c].refused)}</span>`).join(" ");
+  return `${t("tk.spent", { g: num(tk.granted), r: num(tk.refused) })}${per ? " · " + per : ""}`;
+}
+function tkCapLine(tk) {
+  return N(tk.max_grants)
+    ? t("tk.cap.left", { n: num(Math.max(0, N(tk.max_grants) - N(tk.granted))), m: num(tk.max_grants) })
+    : `<span class="muted">${t("tk.cap.none")}</span>`;
+}
+function taskCard(tk) {
+  return `<div class="task"><div style="display:grid;gap:5px;min-width:0">
+    <div class="top"><span class="tid">${esc(tk.task_id)}</span><span class="mono muted">${t("tk.filed", { time: esc(tkTime(tk.filed_at)) })}</span></div>
+    <div class="said">${esc(tk.text)}</div>
+    <div class="spent">${tkSpentLine(tk)}</div>
+    <div class="note">${tkExpects(tk)} · ${tkCapLine(tk)}</div>
+    </div><div class="btns"><button class="pre" type="button" data-close="${esc(tk.task_id)}">${t("tk.close")}</button></div></div>`;
+}
+function tkRenderClosed() {
+  const tb = $("tk-closed").querySelector("tbody");
+  const closed = (TK_ALL || []).filter((tk) => tk.status !== "open");
+  if (!closed.length) { tb.innerHTML = `<tr><td class="muted">${t("tk.done.none")}</td></tr>`; return; }
+  tb.innerHTML = `<tr>${["tk.th.id", "tk.th.text", "tk.th.spent", "tk.th.why", "tk.th.at"].map((k) => `<th>${t(k)}</th>`).join("")}</tr>` +
+    closed.map((tk) => {
+      const why = tk.closed_by === "limit" ? t("tk.closed.by.limit", { n: num(tk.max_grants) }) : t("tk.closed.by.person");
+      return `<tr><td class="num"><span class="tid">${esc(tk.task_id)}</span></td><td class="name">${esc(tk.text)}` +
+        (tk.note ? `<div class="note">${t("tk.note", { note: esc(tk.note) })}</div>` : "") +
+        `</td><td class="num"><span class="ok">${num(tk.granted)}</span>/<span class="bad">${num(tk.refused)}</span></td>` +
+        `<td>${why}</td><td class="num">${esc(tkTime(tk.closed_at))}</td></tr>`;
+    }).join("");
+}
+function renderTasks(s) {
+  $("tk-lead").innerHTML = t("tk.lead");
+  const open = s.tasks || [];
+  $("tk-open-sub").textContent = t("tk.open.sub", { n: num(open.length) });
+  const box = $("tk-classes");
+  if (!box.children.length) {  // the four classes the circuits answer for, not a free-text field
+    box.innerHTML = TOOL_CLASSES.map((c) => `<label><input type="checkbox" data-tkc="${c}">${chipFor(c)}</label>`).join("");
+  }
+  $("tk-list").innerHTML = open.length ? open.map(taskCard).join("") : `<div class="muted">${t("tk.open.none")}</div>`;
+  $("tk-list").querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => closeTask(b.dataset.close, b)));
+  if (!TK_ALL && !TK_BUSY) tkFetchAll(); else tkRenderClosed();
+}
+$("tk-cap-on").addEventListener("change", () => { $("tk-cap").disabled = !$("tk-cap-on").checked; });
+$("tk-file").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const text = $("tk-text").value.trim();
+  if (!text) { $("tk-msg").innerHTML = `<span class="bad">${t("tk.need.text")}</span>`; return; }
+  const classes = [...$("tk-classes").querySelectorAll("[data-tkc]")].filter((b) => b.checked).map((b) => b.dataset.tkc);
+  const body = { text, classes };
+  if ($("tk-cap-on").checked) body.max_grants = Math.max(1, N($("tk-cap").value));
+  $("tk-go").disabled = true;
+  try {
+    const d = await post("/api/task", body, { token: true });  // filing a job is the person's
+    if (d.error) $("tk-msg").innerHTML = `<span class="bad">${esc(d.error)}</span>`;
+    else {
+      $("tk-msg").innerHTML = `<span class="c-agent">${t("tk.filed.ok", { id: esc(d.task_id) })}</span>`;
+      $("tk-text").value = "";
+      TK_ALL = null;
+    }
+  } catch (err) { $("tk-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
+  $("tk-go").disabled = false;
+  await refresh();
+});
+async function closeTask(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = t("tk.closing"); }
+  try {
+    const d = await post(`/api/task/${encodeURIComponent(id)}/close`, {}, { token: true });
+    $("tk-msg").innerHTML = d.error ? `<span class="bad">${esc(d.error)}</span>`
+      : `<span class="c-agent">${t("tk.closed.ok", { id: esc(id) })}</span>`;
+    TK_ALL = null;
+  } catch (err) { $("tk-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
+  await refresh();
+}
+
+// -- the big red button --
+// One press sets the console's operator-stop latch: every request from every agent — the
+// names known now and any that appears or renames itself later — is refused before any
+// circuit is asked, until a person resumes. It also raises blocked for the known names, so
+// the switches panel agrees, but the latch is what holds. Lifting it is a second, deliberate
+// action (press "lift every block", type the word, confirm) placed away from the stop itself.
+// Whether everything is stopped is read out of the state (`operator_stop.on`), never counted
+// from blocked names: a count of names could not speak for the agents not seen yet.
+function stopCount(s) {
+  const n = s.agents.length, m = s.agents.filter((a) => N((a.armed || {}).blocked)).length;
+  return { n, m, stopped: !!(s.operator_stop && s.operator_stop.on) };
+}
+function renderStop(s) {
+  const { n, m, stopped } = stopCount(s);
+  const label = stopped ? t("ap.stop.all") : m ? t("ap.stop.some", { m: num(m), n: num(n) }) : t("ap.stop");
+  const v = viewerOnly();  // a paired phone may block an agent it can see, not stop or resume everything
+  ["stop-all", "stop-all-2", "stop-big"].forEach((id) => {
+    const b = $(id);
+    if (!b) return;
+    if (!b.classList.contains("holding")) b.textContent = label;  // mid-hold the button says "hold"; do not talk over it
+    b.disabled = stopped || v;  // the stop is already in force: the way back is the resume control
+    b.title = v ? t("tok.viewer.no") : t("ap.stop.hint");
+  });
+  ["resume-open", "resume-go"].forEach((id) => { if (v) $(id).disabled = true; });
+  if (v && !$("ap-stop-msg").dataset.viewer) { $("ap-stop-msg").innerHTML = `<span class="muted">${t("tok.viewer.no")}</span>`; $("ap-stop-msg").dataset.viewer = "1"; }
+  if (!v && $("ap-stop-msg").dataset.viewer) { $("ap-stop-msg").innerHTML = ""; delete $("ap-stop-msg").dataset.viewer; }
+  const banner = $("ap-stop-banner");
+  banner.hidden = !(stopped || m);
+  // Under the stop the honest reading is "everything, including agents not seen yet"; a
+  // count of blocked names is only meaningful when the stop is NOT pressed.
+  banner.textContent = stopped ? t("ap.stopped.banner", { n: num(n), since: s.operator_stop.since ? clock(s.operator_stop.since) : "" })
+    : m ? t("ap.blocked.banner", { m: num(m), n: num(n) }) : "";
+  $("ap-resume").hidden = !(stopped || m);
+  $("ap-resume-hint").textContent = t("ap.resume.ask", { word: t("ap.resume.word") });
+  $("resume-word").placeholder = t("ap.resume.word");
+  if (!(stopped || m)) closeResume();
+}
+function closeResume() {
+  $("resume-word").hidden = true; $("resume-go").hidden = true; $("resume-word").value = ""; $("resume-go").disabled = true;
+}
+async function stopAll(stop, note) {
+  const btns = ["stop-all", "stop-all-2", "stop-big", "resume-go"].map($).filter(Boolean);
+  btns.forEach((b) => { b.disabled = true; });
+  try {
+    const d = await post(stop ? "/api/stop-all" : "/api/resume-all", note ? { note } : {}, { token: true });
+    $("ap-stop-msg").innerHTML = d.error
+      ? `<span class="bad">${esc(d.error)}</span>`
+      : `<span class="${stop ? "bad" : "ok"}">${t(stop ? "ap.stop.done" : "ap.resume.done", { n: num(d.count) })}</span>`;
+    if (!d.error) closeResume();
+  } catch (err) { $("ap-stop-msg").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
+  await refresh();
+}
+// Hold to stop. A press that lasts 600 ms fires; lifting the finger, leaving the button, or
+// moving it more than a few pixels cancels — and when a scroll starts on the dock the browser
+// takes the pointer (pointercancel), so a swipe cannot stop anything. A tap alone does nothing,
+// and a click is not the gesture: no confirm dialog, because a dialog is an obstacle in a hurry
+// and a hold is not. The fill rising across the button (.holding) is the only feedback needed.
+const HOLD_MS = 600, HOLD_SLOP = 8;
+["stop-all", "stop-all-2", "stop-big"].forEach((id) => {
+  const b = $(id);
+  if (!b) return;
+  let timer = null, label = null, x0 = 0, y0 = 0;
+  const cancel = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    b.classList.remove("holding");
+    if (label !== null) { b.textContent = label; label = null; }
+    b.style.minWidth = "";
+  };
+  const start = (ev) => {
+    if (b.disabled || timer) return;
+    if (ev.type === "pointerdown") { if (ev.button !== 0) return; x0 = ev.clientX; y0 = ev.clientY; }
+    label = b.textContent;
+    b.style.minWidth = `${b.offsetWidth}px`;   // the words change; the button must not shrink out from under the pointer
+    b.textContent = t("ap.stop.hold");
+    b.classList.add("holding");
+    timer = setTimeout(() => { timer = null; cancel(); show("approvals"); stopAll(true); }, HOLD_MS);  // the banner and the way back are there
+  };
+  b.addEventListener("pointerdown", start);
+  b.addEventListener("pointermove", (ev) => { if (timer && Math.hypot(ev.clientX - x0, ev.clientY - y0) > HOLD_SLOP) cancel(); });
+  ["pointerup", "pointerleave", "pointercancel"].forEach((e) => b.addEventListener(e, cancel));
+  b.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); if (!ev.repeat) start(ev); } });
+  b.addEventListener("keyup", cancel);
+  b.addEventListener("blur", cancel);
+  b.addEventListener("click", (ev) => ev.preventDefault());
+});
+// The drill answers "what would this do?" without doing it: the same list of agents the
+// button would write to, computed from the state already on screen. Nothing is sent.
+$("stop-drill").addEventListener("click", () => {
+  const names = STATE ? STATE.agents.map((a) => a.agent) : [];
+  $("ap-drill").innerHTML = names.length
+    ? t("ap.drill.out", { n: num(names.length), list: esc(names.join(" · ")) })
+    : t("ap.drill.none");
+});
+$("resume-open").addEventListener("click", () => {
+  $("resume-word").hidden = false; $("resume-go").hidden = false; $("resume-word").focus();
+});
+$("resume-word").addEventListener("input", () => {
+  $("resume-go").disabled = $("resume-word").value.trim().toLowerCase() !== t("ap.resume.word").toLowerCase();
+});
+$("resume-go").addEventListener("click", () => {
+  if ($("resume-word").value.trim().toLowerCase() !== t("ap.resume.word").toLowerCase()) return;
+  stopAll(false, "lifted from the page");
+});
+
+// -- activity --
+let FILTER_CLS = "all", FILTER_KIND = "all", LAST = null;
+function renderActivity(s) {
+  const rc = $("req-class");
+  if (!rc.options.length) rc.innerHTML = TOOL_CLASSES.map((c) => `<option value="${c}"${c === "exec" ? " selected" : ""}>${c}</option>`).join("");
+  const tr = s.transcript, reqs = tr.filter((e) => e.kind === "request"), g = reqs.filter((e) => e.granted).length;
+  $("ac-sub").textContent = t("ac.sub", { n: num(tr.length), g: num(g), r: num(reqs.length - g) });
+  const chips = (items, cur, key) => items.map(([v, lab]) => `<button type="button" class="pre${cur === v ? " on" : ""}" data-${key}="${v}">${lab}</button>`).join("");
+  $("ac-filters").innerHTML = chips([["all", t("f.all")]].concat(TOOL_CLASSES.map((c) => [c, c])), FILTER_CLS, "fc") + `<span style="width:12px"></span>` +
+    chips([["all", t("f.all")], ["granted", t("f.granted")], ["refused", t("f.refused")], ["tool", t("f.tool")], ["policy", t("f.policy")]], FILTER_KIND, "fk");
+  $("ac-filters").querySelectorAll("[data-fc]").forEach((b) => b.addEventListener("click", () => { FILTER_CLS = b.dataset.fc; renderActivity(STATE); }));
+  $("ac-filters").querySelectorAll("[data-fk]").forEach((b) => b.addEventListener("click", () => { FILTER_KIND = b.dataset.fk; renderActivity(STATE); }));
+  const rows = tr.filter((e) => {
+    if (FILTER_CLS !== "all" && (e.kind === "request" || e.kind === "policy" || e.kind === "spoof") && (e.class || "exec") !== FILTER_CLS) return false;
+    if (FILTER_CLS !== "all" && (e.kind === "tool" || e.kind === "task" || e.kind === "stop")) return false;
+    if (FILTER_KIND === "granted") return e.kind === "request" && e.granted;
+    if (FILTER_KIND === "refused") return (e.kind === "request" && !e.granted) || e.kind === "spoof";
+    if (FILTER_KIND === "tool") return e.kind === "tool" || e.kind === "stop";  // both are a person's hand
+    if (FILTER_KIND === "policy") return e.kind === "policy";
+    return true;
+  });
+  $("ac-log").innerHTML = rows.length ? foldRuns(rows).map((g) => runHtml(g, false)).join("") : `<div class="muted">${t("ac.none")}</div>`;
+  bindRuns($("ac-log"));
+  if (LAST) showLast(LAST);
+}
+// A run of identical decisions — the same agent asking the same class, getting the same verdict
+// for the same words, one after another — is one row and a count. The sixty-first identical
+// refusal tells a person nothing the first did not (audit F5). Folding is display only: every
+// entry is still in the transcript and a click shows them. Open runs are remembered by the
+// first entry's agent and tick, which do not move as new entries arrive.
+const AC_OPEN = new Set();
+// A chain disagreement is never folded away: it is the one entry in a run a person must see.
+const runKey = (e) => (e.kind === "request" && !e.error && !(e.chain && e.chain.agrees === false) ? JSON.stringify([e.agent, e.class || "exec", e.granted ? 1 : 0, e.why || [], e.task || ""]) : null);
+function foldRuns(entries) {
+  const out = [];
+  for (const e of entries) {
+    const k = runKey(e), last = out[out.length - 1];
+    if (k && last && last.key === k) last.run.push(e); else out.push({ e, key: k, run: [] });
+  }
+  return out;
+}
+function runHtml(g, compact) {
+  let html = entryHtml(g.e, compact);
+  if (!g.run.length) return html;
+  const id = `${g.e.agent}|${g.e.tick}`, open = AC_OPEN.has(id), n = g.run.length + 1;
+  if (open) html += g.run.map((e) => entryHtml(e, compact)).join("");
+  return html + `<div class="e more"><div class="t"></div><div class="d"><span class="cnt">${num(n)}</span> <button class="link" type="button" data-run="${esc(id)}">${t(open ? "ac.less" : g.e.granted ? "ac.more.ok" : "ac.more", { n: num(n) })}</button></div></div>`;
+}
+function bindRuns(root) {
+  root.querySelectorAll("[data-run]").forEach((b) => b.addEventListener("click", () => {
+    if (AC_OPEN.has(b.dataset.run)) AC_OPEN.delete(b.dataset.run); else AC_OPEN.add(b.dataset.run);
+    if (STATE) render(STATE);
+  }));
+}
+function entryHtml(e, compact) {
+  const at = `<div class="t">${clock(e.at)}</div>`;
+  if (e.kind === "tool") {
+    const ar = e.armed || { blocked: e.blocked, confirm: e.confirm };
+    return `<div class="e tool">${at}<div><div class="h"><span class="verdict">${t("v.tool")}</span><span class="agent">${esc(e.agent)}</span></div><div class="d">${t("e.tool", { bits: armedHtml(ar, shownBits(ar)) })}</div>` +
+      (e.note ? `<div class="d reason">${t("ap.h.note", { note: esc(e.note) })}</div>` : "") + `</div></div>`;
+  }
+  if (e.kind === "policy") {
+    const cz = e.circuit;
+    return `<div class="e policy">${at}<div><div class="h"><span class="verdict">${t("v.policy")}</span>${chipFor(e.class || "exec")}<span class="agent">${cz ? t("e.policy", { cls: esc(e.class || "exec"), rules: esc((e.rules || []).join("; ")) }) : t("e.policy.none", { cls: esc(e.class || "exec") })}</span></div>` +
+      (cz ? `<div class="d">${t("e.policy.s", { nand: num(cz.nand), latch: num(cz.latch), rows: num(e.rows), holds: `<span class="${e.every_rule_holds ? "ok" : "bad"}">${t(e.every_rule_holds ? "holds" : "fails")}</span>` })}</div>` : "") + `</div></div>`;
+  }
+  if (e.kind === "task") {
+    // A person filing or closing a job. No circuit was asked — nothing was decided here.
+    return `<div class="e task-e">${at}<div><div class="h"><span class="verdict">${t("v.task")}</span><span class="tid">${esc(e.task)}</span>` +
+      `<span class="agent">${t(e.event === "closed" ? "e.task.closed" : "e.task.filed")}</span></div>` +
+      `<div class="d reason">${esc(e.text || "")}</div>` +
+      (N(e.max_grants) ? `<div class="d">${t("e.task.cap", { n: num(e.max_grants) })}</div>` : "") +
+      (e.note ? `<div class="d">${t("tk.note", { note: esc(e.note) })}</div>` : "") + `</div></div>`;
+  }
+  if (e.kind === "stop") {
+    // The big red button, or its release. A person's act against every agent at once, so it
+    // is one line rather than one per name; the per-name `blocked` writes follow it.
+    const n = (e.agents || []).length;
+    return `<div class="e tool">${at}<div><div class="h"><span class="verdict">${t("v.stop")}</span><span class="agent">${t(e.stopped ? "e.stop.on" : "e.stop.off", { n: num(n) })}</span>` +
+      (e.source ? `<span class="mono muted">${t("e.stop.from", { source: esc(e.source) })}</span>` : "") + `</div>` +
+      (e.note ? `<div class="d reason">${t("ap.h.note", { note: esc(e.note) })}</div>` : "") + `</div></div>`;
+  }
+  if (e.kind === "spoof") {
+    // A request under a bound name without that name's token: refused before any circuit
+    // was asked, so it has no tick and no inputs — only who claimed to be whom.
+    return `<div class="e spoof">${at}<div><div class="h"><span class="verdict">${t("v.spoof")}</span>${e.class ? chipFor(e.class) : ""}<span class="agent">${esc(e.agent)}</span></div>` +
+      `<div class="d">${t(e.token === "missing" ? "e.spoof.missing" : "e.spoof.wrong")}</div>` +
+      (e.reason ? `<div class="d reason">${esc(e.reason)}</div>` : "") +
+      (compact ? "" : `<ul class="why"><li>${esc((e.why || []).join("; "))}</li></ul>`) + `</div></div>`;
+  }
+  if (e.error) return `<div class="e err">${at}<div><div class="h"><span class="verdict">400</span></div><div class="d">${esc(e.error)}</div></div></div>`;
+  const ok = !!e.granted;
+  const inp = e.inputs || { request: 1, intent: e.intent, blocked: e.blocked, confirm: e.confirm };
+  const bits = `intent ${N(inp.intent)} · ` + bitsHtml(inp, Object.keys(inp).filter((n) => n !== "request" && n !== "intent"));
+  let chain = "";
+  if (e.chain) chain = e.chain.pending ? `<span class="chain muted">chain …</span>` : e.chain.error ? `<span class="chain amber" title="${esc(e.chain.error)}">chain ?</span>` : e.chain.agrees ? `<span class="chain ok">chain ✓</span>` : `<span class="chain bad">chain ✗ grant=${N(e.chain.grant)}</span>`;
+  let body = "";
+  if (!compact) {
+    const lines = [`<b>${t("e.tick", { n: num(e.tick) })}</b>`];
+    if (e.ticks_since_previous_grant != null) lines.push(t("e.gap", { n: num(e.ticks_since_previous_grant) }));
+    if (e.class_installed === false) lines.push(t("e.ungated"));
+    if (e.halt) lines.push(`<span class="${e.halt.granted ? "muted" : "bad"}">${t(e.halt.granted ? "e.halt.ok" : "e.halt.no")}</span>`);
+    if (ok) lines.push(t("e.granted"));
+    body = `<div class="d">${lines.join(" · ")}</div>`;
+    // One line of what the call would have done, when the adapter said (I-1).
+    if (e.effect) body += `<div class="d">${effectLine(e.effect)}</div>`;
+    if (!ok && (e.why || []).length) body += `<div class="d">${t("e.why")}</div><ul class="why">${e.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>`;
+    if (e.chain && !e.chain.pending) body += `<div class="d">${e.chain.error ? `<span class="amber">${t("e.chain.err", { err: esc(e.chain.error) })}</span>` : e.chain.agrees ? `<span class="ok">${t("e.chain.ok", { id: N(e.chain.chain_id) })}</span>` : `<span class="bad">${t("e.chain.dis", { id: N(e.chain.chain_id), g: N(e.chain.grant) })}</span>`}</div>`;
+  } else {
+    if (e.effect) body = `<div class="d">${effectLine(e.effect)}</div>`;
+    if (e.reason) body += `<div class="d">${esc(e.reason)}</div>`;
+    if (!ok && (e.why || []).length) body += `<ul class="why"><li>${esc(e.why.join("; "))}</li></ul>`;
+  }
+  return `<div class="e ${ok ? "ok" : "no"}">${at}<div><div class="h"><span class="verdict">${t(ok ? "v.grant" : "v.refuse")}</span><span class="agent">${esc(e.agent)}</span>${chipFor(e.class || "exec")}` +
+    (e.task ? `<span class="tid">${esc(e.task)}</span>` : "") + `<span class="mono muted">tick ${num(e.tick)}</span>` +
+    (compact ? "" : `<span class="bits">${bits}</span>` + (e.reason ? `<span class="reason">${esc(e.reason)}</span>` : "")) + chain + `</div>${body}</div></div>`;
+}
+function showLast(e) {
+  LAST = e;
+  $("last").innerHTML = e.error ? `<span class="bad">${esc(e.error)}</span>` : entryHtml(e, false).replace(/^<div class="e/, '<div style="padding:0;border:0;background:none" class="e');
+}
+// Two tokens, and the page keeps them apart on purpose.
+//
+// The operator token gates installing rules, stopping and resuming, filing tasks and the
+// person's bits. It is kept in this browser only (localStorage), never fetched from the
+// server, and — since 2026-09-17 — sent ONLY with a write it gates, never on a read. It used
+// to ride the two-second /api/state poll, which over the Wi-Fi put the person's one secret on
+// the network in cleartext for as long as the page was open (docs/REDTEAM-2026-09-17.md F1).
+//
+// The viewer token is a paired phone's own (`c3s pair` puts it in the QR). It reads the
+// console and presses confirm/block for a call it can see — the same rights as a Cardputer
+// over Wi-Fi, plus the reads. It cannot install rules, stop, resume or unblock, and the page
+// says so where those controls are instead of failing silently.
+let TOKEN = null, VIEWER = null, READ_DENIED = false;
+try { TOKEN = localStorage.getItem("reflex.token"); VIEWER = localStorage.getItem("reflex.viewer"); } catch (e) { /* private window */ }
+function askToken() {
+  const v = window.prompt(t("tok.prompt"));
+  if (v) { TOKEN = v.trim(); try { localStorage.setItem("reflex.token", TOKEN); } catch (e) { /* ignore */ } }
+  return TOKEN;
+}
+// What a GET carries: the viewer token if this page has one, otherwise nothing. Never the
+// operator token — on this machine a read needs no token, and over the network the phone
+// has its own. A page on the LAN with neither gets 403 and is told to re-pair.
+const readHeaders = () => (VIEWER ? { "x-reflex-device-token": VIEWER } : {});
+const viewerOnly = () => !TOKEN && !!VIEWER;
+async function post(path, body, opts) {
+  const headers = { "content-type": "application/json" };
+  const needsToken = opts && opts.token;
+  let asDevice = false;
+  if (needsToken) {
+    if (TOKEN) headers["x-reflex-token"] = TOKEN;
+    else if (VIEWER && path === "/api/tool") { headers["x-reflex-device-token"] = VIEWER; asDevice = true; }  // the phone's own press
+    else if (VIEWER) return { error: t("tok.viewer.no") };   // rules, stop, resume, tasks: not a phone's to do
+    else if (askToken()) headers["x-reflex-token"] = TOKEN;
+  }
+  let r = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
+  let d = await r.json();
+  // Ask again only when the *token* was the problem. A wrong matching code is also 403,
+  // and prompting for the token there would blame the wrong thing and teach the wrong fix.
+  if (r.status === 403 && needsToken && !asDevice && /token/i.test(d.error || "") && askToken()) {
+    headers["x-reflex-token"] = TOKEN;
+    r = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
+    d = await r.json();
+  }
+  if (!r.ok) d.error = d.error || `HTTP ${r.status}`;
+  return d;
+}
+// Where an operator-only control sits, say what this page can and cannot do when it holds
+// a viewer token. Disabling silently would read as "broken"; failing on click would read as
+// "the token is wrong". Neither is what happened: the phone was given exactly these rights.
+function renderViewer() {
+  const v = viewerOnly();
+  $("viewer-badge").hidden = !v;
+  $("viewer-badge").textContent = v ? t("tok.viewer.badge") : "";
+  const note = `<span class="muted">${t("tok.viewer.no")}</span> <button class="pre viewer-op" type="button">${t("tok.viewer.have")}</button>`;
+  [["install", "install-msg"], ["tk-go", "tk-msg"]].forEach(([btn, msg]) => {
+    if ($(btn)) $(btn).disabled = v;
+    if (v && $(msg) && !$(msg).dataset.viewer) { $(msg).innerHTML = note; $(msg).dataset.viewer = "1"; }
+    if (!v && $(msg) && $(msg).dataset.viewer) { $(msg).innerHTML = ""; delete $(msg).dataset.viewer; }
+  });
+  document.querySelectorAll(".viewer-op").forEach((b) => { b.onclick = () => { if (askToken()) refresh(); }; });
+}
+$("req").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("send").disabled = true; $("last").innerHTML = `<span class="muted">${t("l.sending")}</span>`;
+  try { showLast(await post("/api/request", { agent: $("agent").value || "console", class: $("req-class").value, intent: $("intent").checked ? 1 : 0, reason: $("reason").value })); }
+  catch (err) { $("last").innerHTML = `<span class="bad">${t("l.neterr", { e: esc(err.message) })}</span>`; }
+  $("send").disabled = false;
+  refresh();
+});
+
+// -- agents --
+function latchWords(st, f) {
+  const out = [];
+  if (!st) return "";
+  if (st.sticky_block || N(st.heartbeat_ticks)) out.push(N(f.halted) ? `<span class="bad">${t("ag.halted")}</span>` : (N(st.heartbeat_ticks) && N(f.silence) ? `<span class="amber">${t("ag.silence", { n: num(f.silence) })}</span>` : ""));
+  if (st.confirm_per_irreversible && N(f.token)) out.push(`<span class="ok">${t("ag.token")}</span>`);
+  if (N(st.trip_after_failures)) out.push(N(f.tripped) ? `<span class="bad">${t("ag.tripped")}</span>` : (N(f.fails) ? `<span class="amber">${t("ag.fails", { n: num(f.fails) })}</span>` : ""));
+  if (st.two_key) out.push(`<span class="${N(f.key_a) && N(f.key_b) ? "ok" : ""}">${t("ag.keys", { a: N(f.key_a), b: N(f.key_b) })}</span>`);
+  if (N(st.commit_ticks)) out.push(t("ag.streak", { a: num(f.streak), b: num(st.commit_ticks) }));
+  if (N(st.max_grants)) out.push(`<span class="${N(f.spent) >= N(st.max_grants) ? "bad" : ""}">${t("ag.used", { a: num(f.spent), b: num(st.max_grants) })}</span>`);
+  return out.filter(Boolean).join(" · ");
+}
+function renderAgents(s) {
+  const tb = $("agents").querySelector("tbody");
+  if (!s.agents.length) { tb.innerHTML = `<tr><td class="muted">${t("ag.none")}</td></tr>`; return; }
+  tb.innerHTML = `<tr>${["ag.name", "ag.ticks", "ag.by", "ag.cool", "ag.latch", "ag.armed", "ag.seen"].map((k) => `<th>${t(k)}</th>`).join("")}</tr>` +
+    s.agents.map((a) => {
+      const by = a.by_class || {};
+      const per = ALL_CLASSES.filter((c) => by[c] && (by[c].ticks || isLive(policyOf(c)))).map((c) => `${chipFor(c)} <span class="num">${num(by[c].ticks)}/${num(by[c].grants)}</span>`).join(" ");
+      const cool = ALL_CLASSES.filter((c) => isLive(policyOf(c)) && N(policyOf(c).settings.min_gap_ticks) > 1).map((c) => `${chipFor(c)} ${N(by[c] && by[c].cooldown_left) ? `<span class="amber">${t("ag.left", { n: num(by[c].cooldown_left) })}</span>` : `<span class="ok">${t("ag.ready")}</span>`}`).join(" ");
+      const latches = ALL_CLASSES.filter((c) => isLive(policyOf(c))).map((c) => { const w = latchWords(policyOf(c).settings, (by[c] && by[c].counters) || {}); return w ? `${chipFor(c)} ${w}` : ""; }).filter(Boolean).join("<br>");
+      const ar = a.armed || {};
+      const armed = `<span class="mono">${shownBits(ar).map((n) => `<span class="${N(ar[n]) ? "c-tool" : ""}">${esc(n)} ${N(ar[n])}</span>`).join(" · ")}</span>`;
+      const seen = s.transcript.find((e) => e.agent === a.agent);
+      return `<tr><td class="name">${esc(a.agent)}</td><td class="num">${num(a.ticks)}</td><td>${per || `<span class="muted">${t("ag.norule")}</span>`}</td><td>${cool || `<span class="muted">${t("ag.norule")}</span>`}</td><td>${latches || `<span class="muted">${t("ag.clear")}</span>`}</td><td>${armed}</td><td class="num">${seen ? clock(seen.at) : "—"}</td></tr>`;
+    }).join("");
+}
+
+// -- connect --
+let CN_CLS = "spend";
+function renderStatic() {
+  const o = esc(location.origin), H = "-H 'content-type: application/json'";
+  const HT = H + " -H \"x-reflex-token: $REFLEX_TOKEN\"";  // the person's endpoints need the token
+  // W2: one sentence with two bold words in it, so it is set as HTML here rather than
+  // going through data-i18n (which sets text). Both halves are this file's own words.
+  $("cn-tools-lead").innerHTML = t("tools.lead");
+  if (typeof CN_MAP !== "undefined" && CN_MAP) { cnRenderTools(); cnRenderPanels(); }
+  // W2: the Claude Code and MCP blocks are no longer written out here with `/abs/path`
+  // placeholders — they come from GET /api/classes with this machine's real paths, this
+  // console's port and the class map's own gates (see the W2 block at the end of this file).
+  $("cn-tg").innerHTML = `TELEGRAM_TOKEN=…  CONSOLE_URL=${o}
+TOOL_LAYER_CHATS=<span class="t">-1001234567890</span>
+python3 bot_telegram.py
+
+/ask [class] [why]   /intent [class] [why]   /rules [class]   /state
+<span class="c"># ${lang === "zh" ? "只有 TOOL_LAYER_CHATS（人的聊天）能用，并会收到待确认提醒：" : "only TOOL_LAYER_CHATS (a person's chat) may use these, and are pinged when something waits:"}</span>
+/pending   /confirm [agent]   /confirm_b [agent]
+/block &lt;agent&gt;   /unblock &lt;agent&gt;   /stop   /resume`;
+  $("cn-daily").innerHTML = [["Gmail", "d.gmail"], ["Slack", "d.slack"], ["Google Calendar", "d.cal"], [lang === "zh" ? "文件系统" : "Filesystem", "d.fs"], [lang === "zh" ? "Shell / 代码" : "Shell / code", "d.sh"]]
+    .map(([n, k]) => `<div class="kv"><b>${esc(n)}</b><span>${esc(t(k))}</span></div>`).join("");
+  $("cn-curl").innerHTML = `<span class="c"># ${lang === "zh" ? "操作者令牌在后台启动日志里，也在 ~/.c3s-circuit-agent/operator-token" : "the operator token is in the console's startup log and in ~/.c3s-circuit-agent/operator-token"}</span>
+export REFLEX_TOKEN=<span class="t">…</span>
+<span class="c"># ${lang === "zh" ? "装一类规则（需要令牌；重编译、重证明，这一类的 agent 归零）" : "install one class's rules (needs the token; recompiles, reproves, resets that class)"}</span>
+curl -s ${o}/api/policy ${HT} -d '{"class":"exec","min_gap_ticks":8,"commit_ticks":4,"forbid_when_blocked":true}'
+curl -s ${o}/api/policy ${HT} -d '{"class":"spend","deny_all":true}'
+<span class="c"># ${lang === "zh" ? "工具层：人的位（confirm/blocked）需要令牌，agent 写不到" : "tool layer: the person's bits (confirm/blocked) need the token; the agent cannot write them"}</span>
+curl -s ${o}/api/tool ${HT} -d '{"agent":"my-model","blocked":1}'
+curl -s ${o}/api/tool ${HT} -d '{"agent":"my-model","confirm":1}'
+<span class="c"># ${lang === "zh" ? "agent：一次请求 = 一拍（不需要令牌）" : "agent: one request, one tick (no token)"}</span>
+curl -s ${o}/api/request ${H} -d '{"agent":"my-model","class":"files","intent":1,"reason":"write notes.txt"}'
+curl -s ${o}/api/state`;
+}
+async function sha256hex(hex) {
+  const clean = hex.replace(/^0x/, ""), bytes = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(clean.substr(i * 2, 2), 16);
+  const d = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function renderConnect(s) {
+  cnEnter();  // W2: fetch the tool map once on entry, not on every tick (see the W2 block)
+  const sel = $("cn-class");
+  if (!sel.options.length) { sel.innerHTML = ALL_CLASSES.map((c) => `<option value="${c}"${c === CN_CLS ? " selected" : ""}>${c}</option>`).join(""); sel.addEventListener("change", () => { CN_CLS = sel.value; renderConnect(STATE); }); }
+  const p = policyOf(CN_CLS), pre = $("cn-forge"), note = $("cn-forge-note");
+  if (!p) { pre.textContent = ""; note.textContent = t("cn.forge.none", { cls: CN_CLS }); return; }
+  if (p.deny_all) { pre.textContent = ""; note.textContent = t("cn.forge.deny", { cls: CN_CLS }); return; }
+  const c = p.circuit, inputs = c.inputs || [], nIn = inputs.length, nState = N(p.checked.domain_bits) - nIn;
+  const opt = (inputs.includes("irreversible") ? 1 : 0) | (inputs.includes("failed") ? 2 : 0) | (inputs.includes("heartbeat") ? 4 : 0) | (inputs.includes("confirm_b") ? 8 : 0);
+  const netlist = String(c.netlist || "0x");
+  let sha = "…";
+  try { sha = await sha256hex(netlist); } catch (e) { sha = "(sha256 unavailable)"; }
+  if (CN_CLS !== sel.value) return;  // the class changed while hashing
+  note.textContent = `${CN_CLS} · ${num(c.nand)} NAND + ${num(c.latch)} LATCH · ${num(c.bytes)} B`;
+  pre.innerHTML = `<span class="c"># ${lang === "zh" ? `Boundaries 里 ${esc(CN_CLS)} 类当前装的电路` : `the circuit installed for ${esc(CN_CLS)} under Boundaries`}</span>
+export NETLIST=${esc(netlist)}
+export NETLIST_SHA256=0x${esc(sha)}
+export N_IN=${nIn} OPTIONAL_INPUTS=${opt} N_STATE=${nState}   <span class="c"># 1 irreversible · 2 failed · 4 heartbeat · 8 confirm_b</span>
+export SAFE=<span class="t">0xYourSafe</span> SUPERVISOR=<span class="t">0xYourSupervisorKey</span>
+export RPC=https://opbnb-testnet-rpc.bnbchain.org   <span class="c"># 5611; BSC testnet 97: https://data-seed-prebsc-1-s1.bnbchain.org:8545</span>
+
+cd contracts && forge test
+forge create src/NandMachine.sol:NandMachine --rpc-url $RPC --private-key $PK --broadcast
+forge create src/ReflexModule.sol:ReflexModule --rpc-url $RPC --private-key $PK --broadcast \\
+  --constructor-args $NAND_MACHINE $NETLIST $NETLIST_SHA256 $N_IN $OPTIONAL_INPUTS $N_STATE $SAFE $SUPERVISOR 0x0000000000000000000000000000000000000000
+cast call $MODULE "netlistSha256()(bytes32)" --rpc-url $RPC    <span class="c"># must equal NETLIST_SHA256</span>`;
+}
+$("cn-manifest-go").addEventListener("click", async () => {
+  const note = $("cn-manifest-note"), pre = $("cn-manifest"), cls = CN_CLS;
+  note.textContent = t("cn.manifest.busy");
+  try {
+    const r = await fetch(`/api/manifest?class=${encodeURIComponent(cls)}`, { cache: "no-store", headers: readHeaders() });
+    const d = await r.json();
+    if (!r.ok) { note.textContent = d.error || String(r.status); pre.hidden = true; return; }
+    pre.textContent = d.manifest_canonical;  // byte for byte what the hash covers; do not reformat
+    pre.hidden = false;
+    note.textContent = t("cn.manifest.done", { cls, hash: d.keccak256 || `(${d.hash_error})` });
+  } catch (e) { note.textContent = String(e); }
+});
+document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
+  const text = $(b.dataset.copy).textContent;
+  try { await navigator.clipboard.writeText(text); const old = b.textContent; b.textContent = t("cn.copied"); setTimeout(() => { b.textContent = old; }, 1200); } catch (e) { /* clipboard unavailable */ }
+}));
+
+// ========== W2: Connect — one way in, and the tools a person can see ==========
+//
+// Two things live here. The first screen asks what you use and then shows exactly one
+// way in, with this machine's real paths: Claude Code's two hooks, an MCP client's
+// server block, or the BNBAgent wallet wrapper. The second is "My tools": the tool→class
+// map from GET /api/classes, editable, saved with POST /api/classes.
+//
+// Everything on this screen is fetched once on entry, not on the two-second tick: a
+// table that re-rendered every two seconds would throw away what a person was typing.
+Object.assign(T.zh, {
+  "cn.pick": "你用什么？", "cn.pick.sub": "选一个，下面只显示那一种接法",
+  "cn.pick.claude": "本机跑的 Claude Code —— 两个钩子，Bash / Write / Edit 与所有 MCP 工具都走电路",
+  "cn.pick.mcp.t": "任何 MCP 客户端", "cn.pick.mcp": "Claude Desktop · Cursor · 别的 agent —— 在你的 MCP 服务器外面套一层代理",
+  "cn.pick.bnb": "签名之前先问电路的钱包封装（不碰你的私钥）",
+  "cn.pick.note": "钩子和代理只管走过它们的通道；没接进来的工具，电路看不见。",
+  "cn.cc.title": "Claude Code · settings.json", "cn.cc.agent": "agent 名", "cn.cc.agent.note": "这个名字在流水里代表这一个 Claude Code，改了下面的片段会跟着变",
+  "cn.cc.write": "帮我写进去", "cn.cc.go": "确认写入", "cn.cc.cancel": "取消",
+  "cn.cc.note2": "放行时钩子不出声，Claude Code 原有权限照旧；拒绝时 deny 并给规则原话。PreToolUse 按模式给 irreversible 置位，PostToolUse 上报失败。把它放进 agent 改不到的 settings 文件里。",
+  "cn.cc.remote": "这一步要在后台所在的那台机器上做：你现在是从别的机器看这个页面，所以只能复制。",
+  "cn.cc.diffing": "正在读你的 settings.json，算出要加哪几行…",
+  "cn.cc.already": "已经装好了：这两个钩子在 {path} 里一字不差地存在，不需要再写。",
+  "cn.cc.will": "下面是要加的内容（只加，不删、不改动别的）。写入前会先备份成 {path}.bak-<时间>。",
+  "cn.cc.wrote": "已写入 {path}，备份在 {backup}。重开一个 Claude Code 会话它才读到。",
+  "cn.mcp.title": "MCP 客户端 · mcpServers", "cn.mcp.sub": "代理套在你的服务器外面",
+  "cn.mcp.name": "服务器名", "cn.mcp.cmd": "启动命令", "cn.mcp.cls": "哪张电路裁决",
+  "cn.mcp.byname": "按工具名判（推荐）",
+  "cn.mcp.gates": "拦下的工具：{gates}", "cn.mcp.gateall": "拦下每一次 tools/call（`--gate *`），各自按名字归到自己那张电路。",
+  "cn.mcp.note": "只拦 gate 到的 tools/call，其余原样转发。拒绝是带 isError 的工具结果，模型读得懂。改了下面「我的工具」，代理不用重启就按新的类别走。",
+  "cn.bnb.title": "BNBAgent SDK · 钱包封装", "cn.bnb.sub": "每次签名先过一拍 spend 电路",
+  "cn.bnb.note": "adapters/bnbagent_boundary.py 文档字符串里的原文。它只管走过这个对象的签名；同一个进程里别的钥匙、别的路径它管不到。",
+  "cn.probe.title": "发一条探测", "cn.probe.sub": "让你亲眼看见被拒",
+  "cn.probe.go": "发一条探测", "cn.probe.busy": "正在发…",
+  "cn.probe.note": "探测用 probe:connect 这个名字，不占你自己 agent 的确认、也不动它的冷却。它就是一次普通请求：电路怎么答，这里就显示什么。",
+  "cn.probe.refused": "边界拒绝了这一条 —— 这不是报错，是电路在回答。",
+  "cn.probe.granted": "你的 exec 电路放行了这一条：它没有「不可逆动作要人确认」这条规则。去「边界」里给 exec 装上，再发一次就会看到拒绝。",
+  "cn.probe.tick": "第 {n} 拍 · {cls} 电路", "cn.probe.err": "发不出去：{e}",
+  "tools.title": "我的工具", "tools.reload": "重新读取", "tools.save": "保存",
+  "tools.lead": "<b>类别</b>决定哪张电路来回答这次调用；<b>不可逆</b>决定放行前是不是必须有人点头。两者都是工具层对这个名字的承诺，不是电路能证明的事。",
+  "tools.promise": "电路能证明的是「标了不可逆、又没有未用掉的确认，就不放行」；「send_email 是不可逆的」是这一层说的话，所以这张表可以改。",
+  "tools.h.tool": "工具名", "tools.h.class": "类别", "tools.h.irrev": "不可逆", "tools.h.src": "规则来自", "tools.h.seen": "见过",
+  "tools.src.override": "你的覆盖文件", "tools.src.builtin": "内置规则", "tools.src.unseen": "没有规则 → exec",
+  "tools.locked": "内置模式 {pat} 管着它：这一格改不了", "tools.nowrite": "这个名字写不进规则文件（{why}），只能看",
+  "tools.none": "还没有任何工具进来过。上面选一种接法、发一条探测，这里就会出现名字。",
+  "tools.count": "{n} 个名字 · 自后台启动以来",
+  "tools.files": "覆盖文件：{c} · {i}", "tools.nochange": "没有改动。",
+  "tools.saved": "已保存 {n} 处改动：{what}。适配器下一次调用就按新的走，不用重启。",
+  "tools.savedfiles": "写入 {files}",
+});
+Object.assign(T.en, {
+  "cn.pick": "What do you use?", "cn.pick.sub": "Pick one; only that way in is shown below",
+  "cn.pick.claude": "Claude Code on this machine — two hooks, so Bash / Write / Edit and every MCP tool pass the circuit",
+  "cn.pick.mcp.t": "Any MCP client", "cn.pick.mcp": "Claude Desktop · Cursor · another agent — wrap your MCP server in the proxy",
+  "cn.pick.bnb": "A wallet wrapper that asks the circuit before it signs (it never holds your key)",
+  "cn.pick.note": "Hooks and the proxy govern only the channels that pass through them; a tool that is not routed through one is invisible to the circuit.",
+  "cn.cc.title": "Claude Code · settings.json", "cn.cc.agent": "agent name", "cn.cc.agent.note": "the name this one Claude Code answers under in the transcript; the block below follows it",
+  "cn.cc.write": "Write it for me", "cn.cc.go": "Yes, write it", "cn.cc.cancel": "cancel",
+  "cn.cc.note2": "A grant leaves Claude Code's own permission flow as it was; a refusal denies with the rule's words. PreToolUse arms irreversible by pattern, PostToolUse reports failures. Keep it in a settings file the agent cannot edit.",
+  "cn.cc.remote": "This writes a file on the console's own machine, and you are looking at this page from another one — copy the block instead.",
+  "cn.cc.diffing": "reading your settings.json and working out which lines to add…",
+  "cn.cc.already": "Already installed: both hooks are in {path}, exactly as above. Nothing to write.",
+  "cn.cc.will": "This is what would be added — only added; nothing is removed or rewritten. Your file is backed up to {path}.bak-<time> first.",
+  "cn.cc.wrote": "Written to {path}; the backup is {backup}. A new Claude Code session picks it up.",
+  "cn.mcp.title": "MCP client · mcpServers", "cn.mcp.sub": "the proxy wraps your server",
+  "cn.mcp.name": "server name", "cn.mcp.cmd": "launch command", "cn.mcp.cls": "deciding circuit",
+  "cn.mcp.byname": "by the tool's name (recommended)",
+  "cn.mcp.gates": "held for the circuit: {gates}", "cn.mcp.gateall": "Every tools/call is held (`--gate *`) and each goes to the circuit its own name belongs to.",
+  "cn.mcp.note": "Only gated tools/call are held; everything else passes verbatim. A refusal is a tool result with isError, which the model reads. Change a class under My tools and the proxy follows without a restart.",
+  "cn.bnb.title": "BNBAgent SDK · wallet wrapper", "cn.bnb.sub": "one tick of the spend circuit before every signature",
+  "cn.bnb.note": "Verbatim from the docstring of adapters/bnbagent_boundary.py. It gates the signatures that go through this object and nothing else: another key, or a path that signs elsewhere in the same process, is not gated.",
+  "cn.probe.title": "Send a probe", "cn.probe.sub": "see a refusal with your own eyes",
+  "cn.probe.go": "Send a probe", "cn.probe.busy": "sending…",
+  "cn.probe.note": "The probe goes out as probe:connect, so it spends none of your own agent's confirms and moves none of its cooldown. It is an ordinary request: whatever the circuit answers is what appears here.",
+  "cn.probe.refused": "The boundary refused this one — that is not an error, it is the circuit answering.",
+  "cn.probe.granted": "Your exec circuit granted this one: it has no rule that needs a person for an irreversible call. Install \"an irreversible action needs a confirm\" for exec under Boundaries and send another probe.",
+  "cn.probe.tick": "tick {n} · the {cls} circuit", "cn.probe.err": "could not send it: {e}",
+  "tools.title": "My tools", "tools.reload": "reload", "tools.save": "Save",
+  "tools.lead": "The <b>class</b> decides which circuit answers the call; <b>irreversible</b> decides whether a person must confirm it. Both are the tool layer's promise about a name, not something the circuit proves.",
+  "tools.promise": "What the circuit proves is \"marked irreversible and no unspent confirm ⇒ no grant\". That send_email is irreversible is this layer's word — which is why this table can be edited.",
+  "tools.h.tool": "tool", "tools.h.class": "class", "tools.h.irrev": "irreversible", "tools.h.src": "rule came from", "tools.h.seen": "seen",
+  "tools.src.override": "your override", "tools.src.builtin": "built-in", "tools.src.unseen": "no rule → exec",
+  "tools.locked": "the built-in pattern {pat} covers it: not a per-tool choice", "tools.nowrite": "this name cannot be written to the rule files ({why}) — shown only",
+  "tools.none": "No tool has come through yet. Pick a way in above, send a probe, and names appear here.",
+  "tools.count": "{n} names · since the console started",
+  "tools.files": "override files: {c} · {i}", "tools.nochange": "Nothing changed.",
+  "tools.saved": "Saved {n} change(s): {what}. The adapters' next call follows the new rule — nothing restarted.",
+  "tools.savedfiles": "wrote {files}",
+});
+
+let CN_PICK = null, CN_MAP = null, CN_EDITS = {}, CN_BUSY = false, CN_SHOWN = false;
+try { CN_PICK = localStorage.getItem("reflex.connect.pick"); } catch (e) { /* private window */ }
+const CN_PANELS = { claude: "cn-panel-claude", mcp: "cn-panel-mcp", bnb: "cn-panel-bnb" };
+
+function cnEnter() {
+  if (!CN_MAP && !CN_BUSY) cnFetchMap();
+  if (!CN_SHOWN) { CN_SHOWN = true; cnPick(CN_PICK, false); }
+}
+async function cnFetchMap() {
+  CN_BUSY = true;
+  try {
+    // The map names paths on the console's own machine, so the console closes it to the
+    // network for everyone but the operator — a paired phone's viewer token is refused here
+    // on purpose, and the message says so rather than drawing an empty map.
+    const r = await fetch(`/api/classes?agent=${encodeURIComponent($("cn-cc-agent").value.trim() || "claude-code:mine")}`,
+                          { cache: "no-store", headers: readHeaders() });
+    const d = await r.json();
+    if (!r.ok) { $("cn-tools-msg").textContent = d.error || `HTTP ${r.status}`; CN_BUSY = false; return; }
+    CN_MAP = d;
+    CN_EDITS = {};
+    cnRenderTools();
+    cnRenderPanels();
+  } catch (e) { $("cn-tools-msg").textContent = String(e); }
+  CN_BUSY = false;
+}
+function cnPick(which, remember) {
+  CN_PICK = CN_PANELS[which] ? which : null;
+  if (remember && CN_PICK) { try { localStorage.setItem("reflex.connect.pick", CN_PICK); } catch (e) { /* fine */ } }
+  document.querySelectorAll(".pick").forEach((b) => b.classList.toggle("on", b.dataset.pick === CN_PICK));
+  Object.keys(CN_PANELS).forEach((k) => { $(CN_PANELS[k]).hidden = k !== CN_PICK; });
+  $("cn-probe-card").hidden = !CN_PICK;   // the probe is the last step of connecting, not a thing of its own
+  cnRenderPanels();
+}
+function cnRenderPanels() {
+  if (!CN_MAP || !CN_MAP.connect) return;
+  const c = CN_MAP.connect;
+  // Every block below is set as text, never as HTML: the paths are this machine's, but a
+  // tool name inside a gate is whatever some server called itself.
+  $("cn-cc-block").textContent = JSON.stringify(c.claude_settings_block, null, 2);
+  $("cn-cc-file").textContent = c.claude_settings;
+  $("cn-cc-write").hidden = !c.local;
+  if (!c.local) $("cn-cc-msg").textContent = t("cn.cc.remote");
+  const sel = $("cn-mcp-class");
+  if (!sel.options.length) {
+    sel.innerHTML = `<option value="">${esc(t("cn.mcp.byname"))}</option>` +
+      (CN_MAP.classes || []).map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+    sel.addEventListener("change", cnRenderPanels);
+  }
+  const name = ($("cn-mcp-name").value.trim() || "filesystem").replace(/[^A-Za-z0-9_.-]/g, "-");
+  const cmd = ($("cn-mcp-cmd").value.trim() || "npx -y @modelcontextprotocol/server-filesystem /Users/me/projects").split(/\s+/);
+  const fixed = sel.value, gates = cnGates(fixed);
+  const args = [c.proxy, "--agent", `mcp:${name}`];
+  gates.forEach((g) => { args.push("--gate", g); });
+  if (fixed) args.push("--class", fixed);
+  $("cn-mcp-block").textContent = JSON.stringify({ mcpServers: { [name]: { command: c.python, args: args.concat(["--"], cmd) } } }, null, 2);
+  $("cn-mcp-gates").textContent = fixed ? t("cn.mcp.gates", { gates: gates.join("  ") }) : t("cn.mcp.gateall");
+  $("cn-bnb-env").textContent = [
+    `export REFLEX_CONSOLE=${c.console_url}`,
+    `export REFLEX_AGENT=studio:my-agent`,
+    `export PYTHONPATH=${c.repo}/adapters:$PYTHONPATH`,
+  ].join("\n");
+  $("cn-bnb-block").textContent = c.bnbagent_snippet || "";
+}
+// Which tool names the proxy should hold: for one fixed class, the patterns of that
+// class's own rules (the map's, not a guess); by name, everything.
+function cnGates(cls) {
+  if (!cls) return ["*"];
+  const rules = (CN_MAP.effective && CN_MAP.effective.rules) || [];
+  const pats = rules.filter((r) => r[1] === cls).map((r) => r[0]);
+  const seen = (CN_MAP.tools || []).filter((x) => x.class === cls && x.writable).map((x) => x.tool);
+  return [...new Set(pats.concat(seen))].slice(0, 14);
+}
+
+function cnRenderTools() {
+  const m = CN_MAP, body = $("cn-tools").tBodies[0];
+  if (!m) return;
+  if (m.error) { body.innerHTML = `<tr><td colspan="5" class="bad">${esc(m.error)}</td></tr>`; return; }
+  $("cn-tools-count").textContent = t("tools.count", { n: num((m.tools || []).length) });
+  $("cn-tools-files").textContent = t("tools.files", { c: m.class_file, i: m.irreversible_file });
+  if (!m.tools.length) { body.innerHTML = `<tr><td colspan="5" class="muted">${esc(t("tools.none"))}</td></tr>`; return; }
+  body.innerHTML = m.tools.map((row, i) => {
+    const cls = `<select data-i="${i}" data-f="class">${(m.classes || []).map((c) =>
+      `<option value="${esc(c)}"${c === row.class ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
+    const irr = `<input type="checkbox" data-i="${i}" data-f="irreversible"${row.irreversible ? " checked" : ""}${row.locked_irreversible ? " disabled" : ""}>`;
+    const why = row.writable
+      ? `<span class="src">${esc(t("tools.src." + row.source))}</span>${row.class_pattern ? ` <span class="srcpat">${esc(row.class_pattern)}</span>` : ""}` +
+        (row.locked_irreversible ? `<div class="locked">${esc(t("tools.locked", { pat: row.irreversible_pattern }))}</div>` : "")
+      : `<span class="src amber">${esc(t("tools.nowrite", { why: row.why_not_writable }))}</span>`;
+    return `<tr><td class="name mono">${esc(row.tool)}</td>` +
+      `<td>${row.writable ? cls : `<span class="mono">${esc(row.class)}</span>`}</td>` +
+      `<td>${row.writable ? irr : `<span class="mono">${row.irreversible ? "yes" : "no"}</span>`}</td>` +
+      `<td>${why}</td><td class="num">${num(row.seen)}</td></tr>`;
+  }).join("");
+}
+$("cn-tools").addEventListener("change", (ev) => {
+  const el = ev.target, i = el.dataset && el.dataset.i;
+  if (i === undefined || i === null) return;
+  const edit = CN_EDITS[i] || (CN_EDITS[i] = {});
+  edit[el.dataset.f] = el.type === "checkbox" ? el.checked : el.value;
+});
+$("cn-tools-reload").addEventListener("click", () => { CN_MAP = null; $("cn-tools-msg").textContent = ""; cnFetchMap(); });
+$("cn-tools-save").addEventListener("click", async () => {
+  const msg = $("cn-tools-msg");
+  const tools = Object.keys(CN_EDITS).map((i) => Object.assign({ tool: CN_MAP.tools[i].tool }, CN_EDITS[i]));
+  if (!tools.length) { msg.textContent = t("tools.nochange"); return; }
+  msg.textContent = "…";
+  const d = await post("/api/classes", { tools }, { token: true });
+  if (d.error) { msg.textContent = d.error; return; }
+  CN_MAP = d.map; CN_EDITS = {};
+  cnRenderTools(); cnRenderPanels();
+  msg.textContent = `${t("tools.saved", { n: num(d.changed.length), what: d.changed.join("; ") })} ${d.written.length ? t("tools.savedfiles", { files: d.written.join(", ") }) : ""}`;
+});
+
+document.querySelectorAll(".pick").forEach((b) => b.addEventListener("click", () => cnPick(b.dataset.pick, true)));
+$("cn-mcp-name").addEventListener("input", cnRenderPanels);
+$("cn-mcp-cmd").addEventListener("input", cnRenderPanels);
+$("cn-cc-agent").addEventListener("change", () => { CN_MAP = null; cnFetchMap(); });
+
+// "Write it for me": a preview first, always. The console reads the file, shows the exact
+// lines it would add, and writes nothing until the person presses the second button.
+let CN_DIFF = null;
+$("cn-cc-write").addEventListener("click", async () => {
+  const msg = $("cn-cc-msg");
+  msg.textContent = t("cn.cc.diffing");
+  const d = await post("/api/hooks/claude-code", { action: "preview", agent: $("cn-cc-agent").value.trim() }, { token: true });
+  if (d.error) { msg.textContent = d.error; $("cn-cc-diff").hidden = true; $("cn-cc-confirm").hidden = true; return; }
+  CN_DIFF = d;
+  $("cn-cc-diff").textContent = d.diff || "";
+  $("cn-cc-diff").hidden = !d.diff;
+  $("cn-cc-confirm").hidden = !!d.already_installed;
+  msg.textContent = d.already_installed ? t("cn.cc.already", { path: d.path }) : t("cn.cc.will", { path: d.path });
+});
+$("cn-cc-cancel").addEventListener("click", () => {
+  $("cn-cc-diff").hidden = true; $("cn-cc-confirm").hidden = true; $("cn-cc-msg").textContent = "";
+});
+$("cn-cc-go").addEventListener("click", async () => {
+  const msg = $("cn-cc-msg");
+  const d = await post("/api/hooks/claude-code", { action: "write", agent: $("cn-cc-agent").value.trim() }, { token: true });
+  if (d.error) { msg.textContent = d.error; return; }
+  $("cn-cc-confirm").hidden = true;
+  msg.textContent = d.written ? t("cn.cc.wrote", { path: d.path, backup: d.backup || "—" }) : t("cn.cc.already", { path: d.path });
+  if (d.diff) { $("cn-cc-diff").textContent = d.diff; $("cn-cc-diff").hidden = false; }
+});
+
+// The probe: one call that is meant to be refused, under a name of its own, so the first
+// thing a person sees the boundary do is refuse something instead of nothing happening.
+$("cn-probe").addEventListener("click", async () => {
+  const msg = $("cn-probe-msg"), out = $("cn-probe-out");
+  const agent = "probe:connect";
+  const reason = "[exec] probe [irreversible]: a call sent from the Connect page to be refused";
+  msg.textContent = t("cn.probe.busy");
+  out.innerHTML = "";
+  const armed = await post("/api/tool", { agent, irreversible: 1 });  // the tool layer's own bit: no operator token
+  if (armed.error) { msg.textContent = t("cn.probe.err", { e: armed.error }); return; }
+  const d = await post("/api/request", {
+    agent, class: "exec", intent: 1, reason,
+    effect: { kind: "exec", target: "the boundary itself", summary: t("cn.probe.title"), reversible: false },
+  });
+  if (d.error) { msg.textContent = t("cn.probe.err", { e: d.error }); return; }
+  msg.textContent = t("cn.probe.tick", { n: num(d.tick), cls: d.class });  // textContent: no esc() here
+  const why = (d.why || []).map((w) => `<li>${esc(w)}</li>`).join("");
+  out.innerHTML = `<div class="verdict-row ${d.granted ? "dim" : "bad"}">
+    <div class="mark">${d.granted ? "○" : "✗"}</div>
+    <div><div class="head">${esc(t(d.granted ? "cn.probe.granted" : "cn.probe.refused"))}</div>
+    ${why ? `<ul class="why">${why}</ul>` : ""}</div></div>`;
+});
+// ========== end W2 ==========
+
+// ---------- live ----------
+async function refresh() {
+  try {
+    // Over the LAN the state needs a token: the paired phone's own (never the operator's —
+    // a read is not what that token is for, and it must not ride the Wi-Fi every two
+    // seconds). On this machine no header is needed and none is sent.
+    const r = await fetch("/api/state", { cache: "no-store", headers: readHeaders() });
+    READ_DENIED = r.status === 403;
+    if (!r.ok) throw new Error(r.status);
+    render(await r.json());
+    lastOk = Date.now();
+  } catch (e) { /* the service may be restarting; the header dot says so */ }
+  liveTick();
+}
+function liveTick() {
+  const now = Date.now();
+  const alive = now - lastOk < 6000, settled = lastOk || now - OPENED > 6000;
+  $("svc-dot").className = `dot ${READ_DENIED ? "bad" : settled ? (alive ? "ok" : "bad") : ""}`;
+  $("svc").textContent = READ_DENIED ? t("svc.denied") : t(settled ? (alive ? "svc.ok" : "svc.bad") : "svc.wait");
+  $("clock").textContent = new Date(now).toLocaleTimeString(locale(), { hour12: false });
+}
+
+// A pairing link carries this phone's own viewer token in the fragment (`#approvals&viewer=…`;
+// `c3s pair`). The fragment never leaves the browser, so it is in no server log; it is kept
+// here and then taken off the address bar, so a screenshot or a forwarded link does not carry
+// it on. The older `&token=` form (the operator token) is still read, for a person who
+// deliberately types it, but `c3s pair` no longer produces it.
+(function takeTokenFromFragment() {
+  const m = /^#?([a-z]*)&(token|viewer)=([A-Za-z0-9_\-]+)$/.exec(location.hash || "");
+  if (!m) return;
+  if (m[2] === "viewer") {
+    VIEWER = m[3];
+    try { localStorage.setItem("reflex.viewer", VIEWER); } catch (e) { /* private window: this visit only */ }
+  } else {
+    TOKEN = m[3];
+    try { localStorage.setItem("reflex.token", TOKEN); } catch (e) { /* private window: this visit only */ }
+  }
+  history.replaceState(null, "", "#" + (m[1] || "approvals"));
+})();
+setLang(lang);
+show(location.hash.slice(1) || "overview");
+refresh();
+setInterval(refresh, 2000);
+setInterval(liveTick, 1000);
+</script>
+</html>

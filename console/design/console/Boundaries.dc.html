@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body { margin: 0; background: #15181C; color: #979CA3; font: 14px/1.5 system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+    a { color: #6FA8DC; text-decoration: none; } a:hover { color: #ECE7DC; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-radius: 8px; color: #979CA3; font-size: 13px; }
+    .nav-item.on { background: #2B3037; color: #ECE7DC; }
+    .nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .card { background: #1C2025; border: 1px solid #2B3037; border-radius: 10px; padding: 14px 16px; min-width: 0; }
+    .h2 { margin: 0 0 10px; font-size: 12px; letter-spacing: .04em; color: #979CA3; font-weight: 600; display: flex; gap: 10px; align-items: baseline; }
+    .h2 .sub { font-weight: 400; color: #5E646C; font-size: 12px; letter-spacing: 0; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #5E646C; margin-right: 6px; }
+    .dot.ok { background: #46C878; box-shadow: 0 0 6px rgba(70,200,120,.5); }
+    .badge { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10.5px; letter-spacing: .04em; padding: 1px 6px; border-radius: 4px; border: 1px solid transparent; white-space: nowrap; }
+    .badge.cost { color: #6FA8DC; border-color: rgba(111,168,220,.45); background: rgba(111,168,220,.08); }
+    .badge.boundary { color: #F2A541; border-color: rgba(242,165,65,.45); background: rgba(242,165,65,.08); }
+    .badge.count { color: #F2A541; border-color: rgba(242,165,65,.45); background: rgba(242,165,65,.04); }
+    .rule { display: grid; grid-template-columns: 64px 1fr auto; gap: 6px 12px; align-items: center; padding: 7px 10px; background: #202529; border: 1px solid #2B3037; border-radius: 8px; }
+    .rule .name { color: #ECE7DC; font-size: 13px; font-weight: 500; }
+    .rule .name code { color: #5E646C; font-size: 11.5px; margin-left: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .rule .hint { font-size: 12px; color: #5E646C; line-height: 1.4; }
+    .field { background: #14171a; border: 1px solid #2B3037; color: #ECE7DC; padding: 5px 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; border-radius: 6px; text-align: center; }
+    .check { width: 16px; height: 16px; border-radius: 3px; border: 1px solid #5E646C; display: inline-flex; align-items: center; justify-content: center; margin: 0 auto; }
+    .check.on { background: #F2A541; border-color: #F2A541; }
+    .check svg { width: 11px; height: 11px; stroke: #121417; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .pre { border: 1px solid #2B3037; color: #979CA3; border-radius: 6px; padding: 4px 9px; font-size: 12px; }
+    .tab { padding: 6px 12px; border-radius: 6px; font-size: 13px; color: #979CA3; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .tab.on { background: #2B3037; color: #ECE7DC; }
+    .verdict-row { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 8px 10px; border-radius: 8px; background: #202529; border: 1px solid #2B3037; border-left: 3px solid #46C878; }
+    .verdict-row .mark { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; font-size: 15px; line-height: 1.3; color: #46C878; }
+    .verdict-row .head { color: #ECE7DC; font-weight: 500; font-size: 13px; }
+    .verdict-row .body { font-size: 12.5px; color: #979CA3; margin-top: 2px; }
+    .verdict-row .body b { color: #ECE7DC; font-weight: 500; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    .tile { background: #202529; border: 1px solid #2B3037; border-radius: 8px; padding: 8px 10px; min-width: 0; }
+    .tile .k { font-size: 11px; color: #5E646C; letter-spacing: .04em; }
+    .tile .v { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 17px; color: #ECE7DC; line-height: 1.3; margin-top: 2px; white-space: nowrap; }
+    .tile .v small { font-size: 11.5px; color: #979CA3; margin-left: 3px; }
+    .words { display: grid; gap: 4px; }
+    .words div { display: grid; grid-template-columns: 14px 1fr; gap: 6px; font-size: 13px; color: #ECE7DC; }
+    .words div::before { content: "·"; color: #5E646C; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; background: #15181C; overflow: hidden;">
+
+  <div style="width: 220px; flex: none; background: #111417; border-right: 1px solid #2B3037; display: flex; flex-direction: column; gap: 4px; padding: 16px 12px;">
+    <div style="padding: 4px 12px 14px;">
+      <div style="color: #ECE7DC; font-weight: 600; font-size: 15px; letter-spacing: .01em;">C3S Circuit Agent</div>
+      <div class="mono" style="color: #5E646C; font-size: 11.5px; margin-top: 2px;">boundary console · 边界控制台</div>
+    </div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg><span>Overview · 总览</span></div>
+    <div class="nav-item on"><svg viewBox="0 0 16 16"><path d="M8 1.5 13.5 3.5v4c0 3.2-2.3 5.6-5.5 7-3.2-1.4-5.5-3.8-5.5-7v-4z"></path></svg><span>Boundaries · 边界</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M2 9h3.5l1 2h3l1-2H14"></path><path d="M3.5 3.5h9L14 9v3.5H2V9z"></path></svg><span>Approvals · 待确认</span><span class="mono" style="margin-left: auto; background: rgba(242,165,65,.14); color: #F2A541; border-radius: 4px; padding: 0 6px; font-size: 11px;">2</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M1.5 8h3l2-5 3 10 2-5h3"></path></svg><span>Activity · 流水</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8" rx="1.5"></rect><path d="M6 1.5v2.5M10 1.5v2.5M6 12v2.5M10 12v2.5M1.5 6h2.5M1.5 10h2.5M12 6h2.5M12 10h2.5"></path></svg><span>Agents</span></div>
+    <div class="nav-item"><svg viewBox="0 0 16 16"><path d="M6.5 9.5 9.5 6.5"></path><path d="M7 4.5 8.5 3a2.5 2.5 0 0 1 3.5 3.5L10.5 8"></path><path d="M9 11.5 7.5 13a2.5 2.5 0 0 1-3.5-3.5L5.5 8"></path></svg><span>Connect · 接入</span></div>
+    <div style="flex: 1;"></div>
+    <div class="mono" style="padding: 0 12px; color: #5E646C; font-size: 11px; line-height: 1.6;">拍不是时间。<br>标志位是工具层的承诺。<br>链上只复算，不部署。</div>
+  </div>
+
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+    <div style="height: 48px; flex: none; background: #111417; border-bottom: 1px solid #2B3037; display: flex; align-items: center; gap: 18px; padding: 0 24px; font-size: 12.5px;">
+      <div style="color: #ECE7DC; font-weight: 600; font-size: 14px;">边界 <span style="color: #5E646C; font-weight: 400; margin-left: 6px; font-size: 12.5px;">规则 → 电路 → 逐行核对 → 遍历证明</span></div>
+      <span><i class="dot ok"></i>服务已连接</span>
+      <span><i class="dot ok"></i>链上复核一致 · 未部署</span>
+      <div style="flex: 1;"></div>
+      <span style="display: inline-flex; border: 1px solid #2B3037; border-radius: 6px; overflow: hidden; font-size: 12px;"><span style="padding: 3px 9px; background: #2B3037; color: #ECE7DC;">中文</span><span style="padding: 3px 9px; color: #979CA3;">EN</span></span>
+    </div>
+
+    <div style="flex: 1; min-height: 0; padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <span class="tab on">spend</span><span class="tab">message</span><span class="tab">exec</span><span class="tab">files</span><span class="tab" style="color: #F2A541;">halt（共享）</span>
+        <span style="flex: 1;"></span>
+        <span style="font-size: 12px; color: #5E646C;">这张电路管 <span class="mono" style="color: #ECE7DC;">spend</span> 类工具：转账、支付、下单</span>
+      </div>
+
+      <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 3fr 2fr; gap: 16px;">
+
+        <!-- rule blocks -->
+        <div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="h2" style="margin: 0;">电路积木 <span class="sub">九条规则，各自落在哪个通道上</span></div>
+          <div style="display: flex; gap: 6px; align-items: center; font-size: 12px;">
+            <span style="color: #5E646C;">模板</span>
+            <span class="pre" style="border-color: rgba(242,165,65,.5); color: #F2A541;">不能转钱</span><span class="pre">不能删文件</span><span class="pre">发消息要人确认</span><span class="pre">连续失败就停</span><span class="pre">果蝇默认</span>
+          </div>
+          <div style="display: grid; gap: 7px;">
+            <div class="rule"><div class="field">8</div><div><div class="name">最小放行间隔（拍）<code>min_gap_ticks</code></div><div class="hint">两次放行之间至少隔这么多拍。只数放行次数，无论 agent 怎么做都约束它。</div></div><span class="badge count">边界 · 计数</span></div>
+            <div class="rule"><div class="field">0</div><div><div class="name">承诺拍数<code>commit_ticks</code></div><div class="hint">落在 <span style="color: #6FA8DC;">intent</span> 上——agent 自己写的。这是它随时可以付的代价。</div></div><span class="badge cost">代价</span></div>
+            <div class="rule"><div class="check on"><svg viewBox="0 0 12 12"><path d="M2.5 6.5 5 9l4.5-6"></path></svg></div><div><div class="name">blocked 为高时一律不放<code>forbid_when_blocked</code></div><div class="hint">落在 <span style="color: #F2A541;">blocked</span> 上——只能来自 agent 写不到的工具层。</div></div><span class="badge boundary">边界</span></div>
+            <div class="rule"><div class="field">7</div><div><div class="name">总放行上限<code>max_grants</code></div><div class="hint">累计放行到这个数之后再也不放。0 = 不限。</div></div><span class="badge count">边界 · 计数</span></div>
+            <div class="rule"><div class="field">0</div><div><div class="name">确认窗口（拍）<code>confirm_window_ticks</code></div><div class="hint">一次 confirm 在接下来这么多拍内有效。花钱不用它：一次确认放多次是错的形状。</div></div><span class="badge boundary">边界</span></div>
+            <div class="rule"><div class="check"></div><div><div class="name">封锁后停机，直到有人确认<code>sticky_block</code></div><div class="hint">放在共享 halt 电路里，这里不重复。</div></div><span class="badge boundary">边界</span></div>
+            <div class="rule"><div class="check on"><svg viewBox="0 0 12 12"><path d="M2.5 6.5 5 9l4.5-6"></path></svg></div><div><div class="name">不可逆动作消耗一次确认<code>confirm_per_irreversible</code></div><div class="hint">落在 <span style="color: #F2A541;">irreversible</span> 与 <span style="color: #F2A541;">confirm</span> 上：一次确认只放一次不可逆动作，放行即用掉。</div></div><span class="badge boundary">边界</span></div>
+            <div class="rule"><div class="field">0</div><div><div class="name">熔断：连续 N 次失败<code>trip_after_failures</code></div><div class="hint">落在 <span style="color: #F2A541;">failed</span> 上。exec 类用它，这里关着。</div></div><span class="badge boundary">边界</span></div>
+            <div class="rule"><div class="check on"><svg viewBox="0 0 12 12"><path d="M2.5 6.5 5 9l4.5-6"></path></svg></div><div><div class="name">双钥：confirm 与 confirm_b 都要<code>two_key</code></div><div class="hint">两个人都点头才放行，放行即用掉两把钥匙。</div></div><span class="badge boundary">边界</span></div>
+          </div>
+          <div style="margin-top: auto; display: flex; gap: 10px; align-items: center;">
+            <span style="border: 0; border-radius: 8px; padding: 7px 16px; font-weight: 600; color: #121417; background: #ECE7DC; font-size: 13px;">编译并安装</span>
+            <span style="font-size: 12px; color: #5E646C;">定义域 <span class="mono" style="color: #979CA3;">6 个输入 + 9 位状态 = 2^15 = 32,768 行</span> · 重编译会重置这一类的每个 agent 的计数器</span>
+          </div>
+        </div>
+
+        <!-- evidence -->
+        <div class="card" style="display: flex; flex-direction: column; gap: 10px;">
+          <div class="h2" style="margin: 0;">当前规则的证据 <span class="sub">编译 · 逐行核对 · 遍历证明</span></div>
+          <div class="words">
+            <div>8 拍内至多放行一次 <span class="mono" style="display: block; color: #5E646C; font-size: 11.5px;">at most one grant in any 8 ticks</span></div>
+            <div>总共至多 7 次 <span class="mono" style="display: block; color: #5E646C; font-size: 11.5px;">at most 7 grants in total</span></div>
+            <div>不可逆动作需要自己的一次确认，并消耗它 <span class="mono" style="display: block; color: #5E646C; font-size: 11.5px;">an irreversible grant needs its own confirm, and spends it</span></div>
+            <div>放行需要 confirm 与 confirm_b 两把钥匙，并消耗两把 <span class="mono" style="display: block; color: #5E646C; font-size: 11.5px;">a grant needs both confirm and confirm_b, and spends both</span></div>
+            <div>blocked 为高时一律不放 <span class="mono" style="display: block; color: #5E646C; font-size: 11.5px;">nothing is granted while blocked is high</span></div>
+          </div>
+          <div style="font-size: 12px; color: #5E646C;">电路读取的输入位：<span class="mono" style="color: #6FA8DC;">request intent</span> <span class="mono" style="color: #F2A541;">blocked confirm irreversible confirm_b</span> <span style="margin-left: 6px;"><span style="display: inline-block; width: 8px; height: 8px; background: #6FA8DC; border-radius: 2px;"></span> agent 写 <span style="display: inline-block; width: 8px; height: 8px; background: #F2A541; border-radius: 2px; margin-left: 6px;"></span> 工具层</span></div>
+          <div class="verdict-row"><div class="mark">✓</div><div><div class="head">电路与参考实现逐行一致</div><div class="body">同一组规则用纯 Python 再写一遍，对定义域全部 <b>32,768</b> 行逐行比较输出和下一状态。</div></div></div>
+          <div class="verdict-row"><div class="mark">✓</div><div><div class="head">每条规则都成立</div><div class="body">从复位出发穷尽每个可达状态下的每种输入：可达 <b>312 / 512</b> 个状态，逐条规则计违规数，全部为零。</div></div></div>
+          <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px;">
+            <div class="tile"><div class="k">NAND</div><div class="v">108</div></div>
+            <div class="tile"><div class="k">LATCH</div><div class="v">9</div></div>
+            <div class="tile"><div class="k">字节</div><div class="v">—</div></div>
+            <div class="tile"><div class="k">深度</div><div class="v">—</div></div>
+            <div class="tile"><div class="k">编译+检查</div><div class="v">—<small>ms</small></div></div>
+          </div>
+          <div style="margin-top: auto; font-size: 12px; color: #5E646C;">跨类别的约束（如"花钱后 3 拍内不发消息"）这里不验证。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

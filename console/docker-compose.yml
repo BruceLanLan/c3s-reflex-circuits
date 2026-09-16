@@ -1,0 +1,158 @@
+# The structural answer to the limit the README admits: an agent that runs as you can
+# read the operator token out of ~/.c3s-circuit-agent (or out of the console's own
+# environment), and a boundary whose bits the agent can write is not a boundary.
+#
+# So here the agent does not run as you. It runs in a container that has:
+#   * no route to the host at all — its only network is `agentnet`, which is
+#     `internal: true`, so there is no gateway out of it and no way to reach the host's
+#     127.0.0.1:8765, the LAN, or anything else;
+#   * no sight of the console's configuration — ~/.c3s-circuit-agent is not mounted, so
+#     the operator token, the rules and agents.json are not files it can read;
+#   * one way to speak to the console: `reflex-gateway`, an nginx that accepts
+#     `POST /api/request` and nothing else, and strips the operator token header on the
+#     way through, so the path itself cannot carry a person's authority even if the
+#     agent somehow learned the secret.
+#
+# The console keeps running on the host (it is the person's program, and it drives the
+# Cardputer over USB). The agent's own token (I-3) goes into the container's environment
+# and nowhere else, so the console can tell this program from any other.
+#
+#   cp .env.example .env            # set REFLEX_AGENT_TOKEN and REFLEX_WORKSPACE
+#   docker compose up -d
+#   docker compose exec agent bash  # run Claude Code / your MCP client in here
+#
+# Start the console on the host with REFLEX_REQUIRE_AGENT_TOKEN=1 when you use this. The
+# one call this container may make names the agent it is for, in its body, and an unbound
+# name is one anything may speak for (I-3's compatibility clause) — so without that
+# setting the container can still act as, and spend the confirm of, any agent nobody has
+# bound yet. docs/ISOLATION.md, "what the container can still do", with the proof.
+#
+# Proofs, and how to re-run them: docs/ISOLATION.md. What this does and does not stop:
+# SECURITY.md.
+
+name: reflex-isolation
+
+services:
+  # The agent. Its image is yours to choose — whatever your agent needs, as long as it
+  # gets nothing from this file but the adapters, its workspace and its own token.
+  agent:
+    image: ${REFLEX_AGENT_IMAGE:-python:3.12-slim}
+    container_name: reflex-agent
+    networks: [agentnet]
+    environment:
+      # The gateway, not the console: there is no route to the console from here.
+      REFLEX_CONSOLE: http://reflex-gateway:8080
+      REFLEX_AGENT: ${REFLEX_AGENT_NAME:-claude-code:container}
+      # This agent's own token (I-3). Never a literal in this file: put it in .env, or
+      # export it, and let compose pass it through. The console keeps only its SHA-256.
+      REFLEX_AGENT_TOKEN: ${REFLEX_AGENT_TOKEN:?set REFLEX_AGENT_TOKEN (see docs/ISOLATION.md)}
+      # A boundary that fails open is not one; say so explicitly rather than by default.
+      REFLEX_FAIL_OPEN: "0"
+    volumes:
+      # Read-only: the hook the agent runs is not the agent's to rewrite.
+      - ./adapters:/opt/reflex/adapters:ro
+      # The work itself. Point REFLEX_WORKSPACE at the project the agent may touch, and
+      # nothing above it. Note what is NOT here: no ~/.c3s-circuit-agent, no repository,
+      # no ~/.claude, no docker socket.
+      - ${REFLEX_WORKSPACE:-./workspace}:/work
+    working_dir: /work
+    # Replace with your agent's own command; the container is here to be entered.
+    command: ["sleep", "infinity"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp"]
+    init: true
+
+  # The whole of the path between the two. Nothing else on either side can talk to the
+  # other: `agentnet` has no route out, and this container publishes no port, so it is
+  # reachable from the agent's network and from nowhere on the host or the LAN.
+  reflex-gateway:
+    image: nginx:1.27-alpine
+    container_name: reflex-gateway
+    networks: [agentnet, uplink]
+    # Where the console is, seen from a container. Docker Desktop resolves
+    # host.docker.internal by itself and `host-gateway` is right there; on colima or Lima
+    # the host is 192.168.5.2 and `host-gateway` is the VM's bridge, which is not the
+    # host — set REFLEX_HOST_IP=192.168.5.2. `docs/ISOLATION.md` has the one-line check.
+    extra_hosts:
+      - "host.docker.internal:${REFLEX_HOST_IP:-host-gateway}"
+    configs:
+      - source: gateway_conf
+        target: /etc/nginx/conf.d/default.conf
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID, DAC_OVERRIDE]  # nginx drops to its own user at start
+    security_opt: ["no-new-privileges:true"]
+    depends_on: []
+
+  # Not part of the recipe: the proof harness. `docker compose --profile proof run --rm
+  # probe <curl args>` gives a shell with curl on the agent's own network and with the
+  # agent's own (absence of) mounts, which is how docs/ISOLATION.md shows that the
+  # refusals below are real.
+  probe:
+    image: curlimages/curl:latest
+    profiles: [proof]
+    networks: [agentnet]
+    entrypoint: ["sh", "-c"]
+    command: ["echo 'use: docker compose --profile proof run --rm probe \"<shell command>\"'"]
+
+networks:
+  # internal: true is the whole security property. No default route, no NAT, no host.
+  agentnet:
+    internal: true
+  # The gateway's own way out, so it can reach the console on the host. Nothing on this
+  # network is reachable from the agent, and no port is published to the host.
+  uplink: {}
+
+configs:
+  gateway_conf:
+    content: |
+      # The narrow path, spelled out. Everything an agent may say to the console is one
+      # POST to one path; everything else is refused here, before the console is asked.
+      #
+      # Why /api/request only, and not /api/tool as well: the console accepts the
+      # operator token in the JSON body as well as in a header, and nginx cannot read a
+      # body honestly (a JSON string can spell "confirm" as "confirm"). A path that
+      # carries /api/tool could therefore carry a person's bit if the token ever leaked
+      # into the container. A path that carries only /api/request cannot, whatever the
+      # body says, whatever the agent knows. The cost is written down in SECURITY.md:
+      # inside the container the adapters cannot arm `irreversible` or report `failed`,
+      # so an irreversible call is refused outright instead of being ticked.
+      server {
+        listen 8080;
+        server_name _;
+        access_log /dev/stdout;
+        error_log  /dev/stderr;
+
+        # An agent's request is a few hundred bytes. Read it in one buffer and refuse
+        # anything that looks like a tunnel.
+        client_max_body_size 8k;
+        client_body_buffer_size 8k;
+
+        location = /api/request {
+          limit_except POST { deny all; }
+
+          # With the URI spelled out, nginx sends this path and no other: nothing can be
+          # smuggled through by re-encoding it (/api/request/..%2f..%2fapi%2ftool and
+          # friends never match this exact location in the first place).
+          proxy_pass http://host.docker.internal:8765/api/request;
+
+          # The console answers only to its own name, and only to a program or its own
+          # page: give it the name it expects and no browser Origin.
+          proxy_set_header Host 127.0.0.1:8765;
+          proxy_set_header Origin "";
+
+          # The person's token cannot travel this way, even if the container learns it.
+          proxy_set_header X-Reflex-Token "";
+
+          # X-Reflex-Agent-Token (I-3) is the agent's own and passes through untouched.
+          proxy_http_version 1.1;
+          proxy_set_header Connection "";
+          proxy_connect_timeout 5s;
+          proxy_read_timeout 30s;
+        }
+
+        location / {
+          default_type application/json;
+          return 403 '{"error":"this path carries POST /api/request only: the tool layer (/api/tool), the rules (/api/policy), the task entrance (/api/task) and the console page are not reachable from inside the container"}';
+        }
+      }
