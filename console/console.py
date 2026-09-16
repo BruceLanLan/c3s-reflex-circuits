@@ -91,6 +91,9 @@ KEEP_AGENTS, KEEP_AGENTS_DAYS = 500, 30
 CONFIG_DIR = Path(os.environ.get("REFLEX_CONFIG_DIR", Path.home() / ".c3s-circuit-agent")).expanduser()
 STATE_FILE = Path(os.environ.get("REFLEX_STATE_FILE", CONFIG_DIR / "policies.json")).expanduser()
 TOKEN_FILE = Path(os.environ.get("REFLEX_TOKEN_FILE", CONFIG_DIR / "operator-token")).expanduser()
+# One name, one token (I-3). Written by the console, read by nothing else; the adapters
+# keep their own copy in their own environment and never read this file.
+AGENTS_FILE = Path(os.environ.get("REFLEX_AGENTS_FILE", CONFIG_DIR / "agents.json")).expanduser()
 
 
 def operator_token() -> str:
@@ -115,6 +118,98 @@ def operator_token() -> str:
     except OSError:
         pass
     return token
+
+# ---- I-3: the agent's own token ---------------------------------------------------------
+#
+# The operator token says "a person wrote this". An agent token says "this is the same
+# program as last time". They answer different questions, so they are different secrets:
+# an agent's token is in that agent's own environment (REFLEX_AGENT_TOKEN) and in no file
+# the agent can read, and the console keeps only its SHA-256. What it stops is one agent
+# driving another's circuit under its name — spending the confirm a person left for a
+# different program, or tripping its breaker. What it cannot stop is a program that can
+# read the other's environment: on one machine, one uid, that is always possible (see
+# SECURITY.md), and the structural answer is docs/ISOLATION.md.
+#
+# Trust on first use, deliberately: a name nobody has bound keeps working without a token,
+# so today's adapters do not break, and `/api/state` marks it `token_bound: false`.
+
+AGENTS_LOCK = threading.Lock()
+
+
+def _token_sha256(token: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def agent_bindings() -> dict:
+    """`{name: {"token_sha256": …, "bound_at": …}}`, re-read from disk every time: another
+    process (`c3s token rotate`) may have dropped a binding since the last request, and a
+    binding that only takes effect after a restart is not a binding."""
+    try:
+        data = json.loads(AGENTS_FILE.read_text())
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: v for k, v in data.items() if isinstance(v, dict) and isinstance(v.get("token_sha256"), str)}
+
+
+def _write_bindings(data: dict) -> None:
+    """Replaced whole and atomically, mode 600: a half-written file would read as
+    "nothing is bound", which is the failure that opens the door."""
+    AGENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = AGENTS_FILE.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+    try:
+        tmp.chmod(0o600)
+    except OSError:
+        pass
+    os.replace(tmp, AGENTS_FILE)
+
+
+def check_agent_token(name: str, given: str) -> str:
+    """One of:
+
+    `unbound`  no token offered, none on file — allowed, and shown as unbound.
+    `bound`    a token offered for a name nobody had bound — bound to it now.
+    `ok`       the token matches the one on file.
+    `spoof`    the name is bound and this is not its token (a wrong one, or none).
+    """
+    import hmac
+
+    given = (given or "").strip()
+    with AGENTS_LOCK:
+        data = agent_bindings()
+        record = data.get(name)
+        if record is None:
+            if not given:
+                return "unbound"
+            data[name] = {"token_sha256": _token_sha256(given), "bound_at": time.time()}
+            _write_bindings(data)
+            return "bound"
+        if not given:
+            return "spoof"
+        return "ok" if hmac.compare_digest(_token_sha256(given), record["token_sha256"]) else "spoof"
+
+
+def token_rotate(agent: str) -> dict:
+    """`c3s token rotate --agent <name>`: drop the binding so the next request rebinds.
+
+    Deliberately the whole of rotation. There is no "new token" to hand out, because the
+    console never had the token — only its hash — and the new one is whatever the agent's
+    own environment says next. Depends on nothing but AGENTS_FILE, so a CLI can call it
+    without a console running."""
+    with AGENTS_LOCK:
+        data = agent_bindings()
+        record = data.pop(agent, None)
+        if record is None:
+            return {"agent": agent, "rotated": False, "why": "that name was not bound; the next request with a token binds it"}
+        _write_bindings(data)
+    return {"agent": agent, "rotated": True, "was_bound_at": record.get("bound_at"),
+            "next": "start the agent with a new REFLEX_AGENT_TOKEN; its first request binds the name again"}
+
+
 TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
 CHAIN = None  # set in __main__ when the chain second opinion is on
 TOKEN = None  # set in __main__: the operator secret gating the person's endpoints
@@ -506,6 +601,10 @@ class Boundary:
         }
 
     def status(self) -> dict:
+        # I-3. Read before the lock (it is a file), and only ever as a boolean and a time:
+        # the hash of an agent's token is not something a page needs, and /api/state has
+        # no token of its own. `bound` above is the confirm-binding map and is not this.
+        bindings = agent_bindings()
         with self.lock:
             agents = []
             for name, a in sorted(self.agents.items()):
@@ -526,6 +625,10 @@ class Boundary:
                         "bound": dict(a["bound"]),
                         "armed_blocked": a["armed"]["blocked"],
                         "armed_confirm": a["armed"]["confirm"],
+                        # I-3: has this name got a token of its own, or is anything on this
+                        # machine free to speak as it?
+                        "token_bound": name in bindings,
+                        "token_bound_at": bindings.get(name, {}).get("bound_at"),
                     }
                 )
             policies = {c: (dict(p.summary, **{"class": c}) if p else None) for c, p in self.policies.items()}
@@ -815,6 +918,28 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 self._json(400, {"error": str(e)})
         elif self.path == "/api/request":
+            # Before anything ticks: a request under a bound name with the wrong token must
+            # not spend that agent's confirm, move its cooldown, or count towards its
+            # breaker. It is not that agent's request at all.
+            state = check_agent_token(name, self.headers.get("X-Reflex-Agent-Token") or "")
+            if state == "spoof":
+                asked = payload.get("class")
+                TRANSCRIPTS.appendleft({
+                    "at": time.time(),
+                    "kind": "spoof",
+                    "agent": name,
+                    "class": asked if asked in TOOL_CLASSES else None,
+                    "reason": str(payload.get("reason", ""))[:160],
+                    "granted": False,
+                    "tick": None,
+                    "token": "missing" if not (self.headers.get("X-Reflex-Agent-Token") or "").strip() else "wrong",
+                    "why": [f"{name!r} is bound to another token: refused without asking any circuit"],
+                })
+                self._json(403, {"error": f"{name!r} is bound to its own agent token and this is not it. "
+                                          "Send that agent's REFLEX_AGENT_TOKEN in X-Reflex-Agent-Token, or "
+                                          "choose a name of your own; a person can drop the binding with "
+                                          "`c3s token rotate --agent <name>`."})
+                return
             try:
                 cls = class_from(payload, TOOL_CLASSES)
                 entry = BOUNDARY.request(name, payload.get("intent", 0), str(payload.get("reason", ""))[:160], cls)

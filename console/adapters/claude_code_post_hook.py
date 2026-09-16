@@ -24,7 +24,11 @@ patterns: a failure the framework does not surface as one is this layer's miss.
 This hook prints nothing and always exits 0. The tool has already run; a post hook
 cannot and must not pretend otherwise.
 
-Environment: REFLEX_CONSOLE, REFLEX_AGENT as for claude_code_hook.py.
+Environment: REFLEX_CONSOLE, REFLEX_AGENT as for claude_code_hook.py, and
+REFLEX_AGENT_TOKEN — this agent's own token (I-3), sent as `X-Reflex-Agent-Token` when the
+environment has one, read from the environment and from no file. The console gates
+`/api/request` on it, not `/api/tool`, so this hook sends it to be the same program
+everywhere rather than to get in; unset changes nothing.
 """
 
 from __future__ import annotations
@@ -59,9 +63,12 @@ def main() -> None:
     if not failed(event):
         return
     agent = os.environ.get("REFLEX_AGENT") or f"claude-code:{str(event.get('session_id', ''))[:8]}"
+    headers = {"content-type": "application/json"}
+    token = os.environ.get("REFLEX_AGENT_TOKEN")
+    if token:
+        headers["X-Reflex-Agent-Token"] = token
     body = json.dumps({"agent": agent, "failed": 1}).encode()
-    req = urllib.request.Request(f"{CONSOLE}/api/tool", data=body,
-                                 headers={"content-type": "application/json"})
+    req = urllib.request.Request(f"{CONSOLE}/api/tool", data=body, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             resp.read()

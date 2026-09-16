@@ -36,6 +36,12 @@ Environment:
                               Off by default: a boundary that fails open is not one.
     REFLEX_IRREVERSIBLE_FILE  one fnmatch glob per line, `#` comments; replaces the
                               built-in list unless a line reads `!default`, which keeps it
+    REFLEX_AGENT_TOKEN        this agent's own token (I-3), sent as X-Reflex-Agent-Token.
+                              Read from the environment and from nowhere else: a token in a
+                              file is a token every other program on the machine can send.
+                              The console binds the name to it on the first request and
+                              refuses that name afterwards without it. Unset = unbound, and
+                              everything works as before.
 """
 
 from __future__ import annotations
@@ -101,11 +107,21 @@ def is_irreversible(tool: str, args: dict, cwd: str) -> bool:
     return False
 
 
+def headers() -> dict:
+    """The one place this file decides what it sends. The agent's own token (I-3) goes on
+    every call when the environment has one; the operator's token is never here — this
+    process is the agent's side of the boundary and holds nothing a person holds."""
+    h = {"content-type": "application/json"}
+    token = os.environ.get("REFLEX_AGENT_TOKEN")
+    if token:
+        h["X-Reflex-Agent-Token"] = token
+    return h
+
+
 def arm(agent: str, **bits: int) -> None:
     """Write tool-layer bits. Only ever called with `irreversible` from this file."""
     body = json.dumps({"agent": agent, **bits}).encode()
-    req = urllib.request.Request(f"{CONSOLE}/api/tool", data=body,
-                                 headers={"content-type": "application/json"})
+    req = urllib.request.Request(f"{CONSOLE}/api/tool", data=body, headers=headers())
     with urllib.request.urlopen(req, timeout=15) as resp:
         resp.read()
 
@@ -204,13 +220,30 @@ def main() -> None:
     reason = f"[{cls}] {tool}{' [irreversible]' if irreversible else ''}: {describe(tool, args)}"[:160]
 
     body = json.dumps({"agent": agent, "intent": 1, "reason": reason, "class": cls}).encode()
-    req = urllib.request.Request(f"{CONSOLE}/api/request", data=body,
-                                 headers={"content-type": "application/json"})
+    req = urllib.request.Request(f"{CONSOLE}/api/request", data=body, headers=headers())
     try:
         if irreversible:
-            arm(agent, irreversible=1)  # the bit describes the next tick, and that tick consumes it
+            # The bit describes the next tick, and that tick consumes it. If the tool layer
+            # will not take it — a narrowed path that carries only /api/request
+            # (docs/ISOLATION.md), a console that refuses this name — then this call would be
+            # ticked as if it were reversible, which is the one mistake worth refusing over.
+            try:
+                arm(agent, irreversible=1)
+            except urllib.error.HTTPError as e:
+                deny(f"refusing an irreversible call the tool layer would not record: the console answered "
+                     f"HTTP {e.code} to `irreversible` for {agent!r}. Ticking it as reversible would be a lie; "
+                     f"a person can run this call themselves, or the deployment can let the adapter write its "
+                     f"own tool-layer bits.")
         with urllib.request.urlopen(req, timeout=15) as resp:
             verdict = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        # Reached the console and it refused the request itself (a wrong agent token is 403).
+        # Not "unreachable", and never fail-open: an answer of no is an answer.
+        try:
+            detail = json.loads(e.read()).get("error", "")
+        except Exception:
+            detail = ""
+        deny(f"refused by the boundary console (HTTP {e.code}): {detail or e.reason}")
     except (urllib.error.URLError, OSError, ValueError) as e:
         if os.environ.get("REFLEX_FAIL_OPEN") == "1":
             sys.exit(0)

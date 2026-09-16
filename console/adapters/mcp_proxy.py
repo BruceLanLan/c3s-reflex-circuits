@@ -36,6 +36,11 @@ Environment:
     REFLEX_AGENT     agent name (default mcp:<downstream basename>); --agent overrides
     REFLEX_FAIL_OPEN set to 1 to forward gated calls when the console is unreachable.
                      Off by default: a boundary that fails open is not one.
+    REFLEX_AGENT_TOKEN this proxy's own token (I-3), sent as `X-Reflex-Agent-Token`. Read
+                     from the environment only, never from a file: the console binds the
+                     agent name to it on the first request and then refuses that name to
+                     anything that cannot send it, so one MCP server cannot spend another's
+                     confirm. Unset = unbound, and everything works as before.
 """
 
 from __future__ import annotations
@@ -199,22 +204,39 @@ class Proxy:
         }, ensure_ascii=False).encode("utf-8") + b"\n")
         return False
 
+    def headers(self) -> dict:
+        """What every call to the console carries. The agent's own token (I-3) when the
+        environment has one; never the operator's, which this side of the boundary does
+        not hold."""
+        h = {"content-type": "application/json"}
+        token = os.environ.get("REFLEX_AGENT_TOKEN")
+        if token:
+            h["X-Reflex-Agent-Token"] = token
+        return h
+
     def ask(self, reason: str, cls: str, irreversible: bool = False) -> Optional[str]:
         """One tick of the class's circuit. None if granted, else the refusal text. For a
         tool whose name says its effect cannot be taken back, the tool-layer bit
         `irreversible` is armed first; the tick consumes it."""
         body = json.dumps({"agent": self.agent, "intent": 1, "reason": reason, "class": cls}).encode()
-        req = urllib.request.Request(f"{self.console}/api/request", data=body,
-                                     headers={"content-type": "application/json"})
+        req = urllib.request.Request(f"{self.console}/api/request", data=body, headers=self.headers())
         try:
             if irreversible:
                 arm = urllib.request.Request(f"{self.console}/api/tool",
                                              data=json.dumps({"agent": self.agent, "irreversible": 1}).encode(),
-                                             headers={"content-type": "application/json"})
+                                             headers=self.headers())
                 with urllib.request.urlopen(arm, timeout=15) as resp:
                     resp.read()
             with urllib.request.urlopen(req, timeout=15) as resp:
                 verdict = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            # The console answered, and the answer was no to the request itself — a wrong
+            # agent token is 403. Never fail open on an answer; only on silence.
+            try:
+                detail = json.loads(e.read()).get("error", "")
+            except Exception:
+                detail = ""
+            return (f"refused by the boundary console (HTTP {e.code}): {detail or e.reason}")
         except (urllib.error.URLError, OSError, ValueError) as e:
             if self.fail_open:
                 return None
