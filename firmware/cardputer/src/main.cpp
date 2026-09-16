@@ -546,7 +546,10 @@ void sendKey(const char *action) {
   if (strcmp(action, lastAction) == 0 && now - lastMs < 600) return;
   copyField(lastAction, sizeof lastAction, action);
   lastMs = now;
-  Serial.printf("K|%s|%s\n", action, items[selected].agent);
+  // Confirms name the selected item, so the console binds them to that call and not the
+  // agent's next one; block and unblock are about the agent.
+  if (strncmp(action, "confirm", 7) == 0) Serial.printf("K|%s|%s|%d\n", action, items[selected].agent, selected);
+  else Serial.printf("K|%s|%s\n", action, items[selected].agent);
   if (sound) M5Cardputer.Speaker.tone(strcmp(action, "block") == 0 ? 700 : 2600, 50);
 }
 
