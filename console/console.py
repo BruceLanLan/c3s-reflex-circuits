@@ -160,11 +160,16 @@ def _write_bindings(data: dict) -> None:
     "nothing is bound", which is the failure that opens the door."""
     AGENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = AGENTS_FILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+    # Opened 600 rather than written and then chmod'ed: the window between the two is
+    # small, but it is a window in which another process on this machine could read the
+    # file, and the whole point of the file is that it belongs to one user.
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     try:
-        tmp.chmod(0o600)
-    except OSError:
-        pass
+        with os.fdopen(fd, "w") as fh:
+            fh.write(json.dumps(data, indent=2, sort_keys=True) + "\n")
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
     os.replace(tmp, AGENTS_FILE)
 
 
