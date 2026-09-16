@@ -389,9 +389,92 @@
 
 <!-- ===== Connect ===== -->
 <section data-view="connect">
+  <!-- W2: the first screen is a question — what do you use? — and then one way in. -->
+  <style>
+    .picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+    .pick { display: grid; gap: 3px; text-align: left; padding: 11px 13px; border-radius: 9px; border: 1px solid var(--line);
+            background: var(--panel2); color: var(--dim); min-height: 44px; }
+    .pick:hover { border-color: var(--faint); color: var(--text); }
+    .pick.on { border-color: var(--tool); background: rgba(242,165,65,.08); }
+    .pick b { color: var(--text); font-weight: 600; font-size: 13.5px; }
+    .pick small { font-size: 12px; color: var(--faint); line-height: 1.4; }
+    .pick.on small { color: var(--dim); }
+    .cnrow { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 12.5px; }
+    .cnrow label { display: flex; gap: 6px; align-items: center; color: var(--faint); }
+    .cnrow input[type=text] { width: 190px; max-width: 100%; }
+    #cn-tools td { vertical-align: middle; }
+    #cn-tools select { padding: 3px 6px; }
+    #cn-tools input[type=checkbox] { width: 17px; height: 17px; margin: 0; accent-color: var(--tool); }
+    #cn-tools .src { font-size: 11.5px; }
+    #cn-tools .locked { color: var(--faint); font-size: 11.5px; }
+    .srcpat { font-family: var(--mono); font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
+    @media (max-width: 600px) { .cnrow input[type=text] { width: 100%; } }
+  </style>
+  <div class="card">
+    <div class="h2"><span data-i18n="cn.pick"></span><span class="sub" data-i18n="cn.pick.sub"></span></div>
+    <div class="picks">
+      <button class="pick" type="button" data-pick="claude"><b>Claude Code</b><small data-i18n="cn.pick.claude"></small></button>
+      <button class="pick" type="button" data-pick="mcp"><b data-i18n="cn.pick.mcp.t"></b><small data-i18n="cn.pick.mcp"></small></button>
+      <button class="pick" type="button" data-pick="bnb"><b>BNBAgent SDK</b><small data-i18n="cn.pick.bnb"></small></button>
+    </div>
+    <div class="note" data-i18n="cn.pick.note"></div>
+  </div>
+
+  <div class="card" id="cn-panel-claude" hidden>
+    <div class="h2"><span data-i18n="cn.cc.title"></span><span class="sub" id="cn-cc-file"></span><button class="pre right" type="button" data-copy="cn-cc-block" data-i18n="cn.copy"></button></div>
+    <div class="cnrow"><label data-i18n="cn.cc.agent"></label><input type="text" id="cn-cc-agent" value="claude-code:mine" spellcheck="false"><span class="note" data-i18n="cn.cc.agent.note"></span></div>
+    <pre id="cn-cc-block"></pre>
+    <div class="actions">
+      <button class="pre" type="button" id="cn-cc-write" hidden data-i18n="cn.cc.write"></button>
+      <span class="note" id="cn-cc-msg"></span>
+    </div>
+    <pre id="cn-cc-diff" hidden></pre>
+    <div class="actions" id="cn-cc-confirm" hidden>
+      <button class="go tool" type="button" id="cn-cc-go" data-i18n="cn.cc.go"></button>
+      <button class="link" type="button" id="cn-cc-cancel" data-i18n="cn.cc.cancel"></button>
+    </div>
+    <div class="note" data-i18n="cn.cc.note2"></div>
+  </div>
+
+  <div class="card" id="cn-panel-mcp" hidden>
+    <div class="h2"><span data-i18n="cn.mcp.title"></span><span class="sub" data-i18n="cn.mcp.sub"></span><button class="pre right" type="button" data-copy="cn-mcp-block" data-i18n="cn.copy"></button></div>
+    <div class="cnrow">
+      <label data-i18n="cn.mcp.name"></label><input type="text" id="cn-mcp-name" value="filesystem" spellcheck="false">
+      <label data-i18n="cn.mcp.cmd"></label><input type="text" id="cn-mcp-cmd" value="npx -y @modelcontextprotocol/server-filesystem /Users/me/projects" spellcheck="false">
+      <label data-i18n="cn.mcp.cls"></label><select id="cn-mcp-class"></select>
+    </div>
+    <pre id="cn-mcp-block"></pre>
+    <div class="note" id="cn-mcp-gates"></div>
+    <div class="note" data-i18n="cn.mcp.note"></div>
+  </div>
+
+  <div class="card" id="cn-panel-bnb" hidden>
+    <div class="h2"><span data-i18n="cn.bnb.title"></span><span class="sub" data-i18n="cn.bnb.sub"></span><button class="pre right" type="button" data-copy="cn-bnb-block" data-i18n="cn.copy"></button></div>
+    <pre id="cn-bnb-env"></pre>
+    <pre id="cn-bnb-block"></pre>
+    <div class="note" data-i18n="cn.bnb.note"></div>
+  </div>
+
+  <div class="card" id="cn-probe-card" hidden>
+    <div class="h2"><span data-i18n="cn.probe.title"></span><span class="sub" data-i18n="cn.probe.sub"></span></div>
+    <div class="actions"><button class="go tool" type="button" id="cn-probe" data-i18n="cn.probe.go"></button><span class="note" id="cn-probe-msg"></span></div>
+    <div id="cn-probe-out"></div>
+    <div class="note" data-i18n="cn.probe.note"></div>
+  </div>
+
+  <div class="card">
+    <div class="h2"><span data-i18n="tools.title"></span><span class="sub" id="cn-tools-count"></span><button class="pre right" type="button" id="cn-tools-reload" data-i18n="tools.reload"></button></div>
+    <p class="lead" id="cn-tools-lead"></p>
+    <div class="wrap"><table id="cn-tools">
+      <thead><tr><th data-i18n="tools.h.tool"></th><th data-i18n="tools.h.class"></th><th data-i18n="tools.h.irrev"></th><th data-i18n="tools.h.src"></th><th data-i18n="tools.h.seen"></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="actions"><button class="go tool" type="button" id="cn-tools-save" data-i18n="tools.save"></button><span class="note" id="cn-tools-msg"></span></div>
+    <div class="note" id="cn-tools-files"></div>
+    <div class="note" data-i18n="tools.promise"></div>
+  </div>
+
   <div class="grid3">
-    <div class="card"><div class="h2"><span>Claude Code</span><span class="sub" data-i18n="cn.hook.sub"></span><button class="pre right" type="button" data-copy="cn-hook" data-i18n="cn.copy"></button></div><pre id="cn-hook"></pre><div class="note" data-i18n="cn.hook.note"></div></div>
-    <div class="card"><div class="h2"><span data-i18n="cn.proxy"></span><span class="sub" data-i18n="cn.proxy.sub"></span><button class="pre right" type="button" data-copy="cn-proxy" data-i18n="cn.copy"></button></div><pre id="cn-proxy"></pre><div class="note" data-i18n="cn.proxy.note"></div></div>
     <div class="card"><div class="h2"><span>Telegram</span><span class="sub" data-i18n="cn.tg.sub"></span><button class="pre right" type="button" data-copy="cn-tg" data-i18n="cn.copy"></button></div><pre id="cn-tg"></pre><div class="note" data-i18n="cn.tg.note"></div></div>
   </div>
   <div class="grid2">
@@ -1261,24 +1344,13 @@ let CN_CLS = "spend";
 function renderStatic() {
   const o = esc(location.origin), H = "-H 'content-type: application/json'";
   const HT = H + " -H \"x-reflex-token: $REFLEX_TOKEN\"";  // the person's endpoints need the token
-  $("cn-hook").innerHTML = `{ "hooks": {
-  "PreToolUse": [ { "matcher": "Bash|Write|Edit|mcp__.*",
-    "hooks": [ { "type": "command", "timeout": 20,
-      "command": "REFLEX_AGENT=<span class="t">claude-code:mine</span> python3 /abs/path/reflex-console/adapters/claude_code_hook.py" } ] } ],
-  "PostToolUse": [ { "matcher": "Bash|Write|Edit|mcp__.*",
-    "hooks": [ { "type": "command", "timeout": 10,
-      "command": "REFLEX_AGENT=<span class="t">claude-code:mine</span> python3 /abs/path/reflex-console/adapters/claude_code_post_hook.py" } ] } ],
-  "PostToolUseFailure": [ { "matcher": "Bash|Write|Edit|mcp__.*",
-    "hooks": [ { "type": "command", "timeout": 10,
-      "command": "REFLEX_AGENT=<span class="t">claude-code:mine</span> python3 /abs/path/reflex-console/adapters/claude_code_post_hook.py" } ] } ] } }`;
-  $("cn-proxy").innerHTML = `{ "mcpServers": { "filesystem": {
-    "command": "python3",
-    "args": [ "/abs/path/reflex-console/adapters/mcp_proxy.py",
-      "--agent", "mcp:filesystem",
-      "--gate", "<span class="t">write_*</span>", "--gate", "<span class="t">move_*</span>", "--gate", "<span class="t">delete_*</span>",
-      "--class", "<span class="t">files</span>",
-      "--",
-      "npx", "-y", "@modelcontextprotocol/server-filesystem", "/Users/me/projects" ] } } }`;
+  // W2: one sentence with two bold words in it, so it is set as HTML here rather than
+  // going through data-i18n (which sets text). Both halves are this file's own words.
+  $("cn-tools-lead").innerHTML = t("tools.lead");
+  if (typeof CN_MAP !== "undefined" && CN_MAP) { cnRenderTools(); cnRenderPanels(); }
+  // W2: the Claude Code and MCP blocks are no longer written out here with `/abs/path`
+  // placeholders — they come from GET /api/classes with this machine's real paths, this
+  // console's port and the class map's own gates (see the W2 block at the end of this file).
   $("cn-tg").innerHTML = `TELEGRAM_TOKEN=…  CONSOLE_URL=${o}
 TOOL_LAYER_CHATS=<span class="t">-1001234567890</span>
 python3 bot_telegram.py
@@ -1308,6 +1380,7 @@ async function sha256hex(hex) {
   return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 async function renderConnect(s) {
+  cnEnter();  // W2: fetch the tool map once on entry, not on every tick (see the W2 block)
   const sel = $("cn-class");
   if (!sel.options.length) { sel.innerHTML = ALL_CLASSES.map((c) => `<option value="${c}"${c === CN_CLS ? " selected" : ""}>${c}</option>`).join(""); sel.addEventListener("change", () => { CN_CLS = sel.value; renderConnect(STATE); }); }
   const p = policyOf(CN_CLS), pre = $("cn-forge"), note = $("cn-forge-note");
@@ -1349,6 +1422,256 @@ document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("clic
   const text = $(b.dataset.copy).textContent;
   try { await navigator.clipboard.writeText(text); const old = b.textContent; b.textContent = t("cn.copied"); setTimeout(() => { b.textContent = old; }, 1200); } catch (e) { /* clipboard unavailable */ }
 }));
+
+// ========== W2: Connect — one way in, and the tools a person can see ==========
+//
+// Two things live here. The first screen asks what you use and then shows exactly one
+// way in, with this machine's real paths: Claude Code's two hooks, an MCP client's
+// server block, or the BNBAgent wallet wrapper. The second is "My tools": the tool→class
+// map from GET /api/classes, editable, saved with POST /api/classes.
+//
+// Everything on this screen is fetched once on entry, not on the two-second tick: a
+// table that re-rendered every two seconds would throw away what a person was typing.
+Object.assign(T.zh, {
+  "cn.pick": "你用什么？", "cn.pick.sub": "选一个，下面只显示那一种接法",
+  "cn.pick.claude": "本机跑的 Claude Code —— 两个钩子，Bash / Write / Edit 与所有 MCP 工具都走电路",
+  "cn.pick.mcp.t": "任何 MCP 客户端", "cn.pick.mcp": "Claude Desktop · Cursor · 别的 agent —— 在你的 MCP 服务器外面套一层代理",
+  "cn.pick.bnb": "签名之前先问电路的钱包封装（不碰你的私钥）",
+  "cn.pick.note": "钩子和代理只管走过它们的通道；没接进来的工具，电路看不见。",
+  "cn.cc.title": "Claude Code · settings.json", "cn.cc.agent": "agent 名", "cn.cc.agent.note": "这个名字在流水里代表这一个 Claude Code，改了下面的片段会跟着变",
+  "cn.cc.write": "帮我写进去", "cn.cc.go": "确认写入", "cn.cc.cancel": "取消",
+  "cn.cc.note2": "放行时钩子不出声，Claude Code 原有权限照旧；拒绝时 deny 并给规则原话。PreToolUse 按模式给 irreversible 置位，PostToolUse 上报失败。把它放进 agent 改不到的 settings 文件里。",
+  "cn.cc.remote": "这一步要在后台所在的那台机器上做：你现在是从别的机器看这个页面，所以只能复制。",
+  "cn.cc.diffing": "正在读你的 settings.json，算出要加哪几行…",
+  "cn.cc.already": "已经装好了：这两个钩子在 {path} 里一字不差地存在，不需要再写。",
+  "cn.cc.will": "下面是要加的内容（只加，不删、不改动别的）。写入前会先备份成 {path}.bak-<时间>。",
+  "cn.cc.wrote": "已写入 {path}，备份在 {backup}。重开一个 Claude Code 会话它才读到。",
+  "cn.mcp.title": "MCP 客户端 · mcpServers", "cn.mcp.sub": "代理套在你的服务器外面",
+  "cn.mcp.name": "服务器名", "cn.mcp.cmd": "启动命令", "cn.mcp.cls": "哪张电路裁决",
+  "cn.mcp.byname": "按工具名判（推荐）",
+  "cn.mcp.gates": "拦下的工具：{gates}", "cn.mcp.gateall": "拦下每一次 tools/call（`--gate *`），各自按名字归到自己那张电路。",
+  "cn.mcp.note": "只拦 gate 到的 tools/call，其余原样转发。拒绝是带 isError 的工具结果，模型读得懂。改了下面「我的工具」，代理不用重启就按新的类别走。",
+  "cn.bnb.title": "BNBAgent SDK · 钱包封装", "cn.bnb.sub": "每次签名先过一拍 spend 电路",
+  "cn.bnb.note": "adapters/bnbagent_boundary.py 文档字符串里的原文。它只管走过这个对象的签名；同一个进程里别的钥匙、别的路径它管不到。",
+  "cn.probe.title": "发一条探测", "cn.probe.sub": "让你亲眼看见被拒",
+  "cn.probe.go": "发一条探测", "cn.probe.busy": "正在发…",
+  "cn.probe.note": "探测用 probe:connect 这个名字，不占你自己 agent 的确认、也不动它的冷却。它就是一次普通请求：电路怎么答，这里就显示什么。",
+  "cn.probe.refused": "边界拒绝了这一条 —— 这不是报错，是电路在回答。",
+  "cn.probe.granted": "你的 exec 电路放行了这一条：它没有「不可逆动作要人确认」这条规则。去「边界」里给 exec 装上，再发一次就会看到拒绝。",
+  "cn.probe.tick": "第 {n} 拍 · {cls} 电路", "cn.probe.err": "发不出去：{e}",
+  "tools.title": "我的工具", "tools.reload": "重新读取", "tools.save": "保存",
+  "tools.lead": "<b>类别</b>决定哪张电路来回答这次调用；<b>不可逆</b>决定放行前是不是必须有人点头。两者都是工具层对这个名字的承诺，不是电路能证明的事。",
+  "tools.promise": "电路能证明的是「标了不可逆、又没有未用掉的确认，就不放行」；「send_email 是不可逆的」是这一层说的话，所以这张表可以改。",
+  "tools.h.tool": "工具名", "tools.h.class": "类别", "tools.h.irrev": "不可逆", "tools.h.src": "规则来自", "tools.h.seen": "见过",
+  "tools.src.override": "你的覆盖文件", "tools.src.builtin": "内置规则", "tools.src.unseen": "没有规则 → exec",
+  "tools.locked": "内置模式 {pat} 管着它：这一格改不了", "tools.nowrite": "这个名字写不进规则文件（{why}），只能看",
+  "tools.none": "还没有任何工具进来过。上面选一种接法、发一条探测，这里就会出现名字。",
+  "tools.count": "{n} 个名字 · 自后台启动以来",
+  "tools.files": "覆盖文件：{c} · {i}", "tools.nochange": "没有改动。",
+  "tools.saved": "已保存 {n} 处改动：{what}。适配器下一次调用就按新的走，不用重启。",
+  "tools.savedfiles": "写入 {files}",
+});
+Object.assign(T.en, {
+  "cn.pick": "What do you use?", "cn.pick.sub": "Pick one; only that way in is shown below",
+  "cn.pick.claude": "Claude Code on this machine — two hooks, so Bash / Write / Edit and every MCP tool pass the circuit",
+  "cn.pick.mcp.t": "Any MCP client", "cn.pick.mcp": "Claude Desktop · Cursor · another agent — wrap your MCP server in the proxy",
+  "cn.pick.bnb": "A wallet wrapper that asks the circuit before it signs (it never holds your key)",
+  "cn.pick.note": "Hooks and the proxy govern only the channels that pass through them; a tool that is not routed through one is invisible to the circuit.",
+  "cn.cc.title": "Claude Code · settings.json", "cn.cc.agent": "agent name", "cn.cc.agent.note": "the name this one Claude Code answers under in the transcript; the block below follows it",
+  "cn.cc.write": "Write it for me", "cn.cc.go": "Yes, write it", "cn.cc.cancel": "cancel",
+  "cn.cc.note2": "A grant leaves Claude Code's own permission flow as it was; a refusal denies with the rule's words. PreToolUse arms irreversible by pattern, PostToolUse reports failures. Keep it in a settings file the agent cannot edit.",
+  "cn.cc.remote": "This writes a file on the console's own machine, and you are looking at this page from another one — copy the block instead.",
+  "cn.cc.diffing": "reading your settings.json and working out which lines to add…",
+  "cn.cc.already": "Already installed: both hooks are in {path}, exactly as above. Nothing to write.",
+  "cn.cc.will": "This is what would be added — only added; nothing is removed or rewritten. Your file is backed up to {path}.bak-<time> first.",
+  "cn.cc.wrote": "Written to {path}; the backup is {backup}. A new Claude Code session picks it up.",
+  "cn.mcp.title": "MCP client · mcpServers", "cn.mcp.sub": "the proxy wraps your server",
+  "cn.mcp.name": "server name", "cn.mcp.cmd": "launch command", "cn.mcp.cls": "deciding circuit",
+  "cn.mcp.byname": "by the tool's name (recommended)",
+  "cn.mcp.gates": "held for the circuit: {gates}", "cn.mcp.gateall": "Every tools/call is held (`--gate *`) and each goes to the circuit its own name belongs to.",
+  "cn.mcp.note": "Only gated tools/call are held; everything else passes verbatim. A refusal is a tool result with isError, which the model reads. Change a class under My tools and the proxy follows without a restart.",
+  "cn.bnb.title": "BNBAgent SDK · wallet wrapper", "cn.bnb.sub": "one tick of the spend circuit before every signature",
+  "cn.bnb.note": "Verbatim from the docstring of adapters/bnbagent_boundary.py. It gates the signatures that go through this object and nothing else: another key, or a path that signs elsewhere in the same process, is not gated.",
+  "cn.probe.title": "Send a probe", "cn.probe.sub": "see a refusal with your own eyes",
+  "cn.probe.go": "Send a probe", "cn.probe.busy": "sending…",
+  "cn.probe.note": "The probe goes out as probe:connect, so it spends none of your own agent's confirms and moves none of its cooldown. It is an ordinary request: whatever the circuit answers is what appears here.",
+  "cn.probe.refused": "The boundary refused this one — that is not an error, it is the circuit answering.",
+  "cn.probe.granted": "Your exec circuit granted this one: it has no rule that needs a person for an irreversible call. Install \"an irreversible action needs a confirm\" for exec under Boundaries and send another probe.",
+  "cn.probe.tick": "tick {n} · the {cls} circuit", "cn.probe.err": "could not send it: {e}",
+  "tools.title": "My tools", "tools.reload": "reload", "tools.save": "Save",
+  "tools.lead": "The <b>class</b> decides which circuit answers the call; <b>irreversible</b> decides whether a person must confirm it. Both are the tool layer's promise about a name, not something the circuit proves.",
+  "tools.promise": "What the circuit proves is \"marked irreversible and no unspent confirm ⇒ no grant\". That send_email is irreversible is this layer's word — which is why this table can be edited.",
+  "tools.h.tool": "tool", "tools.h.class": "class", "tools.h.irrev": "irreversible", "tools.h.src": "rule came from", "tools.h.seen": "seen",
+  "tools.src.override": "your override", "tools.src.builtin": "built-in", "tools.src.unseen": "no rule → exec",
+  "tools.locked": "the built-in pattern {pat} covers it: not a per-tool choice", "tools.nowrite": "this name cannot be written to the rule files ({why}) — shown only",
+  "tools.none": "No tool has come through yet. Pick a way in above, send a probe, and names appear here.",
+  "tools.count": "{n} names · since the console started",
+  "tools.files": "override files: {c} · {i}", "tools.nochange": "Nothing changed.",
+  "tools.saved": "Saved {n} change(s): {what}. The adapters' next call follows the new rule — nothing restarted.",
+  "tools.savedfiles": "wrote {files}",
+});
+
+let CN_PICK = null, CN_MAP = null, CN_EDITS = {}, CN_BUSY = false, CN_SHOWN = false;
+try { CN_PICK = localStorage.getItem("reflex.connect.pick"); } catch (e) { /* private window */ }
+const CN_PANELS = { claude: "cn-panel-claude", mcp: "cn-panel-mcp", bnb: "cn-panel-bnb" };
+
+function cnEnter() {
+  if (!CN_MAP && !CN_BUSY) cnFetchMap();
+  if (!CN_SHOWN) { CN_SHOWN = true; cnPick(CN_PICK, false); }
+}
+async function cnFetchMap() {
+  CN_BUSY = true;
+  try {
+    const r = await fetch(`/api/classes?agent=${encodeURIComponent($("cn-cc-agent").value.trim() || "claude-code:mine")}`, { cache: "no-store" });
+    CN_MAP = await r.json();
+    CN_EDITS = {};
+    cnRenderTools();
+    cnRenderPanels();
+  } catch (e) { $("cn-tools-msg").textContent = String(e); }
+  CN_BUSY = false;
+}
+function cnPick(which, remember) {
+  CN_PICK = CN_PANELS[which] ? which : null;
+  if (remember && CN_PICK) { try { localStorage.setItem("reflex.connect.pick", CN_PICK); } catch (e) { /* fine */ } }
+  document.querySelectorAll(".pick").forEach((b) => b.classList.toggle("on", b.dataset.pick === CN_PICK));
+  Object.keys(CN_PANELS).forEach((k) => { $(CN_PANELS[k]).hidden = k !== CN_PICK; });
+  $("cn-probe-card").hidden = !CN_PICK;   // the probe is the last step of connecting, not a thing of its own
+  cnRenderPanels();
+}
+function cnRenderPanels() {
+  if (!CN_MAP || !CN_MAP.connect) return;
+  const c = CN_MAP.connect;
+  // Every block below is set as text, never as HTML: the paths are this machine's, but a
+  // tool name inside a gate is whatever some server called itself.
+  $("cn-cc-block").textContent = JSON.stringify(c.claude_settings_block, null, 2);
+  $("cn-cc-file").textContent = c.claude_settings;
+  $("cn-cc-write").hidden = !c.local;
+  if (!c.local) $("cn-cc-msg").textContent = t("cn.cc.remote");
+  const sel = $("cn-mcp-class");
+  if (!sel.options.length) {
+    sel.innerHTML = `<option value="">${esc(t("cn.mcp.byname"))}</option>` +
+      (CN_MAP.classes || []).map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+    sel.addEventListener("change", cnRenderPanels);
+  }
+  const name = ($("cn-mcp-name").value.trim() || "filesystem").replace(/[^A-Za-z0-9_.-]/g, "-");
+  const cmd = ($("cn-mcp-cmd").value.trim() || "npx -y @modelcontextprotocol/server-filesystem /Users/me/projects").split(/\s+/);
+  const fixed = sel.value, gates = cnGates(fixed);
+  const args = [c.proxy, "--agent", `mcp:${name}`];
+  gates.forEach((g) => { args.push("--gate", g); });
+  if (fixed) args.push("--class", fixed);
+  $("cn-mcp-block").textContent = JSON.stringify({ mcpServers: { [name]: { command: c.python, args: args.concat(["--"], cmd) } } }, null, 2);
+  $("cn-mcp-gates").textContent = fixed ? t("cn.mcp.gates", { gates: gates.join("  ") }) : t("cn.mcp.gateall");
+  $("cn-bnb-env").textContent = [
+    `export REFLEX_CONSOLE=${c.console_url}`,
+    `export REFLEX_AGENT=studio:my-agent`,
+    `export PYTHONPATH=${c.repo}/adapters:$PYTHONPATH`,
+  ].join("\n");
+  $("cn-bnb-block").textContent = c.bnbagent_snippet || "";
+}
+// Which tool names the proxy should hold: for one fixed class, the patterns of that
+// class's own rules (the map's, not a guess); by name, everything.
+function cnGates(cls) {
+  if (!cls) return ["*"];
+  const rules = (CN_MAP.effective && CN_MAP.effective.rules) || [];
+  const pats = rules.filter((r) => r[1] === cls).map((r) => r[0]);
+  const seen = (CN_MAP.tools || []).filter((x) => x.class === cls && x.writable).map((x) => x.tool);
+  return [...new Set(pats.concat(seen))].slice(0, 14);
+}
+
+function cnRenderTools() {
+  const m = CN_MAP, body = $("cn-tools").tBodies[0];
+  if (!m) return;
+  if (m.error) { body.innerHTML = `<tr><td colspan="5" class="bad">${esc(m.error)}</td></tr>`; return; }
+  $("cn-tools-count").textContent = t("tools.count", { n: num((m.tools || []).length) });
+  $("cn-tools-files").textContent = t("tools.files", { c: m.class_file, i: m.irreversible_file });
+  if (!m.tools.length) { body.innerHTML = `<tr><td colspan="5" class="muted">${esc(t("tools.none"))}</td></tr>`; return; }
+  body.innerHTML = m.tools.map((row, i) => {
+    const cls = `<select data-i="${i}" data-f="class">${(m.classes || []).map((c) =>
+      `<option value="${esc(c)}"${c === row.class ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
+    const irr = `<input type="checkbox" data-i="${i}" data-f="irreversible"${row.irreversible ? " checked" : ""}${row.locked_irreversible ? " disabled" : ""}>`;
+    const why = row.writable
+      ? `<span class="src">${esc(t("tools.src." + row.source))}</span>${row.class_pattern ? ` <span class="srcpat">${esc(row.class_pattern)}</span>` : ""}` +
+        (row.locked_irreversible ? `<div class="locked">${esc(t("tools.locked", { pat: row.irreversible_pattern }))}</div>` : "")
+      : `<span class="src amber">${esc(t("tools.nowrite", { why: row.why_not_writable }))}</span>`;
+    return `<tr><td class="name mono">${esc(row.tool)}</td>` +
+      `<td>${row.writable ? cls : `<span class="mono">${esc(row.class)}</span>`}</td>` +
+      `<td>${row.writable ? irr : `<span class="mono">${row.irreversible ? "yes" : "no"}</span>`}</td>` +
+      `<td>${why}</td><td class="num">${num(row.seen)}</td></tr>`;
+  }).join("");
+}
+$("cn-tools").addEventListener("change", (ev) => {
+  const el = ev.target, i = el.dataset && el.dataset.i;
+  if (i === undefined || i === null) return;
+  const edit = CN_EDITS[i] || (CN_EDITS[i] = {});
+  edit[el.dataset.f] = el.type === "checkbox" ? el.checked : el.value;
+});
+$("cn-tools-reload").addEventListener("click", () => { CN_MAP = null; $("cn-tools-msg").textContent = ""; cnFetchMap(); });
+$("cn-tools-save").addEventListener("click", async () => {
+  const msg = $("cn-tools-msg");
+  const tools = Object.keys(CN_EDITS).map((i) => Object.assign({ tool: CN_MAP.tools[i].tool }, CN_EDITS[i]));
+  if (!tools.length) { msg.textContent = t("tools.nochange"); return; }
+  msg.textContent = "…";
+  const d = await post("/api/classes", { tools }, { token: true });
+  if (d.error) { msg.textContent = d.error; return; }
+  CN_MAP = d.map; CN_EDITS = {};
+  cnRenderTools(); cnRenderPanels();
+  msg.textContent = `${t("tools.saved", { n: num(d.changed.length), what: d.changed.join("; ") })} ${d.written.length ? t("tools.savedfiles", { files: d.written.join(", ") }) : ""}`;
+});
+
+document.querySelectorAll(".pick").forEach((b) => b.addEventListener("click", () => cnPick(b.dataset.pick, true)));
+$("cn-mcp-name").addEventListener("input", cnRenderPanels);
+$("cn-mcp-cmd").addEventListener("input", cnRenderPanels);
+$("cn-cc-agent").addEventListener("change", () => { CN_MAP = null; cnFetchMap(); });
+
+// "Write it for me": a preview first, always. The console reads the file, shows the exact
+// lines it would add, and writes nothing until the person presses the second button.
+let CN_DIFF = null;
+$("cn-cc-write").addEventListener("click", async () => {
+  const msg = $("cn-cc-msg");
+  msg.textContent = t("cn.cc.diffing");
+  const d = await post("/api/hooks/claude-code", { action: "preview", agent: $("cn-cc-agent").value.trim() }, { token: true });
+  if (d.error) { msg.textContent = d.error; $("cn-cc-diff").hidden = true; $("cn-cc-confirm").hidden = true; return; }
+  CN_DIFF = d;
+  $("cn-cc-diff").textContent = d.diff || "";
+  $("cn-cc-diff").hidden = !d.diff;
+  $("cn-cc-confirm").hidden = !!d.already_installed;
+  msg.textContent = d.already_installed ? t("cn.cc.already", { path: d.path }) : t("cn.cc.will", { path: d.path });
+});
+$("cn-cc-cancel").addEventListener("click", () => {
+  $("cn-cc-diff").hidden = true; $("cn-cc-confirm").hidden = true; $("cn-cc-msg").textContent = "";
+});
+$("cn-cc-go").addEventListener("click", async () => {
+  const msg = $("cn-cc-msg");
+  const d = await post("/api/hooks/claude-code", { action: "write", agent: $("cn-cc-agent").value.trim() }, { token: true });
+  if (d.error) { msg.textContent = d.error; return; }
+  $("cn-cc-confirm").hidden = true;
+  msg.textContent = d.written ? t("cn.cc.wrote", { path: d.path, backup: d.backup || "—" }) : t("cn.cc.already", { path: d.path });
+  if (d.diff) { $("cn-cc-diff").textContent = d.diff; $("cn-cc-diff").hidden = false; }
+});
+
+// The probe: one call that is meant to be refused, under a name of its own, so the first
+// thing a person sees the boundary do is refuse something instead of nothing happening.
+$("cn-probe").addEventListener("click", async () => {
+  const msg = $("cn-probe-msg"), out = $("cn-probe-out");
+  const agent = "probe:connect";
+  const reason = "[exec] probe [irreversible]: a call sent from the Connect page to be refused";
+  msg.textContent = t("cn.probe.busy");
+  out.innerHTML = "";
+  const armed = await post("/api/tool", { agent, irreversible: 1 });  // the tool layer's own bit: no operator token
+  if (armed.error) { msg.textContent = t("cn.probe.err", { e: armed.error }); return; }
+  const d = await post("/api/request", {
+    agent, class: "exec", intent: 1, reason,
+    effect: { kind: "exec", target: "the boundary itself", summary: t("cn.probe.title"), reversible: false },
+  });
+  if (d.error) { msg.textContent = t("cn.probe.err", { e: d.error }); return; }
+  msg.textContent = t("cn.probe.tick", { n: num(d.tick), cls: d.class });  // textContent: no esc() here
+  const why = (d.why || []).map((w) => `<li>${esc(w)}</li>`).join("");
+  out.innerHTML = `<div class="verdict-row ${d.granted ? "dim" : "bad"}">
+    <div class="mark">${d.granted ? "○" : "✗"}</div>
+    <div><div class="head">${esc(t(d.granted ? "cn.probe.granted" : "cn.probe.refused"))}</div>
+    ${why ? `<ul class="why">${why}</ul>` : ""}</div></div>`;
+});
+// ========== end W2 ==========
 
 // ---------- live ----------
 async function refresh() {
