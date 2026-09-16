@@ -216,7 +216,7 @@
   }
   .key b { font-family: var(--display); font-size: 15px; font-weight: 400; line-height: 1.1; }
   .key span { font-size: 10.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .key.go { grid-column: span 2; background: var(--amber); border-color: #C9852F; color: var(--ink); }
+  .key.go { background: var(--amber); border-color: #C9852F; color: var(--ink); }
   .key.go span { color: rgba(26, 30, 35, 0.72); }
   .key:active, .key.down { transform: translateY(1px); border-bottom-width: 2px; }
   .key[aria-pressed="true"] { border-color: var(--amber); }
@@ -416,7 +416,8 @@
               <div class="bezel"><canvas id="screen" width="960" height="540" role="img" aria-label="Simulated firmware screen"></canvas></div>
               <div class="keys" id="keys"></div>
             </div>
-            <p class="bench-note" data-i18n="benchNote">Click the keys, or type them: Enter launches a loom; the arrow keys or ; . , / change l/v and azimuth.</p>
+            <p class="bench-note" data-i18n="benchNote">Click the keys, or type them. After its self-test the device opens a menu: a number key, or ; . and Enter, opens a page; ` or Delete returns to the menu. On the fly pages Enter launches a loom, and on the reflex page the arrow keys or ; . , / change l/v and azimuth.</p>
+            <p class="bench-note" data-i18n="agentNote">On a real device the Agent page (menu 3) is fed by the boundary console over USB serial, and its keys write confirm or blocked back to it. No console is attached to this simulator, so the page shows no host.</p>
 
             <div class="bench-facts">
               <span><b data-i18n="bfDomainH">Verified on every row.</b> <span data-i18n="bfDomain">The core's step relation was checked on all 8,388,608 (input, state) combinations, not sampled.</span></span>
@@ -455,6 +456,7 @@
               <li data-i18n="diff1">The screen follows firmware/cardputer/src/main.cpp but is not pixel-identical; text uses a browser font.</li>
               <li data-i18n="diff2">atan and tan come from the browser's Math, not the ESP32's maths library, so a live episode can differ from the device by a tick at a bin edge. The self-test replays embedded samples, which does not depend on either.</li>
               <li data-i18n="diff3">Ticks follow the browser's frame clock; the circuit's behaviour depends only on the tick sequence.</li>
+              <li data-i18n="diff4">The device draws in 16-bit colour and turns the gate lattice a step per pass of its main loop; here colours are 24-bit and the lattice turns a step per browser frame. Timings on the digest and self-test pages are this browser's.</li>
             </ul>
           </section>
         </aside>
@@ -520,7 +522,11 @@
 const I18N = {
   en: {},
   zh: {
-    benchNote: "点按键，或者直接用键盘：Enter 发射逼近物；方向键或 ; . , / 调 l/v 和方位角。",
+    benchNote: "点按键，或者直接用键盘。自检之后设备打开菜单：按数字键，或用 ; . 选中再按 Enter，进入对应页面；` 或 Delete 回到菜单。在两个果蝇页面上 Enter 发射逼近物；在反射页上方向键或 ; . , / 调 l/v 和方位角。",
+    agentNote: "真机上，Agent 页（菜单 3）的内容由边界值班台经 USB 串口送来，它的按键把 confirm 或 blocked 写回值班台。这个模拟器没有接值班台，所以这一页显示 no host。",
+    diff4: "真机用 16 位色绘制，门阵每跑一遍主循环转一步；这里是 24 位色，门阵每个浏览器帧转一步。摘要页和自检页上的耗时是本浏览器的。",
+    kMenu: "菜单", kOpen: "打开", kUp: "上移", kDown: "下移", kConfirm: "确认", kAgent: "Agent", kLattice: "门阵", kDigest: "摘要",
+    kMFly: "反射", kMBrain: "果蝇脑", kMAgent: "Agent", kMLattice: "门阵", kMDigest: "摘要", kMTest: "自检", kMKeys: "按键",
     lede: "逃逸核心的 Cardputer ADV 固件，在浏览器里运行。解码网表字节、逐门求值 173 NAND + 6 LATCH、逼近几何、16 位感觉编码和开机自检，都是固件自己的 C 代码编译成的 WebAssembly；屏幕按固件的绘制代码用 JavaScript 重画。",
     bootTitle: "开机自检",
     loading: "正在加载 WebAssembly 模块…",
@@ -625,6 +631,8 @@ const I18N = {
   },
 };
 Object.assign(I18N.en, {
+  kMenu: "menu", kOpen: "open", kUp: "up", kDown: "down", kConfirm: "confirm", kAgent: "agent", kLattice: "lattice", kDigest: "digest",
+  kMFly: "reflex", kMBrain: "brain", kMAgent: "agent", kMLattice: "lattice", kMDigest: "digest", kMTest: "self-test", kMKeys: "keys",
   kGo: "launch", kLvUp: "l/v up", kLvDown: "l/v down", kAzL: "az left", kAzR: "az right",
   kPause: "pause", kStep: "tick", kAuto: "auto", kSound: "sound", kTest: "self-test", kHelp: "keys",
   fNetlist: "Core netlist", fPolicy: "Policy netlist", fModule: "Module", fScreen: "Screen",
@@ -705,9 +713,16 @@ let lvIndex = 7, azimuth = 0, slowIndex = 2;
 let autoDemo = true, paused = false, sound = true;
 let page = "selftest", phase = "idle", pageUntil = 0;
 let last = null, haveTick = false, runLv = 40, runAz = 0, takeoffMotor = -1;
-let lastTickMs = 0, phaseMs = 0, dirty = true;
+let lastTickMs = 0, phaseMs = 0, lastDrawMs = 0, dirty = true;
 let passed = false, runnable = false, selfTestMs = 0, report = null;
-const millis = () => performance.now();
+let menuIndex = 0;
+// The device's millis() counts whole milliseconds.
+const millis = () => Math.floor(performance.now());
+// No boundary console is ever attached to the simulator, so the firmware's host-dependent
+// branches (waiting counts, "host ok", STOP from the menu and the brain page) never run.
+const hostLive = () => false;
+// The firmware does its geometry in float; Math.fround keeps each step single-precision.
+const f32 = Math.fround;
 
 // ---------------------------------------------------------------- drawing primitives (240 x 135, M5GFX-like)
 
@@ -723,6 +738,37 @@ const kMuted = rgb(140, 148, 158), kSensory = rgb(80, 170, 255), kGf = rgb(255, 
 const kLatch = rgb(170, 130, 255), kOk = rgb(70, 200, 120), kBad = rgb(240, 70, 70), kFly = rgb(236, 206, 150);
 const kLoomFill = rgb(74, 80, 94), kLoomEdge = rgb(190, 196, 208), kWing = rgb(150, 170, 190);
 const trunc = Math.trunc;
+const channels = (c) => c.match(/\d+/g).map(Number);
+
+// Lines on the brain and lattice pages are rasterised the way M5GFX's LGFXBase::drawLine
+// does it (Bresenham, err starting at dx >> 1) into a 240 x 135 pixel buffer, so each
+// lit pixel is one the device lights; the buffer is then scaled up without smoothing.
+const raster = document.createElement("canvas");
+raster.width = 240;
+raster.height = 135;
+const rctx = raster.getContext("2d");
+const rimg = rctx.createImageData(240, 135);
+function rasterClear() { rimg.data.fill(0); }
+function rline(x0, y0, x1, y1, c) {
+  const steep = Math.abs(y1 - y0) > Math.abs(x1 - x0);
+  if (steep) { [x0, y0] = [y0, x0]; [x1, y1] = [y1, x1]; }
+  if (x0 > x1) { [x0, x1] = [x1, x0]; [y0, y1] = [y1, y0]; }
+  const dx = x1 - x0, dy = Math.abs(y1 - y0), ystep = y1 > y0 ? 1 : -1, d = rimg.data;
+  let err = dx >> 1, y = y0;
+  for (let x = x0; x <= x1; x++) {
+    const px = steep ? y : x, py = steep ? x : y;
+    if (px >= 0 && px < 240 && py >= 0 && py < 135) {
+      const i = (py * 240 + px) * 4;
+      d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+    }
+    if ((err -= dy) < 0) { err += dx; y += ystep; }
+  }
+}
+function rasterFlush() {
+  rctx.putImageData(rimg, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(raster, 0, 0);
+}
 
 function fillRect(x, y, wd, ht, c) { ctx.fillStyle = c; ctx.fillRect(x, y, wd, ht); }
 function drawRect(x, y, wd, ht, c) { ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, wd - 1, ht - 1); }
@@ -755,16 +801,7 @@ const hex = (v, n) => v.toString(16).padStart(n, "0");
 
 // ---------------------------------------------------------------- simulation
 
-let audio = null;
-function beep(m) {
-  if (!sound || !audio) return;
-  const osc = audio.createOscillator(), gain = audio.createGain();
-  osc.frequency.value = m === MOTOR_SHORT ? 2400 : 1500;
-  gain.gain.value = 0.05;
-  osc.connect(gain).connect(audio.destination);
-  osc.start();
-  osc.stop(audio.currentTime + 0.06);
-}
+function beep(m) { tone(m === MOTOR_SHORT ? 2400 : 1500, 60); }
 
 function launch() {
   if (!runnable) return;
@@ -916,7 +953,7 @@ function drawSelfTest() {
   text(4, 92, kMuted, `live geometry ${r.geometryOk}/${r.episodes} (informational)`);
   if (r.coreDecode || r.policyDecode) text(4, 104, kBad, `decode error core ${r.coreDecode} policy ${r.policyDecode}`);
   else text(4, 104, kMuted, `took ${selfTestMs} ms in this browser`);
-  text(4, 122, kMuted, "any key to continue");
+  text(4, 122, kMuted, "any key: menu");
 }
 
 function drawHelp() {
@@ -927,21 +964,326 @@ function drawHelp() {
     ", /   azimuth left / right",
     "1-4   speed 1x 4x 10x 40x slower",
     "p pause   n one tick when paused",
-    "a auto demo   m sound   t self-test",
-    "serial log is shown beside",
-    "any key to close",
+    "a auto  m sound  t self-test  d digest",
+    "g agent  s STOP all  ` or DEL: menu",
+    "any key: menu",
   ];
   lines.forEach((l, i) => text(4, 4 + i * 14, i === 0 ? kText : kMuted, l));
 }
 
+// ---------------------------------------------------------------- circuit lattice (drawLattice in main.cpp)
+
+// The netlist drawn as itself: one dot per cell, lines to the two signals each NAND
+// reads, each dot lit by that gate's value on the tick being shown. The wasm exports
+// the cells and a traced step; the geometry is the firmware's, in float.
+let lat = null, latSpin = 0;
+const CORE_OUTPUTS = 2;  // the motor command is two bits; the module does not export n_out
+
+function buildLattice() {
+  const first = 2 + w.sim_prog(0, 0), nCells = w.sim_shape(0, 1);
+  const depth = new Uint8Array(w.sim_shape(0, 0));
+  const cells = [];
+  let maxd = 1;
+  for (let i = 0; i < nCells; i++) {
+    const c = { a: w.sim_cell(0, i, 0), b: w.sim_cell(0, i, 1), latch: w.sim_cell(0, i, 2) === 1 };
+    let d = 0;
+    if (!c.latch) {
+      d = 1 + Math.max(depth[c.a], depth[c.b]);
+      if (d > 120) d = 120;
+    }
+    depth[first + i] = d;
+    if (d > maxd) maxd = d;
+    cells.push(c);
+  }
+  cells.forEach((c, i) => {
+    const a = f32(i * f32(2.39996));  // golden angle, so cells of one depth spread out
+    const r = f32(30 + (i % 3) * 7);
+    c.x = 16 + trunc((200 * depth[first + i]) / maxd);
+    c.y = trunc(f32(f32(Math.cos(a)) * r));
+    c.z = trunc(f32(f32(Math.sin(a)) * r));
+  });
+  lat = { first, cells, nSignals: w.sim_shape(0, 0), nState: w.sim_prog(0, 1) };
+}
+
+function latticeProject(cell, c, s) {
+  const y = f32(f32(cell.y * c) - f32(cell.z * s));
+  const z = f32(f32(cell.y * s) + f32(cell.z * c));
+  const k = f32(1 / f32(f32(1.5) - f32(z / 140)));
+  return [cell.x, trunc(f32(66 + f32(f32(y * k) * f32(0.78))))];
+}
+
+function drawLattice() {
+  if (!lat) buildLattice();
+  const { first, cells } = lat;
+  w.sim_trace(0, haveTick ? last.x : 0, haveTick ? last.state : 0);
+  const c = f32(Math.cos(latSpin)), s = f32(Math.sin(latSpin));
+  const outFirst = lat.nSignals - CORE_OUTPUTS;
+  const dim = channels(kDim), panel = channels(kPanel);
+  const at = cells.map((cell) => latticeProject(cell, c, s));
+
+  rasterClear();
+  cells.forEach((cell, i) => {
+    if (cell.latch) return;
+    for (const op of [cell.a, cell.b]) {
+      if (op < first) continue;
+      rline(at[op - first][0], at[op - first][1], at[i][0], at[i][1], w.sim_signal(op) ? dim : panel);
+    }
+  });
+  rasterFlush();
+  cells.forEach((cell, i) => {
+    const sig = first + i, on = w.sim_signal(sig);
+    let col = on ? kText : kPanel;
+    if (cell.latch) col = on ? kLatch : kPanel;
+    if (sig >= outFirst) col = sig === outFirst ? kPar : kGf;
+    fillRect(at[i][0], at[i][1], 2, 2, col);
+  });
+
+  text(4, 4, kText, `${cells.length - lat.nState} NAND + ${lat.nState} LATCH, live`);
+  if (haveTick) text(4, 16, kMuted, `tick ${last.tick} x ${hex(last.x, 5)} motor ${last.motor}`);
+  else text(4, 16, kMuted, "at rest; ENTER on the main page to drive it");
+  text(4, 122, kMuted, "logic depth left to right; any key: menu");
+}
+
+// ---------------------------------------------------------------- whole-domain digest (drawDigest)
+
+let digestHex = "", digestRows = 0, digestMs = 0, digestPending = false;
+
+function drawDigest() {
+  text(4, 4, kText, "WHOLE-DOMAIN DIGEST");
+  text(4, 20, kMuted, "SHA-256 chain over every (input, state) row");
+  text(4, 34, kText, `${cstr(w.sim_name(0))}: 8,388,608 rows`);
+  if (!digestRows) {
+    text(4, 52, kMuted, "computing in this browser..");
+    text(4, 122, kMuted, "any key: menu");
+    return;
+  }
+  text(10, 52, kText, digestHex.slice(0, 32));
+  text(10, 62, kText, digestHex.slice(32));
+  text(4, 80, kMuted, `${digestRows} rows in ${digestMs} ms in this browser`);
+  text(4, 94, kMuted, "equal to Python, the browser and the EVM");
+  text(4, 106, kMuted, "if it matches docs/CIRCUITS.md");
+  text(4, 122, kMuted, "any key: menu");
+}
+
+// ---------------------------------------------------------------- agent page (drawAgent)
+
+// On the device this page is fed by the boundary console over USB serial. The simulator
+// has no console, so only the firmware's no-host branch is drawn; nothing here pretends
+// to be a host.
+function drawAgent() {
+  const live = hostLive();
+  text(4, 3, kText, "C3S CIRCUIT AGENT");
+  text(live ? 190 : 172, 3, live ? kOk : kBad, live ? "host ok" : "no host");
+  text(4, 30, kMuted, "waiting for the boundary console");
+  text(4, 44, kMuted, "on the computer, over USB:");
+  text(4, 60, kText, "REFLEX_CARDPUTER=1 python console.py");
+  text(4, 84, kMuted, "this key only writes confirm/blocked;");
+  text(4, 96, kMuted, "no network, nothing stored");
+  text(4, 124, kMuted, "` or DEL: menu");
+}
+
+// `s` and `r` on the agent page write to serial whether or not a console listens
+// (sendAll in main.cpp); the line goes to the serial log, where nothing reads it.
+let sendAllMs = -1e9;
+function sendAll(action) {
+  const now = millis();
+  if (now - sendAllMs < 600) return;
+  sendAllMs = now;
+  log(`K|${action}|*`);
+  tone(action === "stop_all" ? 520 : 2200, 160);
+  dirty = true;
+}
+
+// ---------------------------------------------------------------- fly brain (drawBrain)
+
+// scripts/build_firmware_brain.py, over the skeletons this page already loads: the
+// device's int8 points (x127, numpy's round-half-to-even, clipped) and its outline,
+// per side an ellipse at the LC4+LPLC2 centroid with radii of 2.5 standard deviations,
+// and between them one spanning the gap, as tall as the giant fibers within that slab.
+// The ellipses are rounded to four decimals as the generated header prints them.
+function buildBrain(sk) {
+  const { pts, segs, cells } = sk;
+  const rint = (v) => {
+    const f = Math.floor(v), d = v - f;
+    return d > 0.5 ? f + 1 : d < 0.5 ? f : f % 2 === 0 ? f : f + 1;
+  };
+  const q = new Int8Array(pts.length);
+  for (let i = 0; i < pts.length; i++) q[i] = Math.max(-127, Math.min(127, rint(f32(pts[i] * 127))));
+
+  const pointsOf = (keep) => {
+    const out = [];
+    for (const c of cells) {
+      if (!keep(c)) continue;
+      const u = [...new Set(segs.subarray(c.first_segment * 2, (c.first_segment + c.segments) * 2))].sort((a, b) => a - b);
+      for (const i of u) out.push(i);
+    }
+    return out;
+  };
+  const stats = (idx) => {
+    const mean = [0, 0, 0], sd = [0, 0, 0];
+    for (const i of idx) for (let k = 0; k < 3; k++) mean[k] += pts[3 * i + k];
+    for (let k = 0; k < 3; k++) mean[k] /= idx.length;
+    for (const i of idx) for (let k = 0; k < 3; k++) sd[k] += (pts[3 * i + k] - mean[k]) ** 2;
+    for (let k = 0; k < 3; k++) sd[k] = Math.sqrt(sd[k] / idx.length);
+    return [mean, sd];
+  };
+  const lobes = {};
+  const outline = [];
+  for (const side of ["L", "R"]) {
+    const [m, sd] = stats(pointsOf((c) => (c.type === "LC4" || c.type === "LPLC2") && c.side === side));
+    lobes[side] = [m, sd];
+    outline.push([m[0], m[1], m[2], 2.5 * sd[0], 2.5 * sd[1]]);
+  }
+  const [[ml, sl], [mr, sr]] = [lobes.L, lobes.R];
+  const cz = (ml[2] + mr[2]) / 2;
+  const inner = Math.min(Math.abs(ml[0]) - 2.5 * sl[0], Math.abs(mr[0]) - 2.5 * sr[0]);
+  let lo = Infinity, hi = -Infinity;
+  for (const i of pointsOf((c) => c.type === "DNp01")) {
+    if (Math.abs(pts[3 * i + 2] - cz) < 0.25) { lo = Math.min(lo, pts[3 * i + 1]); hi = Math.max(hi, pts[3 * i + 1]); }
+  }
+  outline.push([(ml[0] + mr[0]) / 2, (lo + hi) / 2, cz, Math.max(inner, 0.2), (hi - lo) / 2]);
+  return {
+    q,
+    segs,
+    outline: outline.map((e) => e.map((v) => f32(Number(v.toFixed(4))))),
+    cells: cells.map((c) => ({ type: { DNp01: 0, LC4: 1, LPLC2: 2 }[c.type], side: c.side === "L" ? 0 : 1, first: c.first_segment, n: c.segments })),
+  };
+}
+
+let brain = null, brainX = null, brainY = null, brainFrames = 0, brainMsSum = 0;
+
+function mix(a, b, k) {
+  return a.map((v, i) => trunc(f32(f32(v * f32(1 - k)) + f32(b[i] * k))) & 255);
+}
+
+function drawBrain() {
+  const t0 = millis();
+  const text3 = () => {
+    text(4, 3, kText, "FLY BRAIN");
+    text(64, 3, kMuted, "26 real cells");
+  };
+  if (!brain && skel) brain = buildBrain(skel);
+  if (!brain) {  // the skeletons are still loading (or could not be fetched)
+    loadSkeletons();
+    text3();
+    text(4, 60, kMuted, skelPending ? "loading the cells.." : "cells unavailable");
+    return;
+  }
+  const ang = f32(f32(0.62) * f32(Math.sin(f32(f32(t0) / 2600))));  // a slow sway, never edge-on
+  const ca = f32(Math.cos(ang)), sa = f32(Math.sin(ang));
+  const K = 86, CX = 120, CY = 66, P = f32(1.9), Q = f32(0.55);
+  const project = (x, y, z) => {
+    const rx = f32(f32(x * ca) - f32(z * sa)), rz = f32(f32(x * sa) + f32(z * ca));
+    const s = f32(P / f32(P - f32(Q * rz)));
+    return [trunc(f32(CX + f32(f32(rx * K) * s))), trunc(f32(CY + f32(f32(y * K) * s)))];
+  };
+
+  rasterClear();
+  // outline: where these cells are
+  const outlineColor = [38, 44, 56];
+  for (const [ex, ey, ez, erx, ery] of brain.outline) {
+    let prev = null;
+    for (let i = 0; i <= 40; i++) {
+      const a = f32((i * 2 * Math.PI) / 40);
+      const p = project(f32(ex + f32(erx * f32(Math.cos(a)))), f32(ey + f32(ery * f32(Math.sin(a)))), ez);
+      if (prev) rline(prev[0], prev[1], p[0], p[1], outlineColor);
+      prev = p;
+    }
+  }
+
+  const q = brain.q, n = q.length / 3;
+  if (!brainX) { brainX = new Int16Array(n); brainY = new Int16Array(n); }
+  for (let i = 0; i < n; i++) {
+    const p = project(f32(q[3 * i] / 127), f32(q[3 * i + 1] / 127), f32(q[3 * i + 2] / 127));
+    brainX[i] = p[0];
+    brainY[i] = p[1];
+  }
+
+  const x = haveTick ? last.x : 0, path = haveTick ? last.pathways : 0;
+  const flash = takeoffMotor >= 0 && phase === "tookoff";
+  for (const cell of brain.cells) {
+    let col;
+    if (cell.type === 0) {
+      col = flash ? [210, 255, 225] : (path & 1) ? [123, 224, 168] : [85, 96, 110];
+    } else {
+      const field = cell.type === 1 ? (cell.side === 0 ? (x >> 4) & 15 : (x >> 12) & 15)
+                                    : (cell.side === 0 ? x & 15 : (x >> 8) & 15);
+      const off = cell.type === 1 ? [74, 85, 104] : [83, 86, 106];
+      const on = cell.type === 1 ? [255, 138, 101] : [255, 196, 84];
+      col = field ? mix(off, on, f32(f32(0.35) + f32(f32(f32(0.65) * field) / 15))) : off;
+    }
+    const end = (cell.first + cell.n) * 2;
+    for (let j = cell.first * 2; j < end; j += 2) {
+      const a = brain.segs[j], b = brain.segs[j + 1];
+      rline(brainX[a], brainY[a], brainX[b], brainY[b], col);
+    }
+  }
+  rasterFlush();
+
+  text3();
+  if (haveTick) {
+    const name = motorName(last.motor);
+    text(236 - 6 * name.length, 3, motorColor(last.motor), name);
+  }
+  text(4, 114, kMuted, `L ${(x >> 4) & 15}/${x & 15}  R ${(x >> 12) & 15}/${(x >> 8) & 15}  GF ${(path & 1) ? "on" : "off"}`);
+  text(4, 125, kDim, "MaleCNS v1.0 CC-BY  ENT loom  ` menu");
+
+  brainMsSum += millis() - t0;
+  if (++brainFrames === 60) log(`brain view: ${Math.floor(brainMsSum / 60)} ms per frame over 60 frames`);
+}
+
+// ---------------------------------------------------------------- menu (drawMenu)
+
+const MENU = [
+  ["1", "Fly escape reflex", "the circuit decides takeoff, live", "main"],
+  ["2", "Fly brain, real cells", "26 published cells lit by the circuit", "brain"],
+  ["3", "Agent confirm key", "approve what the boundary held back", "agent"],
+  ["4", "Gate lattice", "173 NAND gates, each lit by its value", "lattice"],
+  ["5", "Whole-domain digest", "8,388,608 rows in this browser", "digest"],
+  ["6", "Self-test", "hashes and reference episodes", "selftest"],
+  ["7", "Keys", "every key on every page", "help"],
+];
+
+function drawMenu() {
+  text(4, 3, kText, "C3S CIRCUIT AGENT");
+  text(206, 3, passed ? kOk : kBad, passed ? "PASS" : "FAIL");
+  MENU.forEach(([key, label, , target], i) => {
+    const y = 16 + i * 14;
+    if (i === menuIndex) {
+      fillRect(0, y - 2, 240, 13, kPanel);
+      fillRect(0, y - 2, 2, 13, kPar);
+    }
+    text(6, y, i === menuIndex ? kText : kMuted, `${key}  ${label}`);
+    if (target === "agent") text(172, y, hostLive() ? kOk : kDim, hostLive() ? "host ok" : "no host");
+  });
+  text(4, 120, kMuted, hostLive() ? "s: STOP every agent" : MENU[menuIndex][2]);
+  fillRect(0, 130, 240, 1, kDim);
+}
+
+function enterPage(p) {
+  page = p;
+  pageUntil = 0;
+  if (p === "digest") { digestRows = 0; digestPending = true; }
+  if (p === "main" || p === "brain") phaseMs = millis();
+  if (p === "brain") brainFrames = brainMsSum = 0;
+  dirty = true;
+}
+
+let keysPage = null;
 function draw() {
   fillRect(0, 0, 240, 135, kBg);
   if (page === "selftest") drawSelfTest();
   else if (page === "help") drawHelp();
+  else if (page === "digest") drawDigest();
+  else if (page === "lattice") drawLattice();
+  else if (page === "agent") drawAgent();
+  else if (page === "menu") drawMenu();
+  else if (page === "brain") drawBrain();
   else { drawTopBar(); drawArena(); drawPanel(); drawBottomBar(); }
+  if (keysPage !== page) renderKeys();  // the on-screen keys are labelled for the page showing
 }
 
-// ---------------------------------------------------------------- input
+// ---------------------------------------------------------------- input (onKey and readInput)
 
 function onKey(c) {
   switch (c) {
@@ -954,39 +1296,113 @@ function onKey(c) {
     case "n": if (paused && phase === "looming") advance(); break;
     case "a": autoDemo = !autoDemo; phaseMs = millis(); break;
     case "m": sound = !sound; break;
+    case "d": page = "digest"; pageUntil = 0; digestRows = 0; digestPending = true; break;
+    case "w": page = "lattice"; pageUntil = 0; break;
     case "t": page = "selftest"; pageUntil = 0; break;
     case "h": page = "help"; break;
+    case "g": page = "agent"; break;
+    case "s": if (hostLive()) sendAll("stop_all"); break;
     default: break;
   }
   dirty = true;
   renderKeys();
 }
 
-// A keyboard key: on the device, any key first closes the self-test or help page.
+let audio = null;
+function wakeAudio() { if (!audio && window.AudioContext) audio = new AudioContext(); }
+function tone(freq, ms) {
+  if (!sound || !audio) return;
+  const osc = audio.createOscillator(), gain = audio.createGain();
+  osc.frequency.value = freq;
+  gain.gain.value = 0.05;
+  osc.connect(gain).connect(audio.destination);
+  osc.start();
+  osc.stop(audio.currentTime + ms / 1000);
+}
+
+function randomLaunch() {
+  lvIndex = Math.floor(Math.random() * kLv.length);
+  azimuth = (Math.floor(Math.random() * 19) - 9) * 10;
+  launch();
+}
+
+// One keyboard key, as readInput handles it page by page. c is a character, "\n" for
+// ENTER or "DEL". On the agent page ENTER, b and u write for the selected waiting item;
+// with no console there is never an item, so here they do nothing.
 function keyboard(c) {
   if (!w) return;
-  if (!audio && window.AudioContext) audio = new AudioContext();
-  if (page !== "main") { page = "main"; dirty = true; return; }
-  if (c === "\n" || c === " ") { autoDemo = false; launch(); return; }
+  wakeAudio();
+  const enter = c === "\n" || c === " ", del = c === "DEL";
+  if (page === "agent") {
+    if (c === "s") sendAll("stop_all");
+    else if (c === "r") sendAll("resume_all");
+    else if (c === "`" || c === "h" || del) page = "menu";
+    dirty = true;
+    return;
+  }
+  if (page === "brain") {
+    if (c === "s" && hostLive()) sendAll("stop_all");
+    else if (enter) { autoDemo = false; randomLaunch(); }
+    else page = "menu";
+    dirty = true;
+    return;
+  }
+  if (page === "menu") {
+    if (enter) enterPage(MENU[menuIndex][3]);
+    if (c === "s" && hostLive()) sendAll("stop_all");
+    if (c === ";" && menuIndex > 0) menuIndex--;
+    else if (c === "." && menuIndex + 1 < MENU.length) menuIndex++;
+    for (const m of MENU) if (c === m[0]) enterPage(m[3]);
+    dirty = true;
+    return;
+  }
+  if (page !== "main") { page = "menu"; dirty = true; return; }  // help, digest, lattice, self-test
+  if (del || c === "`") { page = "menu"; dirty = true; return; }
+  if (enter) { autoDemo = false; launch(); return; }
   onKey(c);
 }
-// The G0 button.
+
+// The G0 side button (BtnA): confirm on the agent page, a loom on the brain page, the
+// selected entry on the menu, and on every other page a loom without leaving the page.
 function buttonG0() {
   if (!w) return;
-  if (!audio && window.AudioContext) audio = new AudioContext();
-  page = "main";
+  wakeAudio();
+  if (page === "agent") return;  // confirm for the selected item; there is none without a console
+  if (page === "brain") { autoDemo = false; randomLaunch(); return; }
+  if (page === "menu") { enterPage(MENU[menuIndex][3]); return; }
   autoDemo = false;
   launch();
 }
 
 const KEYS = [
-  { c: "G0", label: "kGo", go: true },
-  { c: ";", label: "kLvUp" }, { c: ".", label: "kLvDown" }, { c: ",", label: "kAzL" }, { c: "/", label: "kAzR" },
-  { c: "1", text: "1×" }, { c: "2", text: "4×" }, { c: "3", text: "10×" }, { c: "4", text: "40×" },
-  { c: "p", label: "kPause", on: () => paused }, { c: "n", label: "kStep" },
-  { c: "a", label: "kAuto", on: () => autoDemo }, { c: "m", label: "kSound", on: () => sound },
-  { c: "t", label: "kTest" }, { c: "h", label: "kHelp" },
+  { c: "G0", go: true }, { c: "\n", face: "ENT" }, { c: "`" }, { c: "DEL" },
+  { c: ";" }, { c: "." }, { c: "," }, { c: "/" },
+  { c: "1" }, { c: "2" }, { c: "3" }, { c: "4" }, { c: "5" }, { c: "6" }, { c: "7" }, { c: "g" },
+  { c: "p" }, { c: "n" }, { c: "a" }, { c: "m" }, { c: "t" }, { c: "h" }, { c: "w" }, { c: "d" },
 ];
+const SPEED = ["1×", "4×", "10×", "40×"];
+const MAIN_ROLES = {
+  G0: "kGo", "\n": "kGo", "`": "kMenu", DEL: "kMenu", ";": "kLvUp", ".": "kLvDown", ",": "kAzL", "/": "kAzR",
+  g: "kAgent", p: "kPause", n: "kStep", a: "kAuto", m: "kSound", t: "kTest", h: "kHelp", w: "kLattice", d: "kDigest",
+};
+const MENU_ROLES = ["kMFly", "kMBrain", "kMAgent", "kMLattice", "kMDigest", "kMTest", "kMKeys"];
+// What a key does on the page showing, or null when it does nothing there.
+function keyRole(c) {
+  if (page === "main") return /^[1-4]$/.test(c) ? { text: SPEED[Number(c) - 1] } : MAIN_ROLES[c] ? { key: MAIN_ROLES[c] } : null;
+  if (page === "menu") {
+    if (c === "G0" || c === "\n") return { key: "kOpen" };
+    if (c === ";") return { key: "kUp" };
+    if (c === ".") return { key: "kDown" };
+    return /^[1-7]$/.test(c) ? { key: MENU_ROLES[Number(c) - 1] } : null;
+  }
+  if (page === "agent") {
+    if (c === "G0" || c === "\n") return { key: "kConfirm" };
+    return c === "`" || c === "h" || c === "DEL" ? { key: "kMenu" } : null;
+  }
+  if (page === "brain") return c === "G0" || c === "\n" ? { key: "kGo" } : { key: "kMenu" };
+  return c === "G0" ? { key: "kGo" } : { key: "kMenu" };  // help, digest, lattice, self-test
+}
+
 const keysEl = document.getElementById("keys");
 function renderKeys() {
   if (!keysEl.children.length) {
@@ -996,15 +1412,22 @@ function renderKeys() {
       b.className = "key" + (k.go ? " go" : "");
       b.dataset.c = k.c;
       b.innerHTML = "<b></b><span></span>";
-      b.querySelector("b").textContent = k.c;
+      b.querySelector("b").textContent = k.face ?? k.c;
       b.addEventListener("click", () => (k.go ? buttonG0() : keyboard(k.c)));
       keysEl.append(b);
     }
   }
+  keysPage = page;
   KEYS.forEach((k, i) => {
-    const b = keysEl.children[i];
-    b.querySelector("span").textContent = k.text ?? t(k.label);
-    const pressed = k.on ? k.on() : /^[1-4]$/.test(k.c) ? Number(k.c) - 1 === slowIndex : null;
+    const b = keysEl.children[i], role = keyRole(k.c);
+    b.querySelector("span").textContent = role ? role.text ?? t(role.key) : "–";
+    let pressed = null;
+    if (page === "main") {
+      if (/^[1-4]$/.test(k.c)) pressed = Number(k.c) - 1 === slowIndex;
+      else if (k.c === "p") pressed = paused;
+      else if (k.c === "a") pressed = autoDemo;
+      else if (k.c === "m") pressed = sound;
+    }
     if (pressed === null) b.removeAttribute("aria-pressed");
     else b.setAttribute("aria-pressed", String(pressed));
   });
@@ -1014,11 +1437,13 @@ document.addEventListener("keydown", (e) => {
   // Keys belong to the simulator only when no other control has focus: a focused tab,
   // link or button keeps Enter and Space, and the RPC fields keep every character.
   if (e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.target.closest("input, textarea, select, a, button:not(.key), [role=tablist]")) return;  let c = ARROWS[e.key] ?? (e.key === "Enter" ? "\n" : e.key.length === 1 ? e.key.toLowerCase() : null);
+  if (e.target.closest("input, textarea, select, a, button:not(.key), [role=tablist]")) return;
+  const c = ARROWS[e.key] ?? (e.key === "Enter" ? "\n" : e.key === "Backspace" || e.key === "Delete" ? "DEL"
+    : e.key.length === 1 ? e.key.toLowerCase() : null);
   if (c === null) return;
   if (e.target.closest(".key") && (c === "\n" || c === " ")) return;  // the button's own click handles it
   e.preventDefault();
-  const el = keysEl.querySelector(`[data-c="${CSS.escape(c)}"]`) ?? (c === "\n" || c === " " ? keysEl.firstElementChild : null);
+  const el = keysEl.querySelector(`[data-c="${CSS.escape(c === " " ? "\n" : c)}"]`);
   if (el) { el.classList.add("down"); setTimeout(() => el.classList.remove("down"), 120); }
   keyboard(c);
 });
@@ -1090,9 +1515,22 @@ function boot() {
   applyLang();
 }
 
+// One pass of loop() in main.cpp per browser frame.
 function frame() {
   const now = millis();
-  if (page === "selftest" && pageUntil && now > pageUntil) { page = "main"; phaseMs = now; dirty = true; }
+  // The digest blocks for a moment, as it does on the device, and only once the
+  // "computing" frame has been painted: a canvas paints after this callback returns, so
+  // the check runs at the start of the pass after the one that drew it.
+  if (digestPending && page === "digest" && !dirty) {
+    const t0 = millis();
+    digestHex = cstr(w.sim_digest(0));
+    digestMs = millis() - t0;
+    digestRows = 2 ** (w.sim_prog(0, 0) + w.sim_prog(0, 1));
+    digestPending = false;
+    dirty = true;
+    log(`digest ${digestHex} over ${digestRows} rows in ${digestMs} ms`);
+  }
+  if (page === "selftest" && pageUntil && now > pageUntil) { page = "menu"; dirty = true; }
   if (phase === "looming" && !paused) {
     const period = w.sim_info(9) * kSlow[slowIndex];
     if (now - lastTickMs > 500) lastTickMs = now - period;  // after a stall, do not race to catch up
@@ -1102,12 +1540,20 @@ function frame() {
     dirty = true;
     if (now - phaseMs > 700) { phase = "ended"; phaseMs = now; }
   }
-  if (autoDemo && runnable && page === "main" && (phase === "idle" || phase === "ended") && now - phaseMs > 2000) {
-    lvIndex = Math.floor(Math.random() * kLv.length);
-    azimuth = (Math.floor(Math.random() * 19) - 9) * 10;
-    launch();
+  if (autoDemo && runnable && (page === "main" || page === "brain") && (phase === "idle" || phase === "ended") &&
+      now - phaseMs > 2000) {
+    randomLaunch();
   }
-  if (dirty) { draw(); dirty = false; }
+  if (dirty && now - lastDrawMs >= 33) {
+    draw();
+    lastDrawMs = now;
+    dirty = false;
+  }
+  if (page === "brain") dirty = true;  // it sways
+  if (page === "lattice") {
+    latSpin = f32(latSpin + f32(0.03));
+    dirty = true;  // the lattice turns, so it needs a frame even when nothing ticks
+  }
   drawWiring(now);
   requestAnimationFrame(frame);
 }
@@ -1320,7 +1766,13 @@ function setWiringView(view) {
   }
   document.getElementById("panel-3d").setAttribute("aria-labelledby", cells ? "tab-fly" : "tab-wiring");
 }
-document.getElementById("stage-launch").addEventListener("click", buttonG0);
+// Page UI, not the device's G0: it launches a loom whatever page the device shows.
+document.getElementById("stage-launch").addEventListener("click", () => {
+  if (!w) return;
+  wakeAudio();
+  autoDemo = false;
+  launch();
+});
 
 function drawWiring(now) {
   const c = document.getElementById("wiring");
@@ -1445,7 +1897,7 @@ applyLang();
 splash(["SELF-TEST", "hashing and replaying the netlists..."], kMuted);
 loadWiring().catch(() => { /* the 3D wiring view is decoration; the page works without it */ });
 loadModule().then(
-  () => { renderFacts(); setTimeout(() => { boot(); requestAnimationFrame(frame); }, 60); },
+  () => { renderFacts(); loadSkeletons(); setTimeout(() => { boot(); requestAnimationFrame(frame); }, 60); },
   () => { loadError = true; renderChecks(); splash(["SELF-TEST", "could not load c3s_core.wasm"], kBad); },
 );
 </script>
