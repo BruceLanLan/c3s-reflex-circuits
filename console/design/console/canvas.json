@@ -1,0 +1,12 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "Overview · 总览", "x": 0, "y": 0, "w": 1440, "h": 900 },
+    { "file": "Boundaries.dc.html", "title": "Boundaries · 边界", "x": 1560, "y": 0, "w": 1440, "h": 900 },
+    { "file": "Approvals.dc.html", "title": "Approvals · 待确认", "x": 0, "y": 1040, "w": 1440, "h": 900 },
+    { "file": "Connect.dc.html", "title": "Connect · 接入", "x": 1560, "y": 1040, "w": 1440, "h": 900 }
+  ],
+  "annotations": [
+    { "id": "brief", "x": 0, "y": -160, "w": 520, "text": "C3S Circuit Agent · 后台控制台 · 静态稿 · 深色沿用现有 token · 数字来自 2026-09-16 实测" }
+  ],
+  "launch": { "view": "canvas" }
+}
