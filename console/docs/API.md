@@ -19,7 +19,19 @@ first: five workstreams read it. Endpoints are on `http://127.0.0.1:8765` by def
 | `GET /api/device/frame`, `POST /api/tool` from a device | a **paired Cardputer** over the LAN | device token, and only as below |
 | `POST /api/device/pair` | a device claiming an open window | **none by design** — see below |
 | `POST /api/device/pair/begin\|confirm`, `POST /api/device/forget` | **a person** | operator token |
-| `GET /api/state`, `GET /api/manifest` | anything local | none |
+| `GET /api/state`, `GET /api/manifest` | anything local · over the LAN: the operator, or a bound agent's own token (which sees a **narrowed** state — below) | none from loopback |
+
+**Reading over the network** (2026-09-17, F2). `GET /api/state` answers according to who is
+reading. From loopback and with the operator token it is the whole console. With a bound
+agent's own token (`X-Reflex-Agent-Token`, I-3) it is **that agent's rows only**: its entry in
+`agents`, its items in `pending`, and the transcript entries about it or about the rules
+(`request`/`tool`/`spoof` for that name, every `policy` entry, and each `stop` entry with the
+list of names removed). Other agents' calls, notes and armed bits are not in the reply, so an
+agent's token cannot learn the `reason` another agent's confirm is bound to — the string
+`docs/ISOLATION.md` relies on it not having. The rules and what was checked about them, the
+open `tasks` (the person's jobs, which an adapter reads there — I-6) and the count of bound
+names stay. A narrowed reply carries `"view": {"scope": "agent", "agent": "<name>"}`; the full
+one carries no `view`. `GET /api/tasks`, `/api/task/<id>` and `/api/manifest` are unchanged.
 
 **Pairing a phone**: the token travels in the URL **fragment**, never the query string —
 `http://<LAN-IP>:8765/#approvals&token=<operator token>`. A fragment is not sent to the
