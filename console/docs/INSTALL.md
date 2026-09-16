@@ -12,10 +12,10 @@
 
 | 东西 | 说明 |
 | --- | --- |
-| `git` | 要克隆两个仓库（§1） |
+| `git` | 要克隆这个仓库（§1） |
 | Python ≥ 3.10 | 本机的 `python` 可能是 Python 2；`install.sh` 会自己从 `python3.13 … python3` 里挑一个够新的，一个都没有就报错并告诉你装哪个 |
-| 电路仓 `c3s-reflex` | 后台用它编译并逐行核对规则（`c3s/policy.py`）。默认找 `~/work/c3s-reflex`，否则设 `C3S_REPO`。**必须自己先克隆**，见 §1 |
-| 值班台这个 checkout | `console.py` 与 `static/index.html` 从 checkout 里跑，**不打进 wheel**（见 §2） |
+| 电路（`c3s/policy.py`） | 后台用它编译并逐行核对规则。**就在同一个仓库里、上一层目录**，什么都不用设；单独放在别处时用 `C3S_REPO` 指过去 |
+| 这个 checkout | `console.py` 与 `static/index.html` 从 checkout 里跑，**不打进 wheel**（见 §2） |
 | macOS | 常驻（launchd）与菜单栏只做 macOS；Linux/Windows 用 CLI 一样能起，只是没有 launchd 与菜单栏 |
 
 `uv` 或 `pipx` 有就用，没有也行：`install.sh` 会退到 `~/.c3s-circuit-agent/venv` 里的一个 venv。
@@ -23,20 +23,19 @@
 唯一的第三方依赖是 `numpy`（电路仓的 `c3s/policy.py` 要它）。串口钥匙（Cardputer）要
 `pyserial`、菜单栏要 `rumps`，两者都是可选 extra：不用就不会被装下来。
 
-## 1. 从零开始：两个仓库，一条命令
+## 1. 从零开始：一个克隆，一条命令
 
-**这是两个仓库，不是一个。** 值班台（`reflex-console`，就是这里）是页面和命令；电路仓
-（`c3s-reflex`）是编译器和被逐行核对过的网表，后台起来的第一件事就是拿它把规则编译成电路。
-没有电路仓，`install.sh` 会停在第一步并告诉你缺哪个。先把两个都拿下来：
+一个仓库两半：**根目录是电路**（编译器和被逐行核对过的网表，后台起来第一件事就是拿它把规则编译
+成电路），**`console/` 是后台**（页面和命令）。以前这是两个仓库，于是安装文档必须提醒你克隆第二
+个——而它没提，`install.sh` 就停在第一步。现在没有第二个：
 
 ```sh
-git clone <本仓库> ~/work/reflex-console
-git clone https://github.com/BruceLanLan/c3s-reflex-circuits ~/work/c3s-reflex
-cd ~/work/reflex-console
+git clone https://github.com/BruceLanLan/c3s-reflex-circuits
+cd c3s-reflex-circuits/console
 sh install.sh
 ```
 
-电路仓放在别处也行，告诉它在哪就是：`C3S_REPO=/path/to/c3s-reflex sh install.sh`。
+电路单独放在别处也行，告诉它在哪就是：`C3S_REPO=/path/to/c3s-reflex sh install.sh`。
 
 ```sh
 sh install.sh                # 装 c3s，然后 c3s up

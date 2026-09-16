@@ -65,19 +65,18 @@ agent 永远可以选择付的成本**。`blocked` 和 `confirm` 必须来自 ag
 
 ## 装上
 
-两个仓库：电路仓（编译器和它的证明）和这个后台。需要 Python 3.10 以上的 `python3`；有 `uv` 或
-`pipx` 就用，没有就建一个普通 venv。
+一个克隆就够。编译并逐行核对你那些规则的电路，就在同一个仓库里、上一层目录；后台是这个目录。
+需要 Python 3.10 以上的 `python3`；有 `uv` 或 `pipx` 就用，没有就建一个普通 venv。
 
 ```sh
-git clone https://github.com/BruceLanLan/c3s-reflex-circuits ~/work/c3s-reflex
-git clone <后台仓库> reflex-console && cd reflex-console   # 尚未公开发布；从交给你的地方克隆
-sh install.sh
+git clone https://github.com/BruceLanLan/c3s-reflex-circuits
+cd c3s-reflex-circuits/console && sh install.sh
 ```
 
 `install.sh` 把 `c3s` 命令装进一个隔离环境（不碰系统 Python，不用 `sudo`），记住这个 checkout，
-然后启动后台。页面在 http://127.0.0.1:8765。电路仓不在 `~/work/c3s-reflex` 就先设 `C3S_REPO`；
-装完找不到 `c3s`，是 `~/.local/bin` 不在 `PATH` 里。安装只为拉那两个 Python 包上一次网；后台自己
-只在做链上复算时联网，没网也照常工作。
+然后启动后台。页面在 http://127.0.0.1:8765。它到 `../c3s` 找电路，什么都不用设；电路放在别处时
+`C3S_REPO` 仍然优先。装完找不到 `c3s`，是 `~/.local/bin` 不在 `PATH` 里。安装只为拉那两个 Python
+包上一次网；后台自己只在做链上复算时联网，没网也照常工作。
 
 首次启动会打印一个**操作者令牌**，同时存在 `~/.c3s-circuit-agent/operator-token`（权限 600）。
 它是人的钥匙：装规则、写人的那几位（`confirm`、`confirm_b`、`blocked`、`heartbeat`）都要它。页面

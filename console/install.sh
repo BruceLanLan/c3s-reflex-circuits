@@ -25,19 +25,30 @@ for arg in "$@"; do
 done
 
 here=$(cd "$(dirname "$0")" && pwd)
-repo=${C3S_REPO:-$HOME/work/c3s-reflex}
 config=${REFLEX_CONFIG_DIR:-$HOME/.c3s-circuit-agent}
 
-echo "reflex-console checkout: $here"
+# The circuits are in this repository, one level up from console/. C3S_REPO still wins, and
+# the older two-checkout layout still resolves, because people have it.
+if [ -n "${C3S_REPO:-}" ]; then
+  repo=$C3S_REPO
+elif [ -f "$here/../c3s/policy.py" ]; then
+  repo=$(cd "$here/.." && pwd)
+else
+  repo=$HOME/work/c3s-reflex
+fi
 
-# --- the circuits repository: the compiler and the verified netlist ---------------------
+echo "console checkout: $here"
+
+# --- the circuits: the compiler and the verified netlist -------------------------------
 if [ ! -f "$repo/c3s/policy.py" ]; then
-  echo "the circuits repository is not at $repo." >&2
-  echo "the console compiles and checks every rule with it, so clone it first:" >&2
+  echo "cannot find the circuits (c3s/policy.py) at $repo." >&2
+  echo "the console compiles and checks every rule with them. They live in this same" >&2
+  echo "repository, one level above console/ — so a full clone already has them:" >&2
   echo >&2
-  echo "  git clone https://github.com/BruceLanLan/c3s-reflex-circuits \"$HOME/work/c3s-reflex\"" >&2
+  echo "  git clone https://github.com/BruceLanLan/c3s-reflex-circuits" >&2
+  echo "  cd c3s-reflex-circuits/console && sh install.sh" >&2
   echo >&2
-  echo "then run this again. If you keep it somewhere else, say where: C3S_REPO=/path/to/it sh install.sh" >&2
+  echo "If you keep them somewhere else, say where: C3S_REPO=/path/to/it sh install.sh" >&2
   exit 3
 fi
 echo "circuits repository:     $repo"

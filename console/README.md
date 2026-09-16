@@ -75,20 +75,20 @@ later.
 
 ## Install
 
-Two repositories: the circuits (the compiler and its proofs) and this console. Python 3.10
-or newer as `python3`; `uv` or `pipx` if you have one, a plain venv otherwise.
+One clone. The circuits that compile and check your rules are in the same repository, one
+level up; the console is this directory. Python 3.10 or newer as `python3`; `uv` or `pipx`
+if you have one, a plain venv otherwise.
 
 ```sh
-git clone https://github.com/BruceLanLan/c3s-reflex-circuits ~/work/c3s-reflex
-git clone <the console repository> reflex-console && cd reflex-console   # not yet published; clone it from wherever you were handed it
-sh install.sh
+git clone https://github.com/BruceLanLan/c3s-reflex-circuits
+cd c3s-reflex-circuits/console && sh install.sh
 ```
 
 `install.sh` puts the `c3s` command in an isolated environment (nothing goes into your
 system Python, nothing runs with `sudo`), remembers this checkout, and starts the console.
-The page is at http://127.0.0.1:8765. If the circuits are somewhere other than
-`~/work/c3s-reflex`, set `C3S_REPO` first; if `c3s` is not found afterwards, `~/.local/bin`
-is not on your `PATH`. Fetching the two Python packages is the only network access the
+The page is at http://127.0.0.1:8765. It finds the circuits at `../c3s` and needs nothing
+set; `C3S_REPO` still overrides that if you keep them somewhere else. If `c3s` is not found
+afterwards, `~/.local/bin` is not on your `PATH`. Fetching the two Python packages is the only network access the
 install needs; the console itself talks to the network only for the on-chain second
 opinion, and works without it.
 

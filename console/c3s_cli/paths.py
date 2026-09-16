@@ -29,8 +29,11 @@ TOKEN_FILE = Path(os.environ.get("REFLEX_TOKEN_FILE", CONFIG_DIR / "operator-tok
 CONSOLE_DIR_MEMO = CONFIG_DIR / "console-dir"
 PLIST = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
 
-DEFAULT_CONSOLE_DIR = Path.home() / "work" / "reflex-console"
+# The console lives inside the circuits repository, at <repo>/console. Both defaults keep
+# the older two-checkout layout working for anyone who already had it.
 DEFAULT_REPO = Path.home() / "work" / "c3s-reflex"
+DEFAULT_CONSOLE_DIR = DEFAULT_REPO / "console"
+LEGACY_CONSOLE_DIR = Path.home() / "work" / "reflex-console"
 
 
 class Missing(Exception):
@@ -54,7 +57,7 @@ def console_dir(remember: bool = False) -> Path:
     tried = []
     candidates = [os.environ.get("REFLEX_CONSOLE_DIR"),
                   CONSOLE_DIR_MEMO.read_text().strip() if CONSOLE_DIR_MEMO.is_file() else None,
-                  Path.cwd(), DEFAULT_CONSOLE_DIR]
+                  Path.cwd(), DEFAULT_CONSOLE_DIR, LEGACY_CONSOLE_DIR]
     for candidate in candidates:
         if not candidate:
             continue
@@ -74,15 +77,36 @@ def remember_console_dir(path: Path) -> None:
     CONSOLE_DIR_MEMO.write_text(str(Path(path).resolve()) + "\n")
 
 
+def _has_circuits(path: Path) -> bool:
+    return (path / "c3s" / "policy.py").is_file()
+
+
 def circuits_repo() -> Path:
-    """The c3s-reflex checkout: the compiler, the netlist and the on-chain evaluator."""
-    path = Path(os.environ.get("C3S_REPO", DEFAULT_REPO)).expanduser()
-    if not (path / "c3s" / "policy.py").is_file():
-        raise Missing(
-            f"the circuits repository is not at {path}: clone "
-            "https://github.com/BruceLanLan/c3s-reflex-circuits and set C3S_REPO to it "
-            "(the console compiles its rules with that repository's checker).")
-    return path.resolve()
+    """The circuits: the compiler, the netlist and the on-chain evaluator.
+
+    They are in this repository, one level above the console — so a single clone is the
+    whole product and there is nothing to set. `C3S_REPO` still wins, and the older
+    two-checkout layout still resolves, because people have it.
+    """
+    named = os.environ.get("C3S_REPO")
+    tried = []
+    candidates = [named] if named else []
+    if not named:
+        try:
+            candidates.append(console_dir().parent)
+        except Missing:
+            pass
+        candidates.append(DEFAULT_REPO)
+    for candidate in candidates:
+        path = Path(candidate).expanduser()
+        tried.append(str(path))
+        if _has_circuits(path):
+            return path.resolve()
+    raise Missing(
+        f"cannot find the circuits (c3s/policy.py), which compile and check every rule. "
+        f"They are in this repository, one level above the console; clone "
+        f"https://github.com/BruceLanLan/c3s-reflex-circuits and run from inside it, or "
+        f"set C3S_REPO. Tried: {', '.join(tried)}.")
 
 
 # --------------------------------------------------------------- this machine's addresses
