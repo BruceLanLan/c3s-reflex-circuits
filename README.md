@@ -1,10 +1,18 @@
-# C3S Reflex Circuits
+# C3S Circuit Agent
 
-**Connectome-constrained circuit synthesis: from the fruit-fly giant-fiber escape
-pathway to exhaustively verified NAND/LATCH netlists that run on chain.**
+**An agent whose actions pass through a circuit you wrote: rules compiled to NAND
+gates, checked on every row, proven over every reachable state, and replayable
+read-only on BNB Smart Chain.**
+
+C3S Circuit Agent puts a compiled, exhaustively checked rule circuit between your own
+model and the actions it can take ([docs/AGENT.md](docs/AGENT.md)). Its first circuit
+is the fruit-fly giant-fiber escape reflex, kept under its research name: the
+connectome-constrained synthesis below, from MaleCNS v1.0 to a 173-NAND netlist
+checked on all 8,388,608 rows. The fly circuit is where the method comes from; the
+model that does the work is yours.
 
 [中文说明](README.zh-CN.md) · [Live demo](https://brucelanlan.github.io/c3s-reflex-circuits/demo/) ·
-[Handheld simulator](https://brucelanlan.github.io/c3s-reflex-circuits/sim/) ·
+[C3S Circuit Agent](https://brucelanlan.github.io/c3s-reflex-circuits/sim/) ·
 [Release v0.2.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0)
 
 This repository asks a narrow question: *if a behaviour is shaped by measured

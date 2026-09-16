@@ -1,8 +1,10 @@
-# C3S 反射弧电路
+# C3S Circuit Agent
 
-**受连接组约束的电路综合：从果蝇巨纤维逃逸通路，到经过穷举验证、可以在链上运行的 NAND/LATCH 网表。**
+**一个 agent，它的每个动作都要穿过你写的电路：规则编译成 NAND 门，逐行核对，在每个可达状态上证明，并可在 BNB 智能链上只读复算。**
 
-[English](README.md) · [在线演示](https://brucelanlan.github.io/c3s-reflex-circuits/demo/) · [掌机仿真器](https://brucelanlan.github.io/c3s-reflex-circuits/sim/) · [Release v0.2.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0)
+C3S Circuit Agent 在你自己的模型和它能做的动作之间，放一颗编译出来、穷举核对过的规则电路（见 [docs/AGENT.md](docs/AGENT.md)）。它的第一颗电路是果蝇巨纤维逃逸反射，沿用研究名：也就是下文受连接组约束的电路综合，从 MaleCNS v1.0 一路做到 173 个 NAND 门、全部 8,388,608 行逐行核过的网表。果蝇电路是这套方法的来源；干活的模型是你自己的。
+
+[English](README.md) · [在线演示](https://brucelanlan.github.io/c3s-reflex-circuits/demo/) · [C3S Circuit Agent](https://brucelanlan.github.io/c3s-reflex-circuits/sim/) · [Release v0.2.0](https://github.com/BruceLanLan/c3s-reflex-circuits/releases/tag/v0.2.0)
 
 这个仓库只问一个很窄的问题：**如果一个行为是由实测的神经连线塑造的，最少需要多小的一台确定机器才能复现它？这台机器有多少部分可以被证明，而不是被信任？**
 
