@@ -163,7 +163,9 @@ class Boundary:
                 "tick": a["ticks"],
                 "ticks_since_previous_grant": gap,
                 "why": self.why(name, inputs, state_before, grant),
-                "_decisive": (inputs, state_before, grant, a["state"]),
+                # Carried out of the lock so the chain re-evaluates the circuit that
+                # actually decided, not whichever one is installed by the time it asks.
+                "_decisive": (inputs, state_before, grant, a["state"], self.netlist, self.policy.state_bits),
             }
             TRANSCRIPTS.appendleft(entry)
             return entry
@@ -281,10 +283,18 @@ def policy_from(payload: dict) -> Policy:
             raise ValueError(f"{key}={value} outside 0..{limit}")
         return value
 
+    def flag(key: str) -> bool:
+        """Not bool(): the string "false" is truthy, and this one decides whether a
+        rule that only the tool layer can satisfy is installed at all."""
+        value = payload.get(key, True)
+        if not isinstance(value, bool):
+            raise ValueError(f"{key} must be true or false")
+        return value
+
     return Policy(
         min_gap_ticks=whole("min_gap_ticks", 255),
         commit_ticks=whole("commit_ticks", 255),
-        forbid_when_blocked=bool(payload.get("forbid_when_blocked", True)),
+        forbid_when_blocked=flag("forbid_when_blocked"),
         max_grants=whole("max_grants", 255),
         confirm_window_ticks=whole("confirm_window_ticks", 255),
     )
@@ -348,11 +358,9 @@ class Handler(BaseHTTPRequestHandler):
             entry = BOUNDARY.request(name, payload.get("intent", 0), str(payload.get("reason", ""))[:160])
             decisive = entry.pop("_decisive", None)
             if CHAIN is not None and decisive is not None:
-                inputs, state, grant, next_state = decisive
+                inputs, state, grant, next_state, netlist, state_bits = decisive
                 try:
-                    got, got_state = CHAIN.evaluate(
-                        BOUNDARY.netlist, len(INPUT_NAMES), 1, BOUNDARY.policy.state_bits, inputs, state
-                    )
+                    got, got_state = CHAIN.evaluate(netlist, len(INPUT_NAMES), 1, state_bits, inputs, state)
                     entry["chain"] = {
                         "chain_id": CHAIN.chain(),
                         "grant": got,

@@ -1,14 +1,24 @@
-"""Relay the duty console into a Telegram chat. It carries no authority of its own.
+"""Relay the boundary console into a Telegram chat. It carries no authority of its own.
 
     TELEGRAM_TOKEN=... CONSOLE_URL=http://127.0.0.1:8765 python bot_telegram.py
 
 Commands:
-    /propose <l/v ms> <azimuth deg> [why]   ask the circuit about a stimulus
-    /state                                  the refractory countdown per agent
+    /ask [why]        one tick on the agent channel, without intent
+    /intent [why]     one tick on the agent channel, with intent high
+    /rules            the installed rules, and what was checked about them
+    /state            each agent's counters as the circuit sees them
+
+A chat is the agent's channel. `blocked` and `confirm` are bits that only a layer the
+agent cannot reach may write, so this program refuses to send them from a chat unless
+that chat's id is listed in TOOL_LAYER_CHATS — otherwise a rule meant as a boundary
+would be satisfiable by whoever is typing, which is the failure docs/AGENT.md names.
+
+    TOOL_LAYER_CHATS=-1001234567890 python bot_telegram.py
+    /block on | /block off | /confirm     (those chats only)
 
 The token is read from the environment and never written anywhere. The bot only
-forwards to the console's two endpoints, so it can do nothing the console cannot, and
-the console can do nothing the circuit does not allow.
+forwards to the console's endpoints, so it can do nothing the console cannot, and the
+console can do nothing the compiled rules do not allow.
 """
 
 from __future__ import annotations
@@ -22,8 +32,14 @@ import urllib.request
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CONSOLE = os.environ.get("CONSOLE_URL", "http://127.0.0.1:8765").rstrip("/")
+TOOL_LAYER_CHATS = {c.strip() for c in os.environ.get("TOOL_LAYER_CHATS", "").split(",") if c.strip()}
 API = f"https://api.telegram.org/bot{TOKEN}"
-HELP = "/propose <l/v ms> <azimuth deg> [why] — ask the circuit\n/state — refractory countdown"
+HELP = (
+    "/ask [why] — one tick, no intent\n"
+    "/intent [why] — one tick with intent high\n"
+    "/rules — the installed rules\n"
+    "/state — counters per agent"
+)
 
 
 def call(url: str, payload: dict | None = None, timeout: int = 40) -> dict:
@@ -43,35 +59,74 @@ def say(chat_id: int, text: str) -> None:
 def verdict_line(v: dict) -> str:
     if v.get("error"):
         return f"refused before the circuit saw it: {v['error']}"
-    gap = v.get("ticks_since_previous_authorisation")
-    tail = f", {gap} ticks after the last authorisation" if gap is not None else ""
-    head = "AUTHORISED" if v["authorised"] else "refused"
-    return f"{head} — {v['action']} after {v['ticks_used']} ticks{tail}"
+    head = "GRANTED" if v.get("granted") else "refused"
+    why = "; ".join(v.get("why") or [])
+    gap = v.get("ticks_since_previous_grant")
+    lines = [f"{head} — tick {v.get('tick')}" + (f", {gap} ticks after the last grant" if gap is not None else "")]
+    if why:
+        lines.append(why)
+    chain = v.get("chain") or {}
+    if chain.get("error"):
+        lines.append(f"chain check unavailable: {chain['error']}")
+    elif chain:
+        agrees = "agrees" if chain.get("agrees") else "DISAGREES"
+        lines.append(f"chain {chain.get('chain_id')} {agrees} — read-only, nothing deployed")
+    return "\n".join(lines)
+
+
+def request(chat_id: int, intent: int, reason: str) -> None:
+    payload = {"agent": f"tg:{chat_id}", "intent": intent, "reason": reason}
+    try:
+        say(chat_id, verdict_line(call(f"{CONSOLE}/api/request", payload)))
+    except urllib.error.HTTPError as e:
+        say(chat_id, verdict_line(json.loads(e.read())))
 
 
 def handle(chat_id: int, text: str) -> None:
     parts = text.split()
     command = parts[0].split("@")[0] if parts else ""
-    if command == "/state":
+    rest = " ".join(parts[1:])
+
+    if command == "/rules":
+        p = call(f"{CONSOLE}/api/state")["policy"]
+        c, checked = p["circuit"], p["checked"]
+        lines = [f"{c['nand']} NAND + {c['latch']} LATCH, compiled from these rules:"]
+        lines += [f"· {r}" for r in p["rules"]] or ["· nothing is granted, ever"]
+        lines.append(f"checked on all {checked['rows']:,} rows of its domain: "
+                     f"{'matches the reference' if checked['matches_reference'] else 'DOES NOT MATCH'}")
+        lines.append(f"every rule holds across {checked['reachable_states']} reachable states: "
+                     f"{'yes' if checked['every_rule_holds'] else 'NO'}")
+        say(chat_id, "\n".join(lines))
+    elif command == "/state":
         s = call(f"{CONSOLE}/api/state")
-        c = s["circuit"]
-        lines = [f"{c['name']} · {c['nand']} NAND + {c['latch']} LATCH · refractory {s['refractory_ticks']} ticks (proven)"]
+        lines = []
         for a in s["agents"] or []:
-            left = a["refractory_ticks_left"]
-            lines.append(f"{a['agent']}: {a['ticks']} ticks, {a['authorisations']} authorised"
-                         + (f", {left} refractory ticks left" if left else ""))
-        say(chat_id, "\n".join(lines) or "no proposals yet")
-    elif command == "/propose":
-        try:
-            lv, az = float(parts[1]), float(parts[2])
-        except (IndexError, ValueError):
-            say(chat_id, HELP)
+            bits = [f"{a['ticks']} ticks", f"{a['grants']} granted"]
+            if a["cooldown_left"]:
+                bits.append(f"{a['cooldown_left']} cooldown ticks left")
+            if a["intent_streak"]:
+                bits.append(f"intent streak {a['intent_streak']}")
+            if a["confirm_window_left"]:
+                bits.append(f"confirm window {a['confirm_window_left']}")
+            lines.append(f"{a['agent']}: " + ", ".join(bits))
+        say(chat_id, "\n".join(lines) or "no requests yet")
+    elif command == "/ask":
+        request(chat_id, 0, rest)
+    elif command == "/intent":
+        request(chat_id, 1, rest)
+    elif command in ("/block", "/confirm"):
+        if str(chat_id) not in TOOL_LAYER_CHATS:
+            say(chat_id, "blocked and confirm may only be written by a layer the agent cannot reach. "
+                         "This chat is the agent's own channel, so the bot will not send them from here; "
+                         "list the chat id in TOOL_LAYER_CHATS if it is in fact a separate, trusted one.")
             return
-        payload = {"agent": f"tg:{chat_id}", "l_over_v_ms": lv, "azimuth_deg": az, "reason": " ".join(parts[3:])}
-        try:
-            say(chat_id, verdict_line(call(f"{CONSOLE}/api/propose", payload)))
-        except urllib.error.HTTPError as e:
-            say(chat_id, verdict_line(json.loads(e.read())))
+        body = {"agent": f"tg:{chat_id}"}
+        if command == "/confirm":
+            body["confirm"] = 1
+        else:
+            body["blocked"] = 0 if rest.strip() == "off" else 1
+        armed = call(f"{CONSOLE}/api/tool", body)
+        say(chat_id, f"tool layer wrote blocked={armed['blocked']} confirm={armed['confirm']}")
     else:
         say(chat_id, HELP)
 
@@ -80,6 +135,8 @@ def main() -> None:
     if not TOKEN:
         sys.exit("set TELEGRAM_TOKEN (see .env.example); it is never stored by this program")
     print(f"relaying {CONSOLE} into Telegram; Ctrl-C to stop", flush=True)
+    if TOOL_LAYER_CHATS:
+        print(f"tool-layer bits accepted from {len(TOOL_LAYER_CHATS)} chat(s)", flush=True)
     offset = 0
     while True:
         try:
