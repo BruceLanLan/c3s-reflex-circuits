@@ -21,6 +21,12 @@ bool passed = false;
 bool runnable = false;
 uint32_t selfTestMs = 0;
 
+// Whole-domain digest, computed on request: it takes seconds, so the page is drawn
+// first and the work happens in the next loop pass.
+char digestHex[65] = "";
+uint32_t digestRows = 0, digestMs = 0;
+bool digestPending = false;
+
 M5Canvas canvas(&M5Cardputer.Display);
 
 const int kLv[] = {10, 12, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 100, 140};  // l/v, ms
@@ -34,7 +40,7 @@ bool autoDemo = true;
 bool paused = false;
 bool sound = true;
 
-enum class Page { Main, SelfTest, Help };
+enum class Page { Main, SelfTest, Help, Digest };
 enum class Phase { Idle, Looming, TookOff, Ended };
 Page page = Page::SelfTest;
 Phase phase = Phase::Idle;
@@ -309,11 +315,33 @@ void drawHelp() {
       ", /   azimuth left / right",
       "1-4   speed 1x 4x 10x 40x slower",
       "p pause   n one tick when paused",
-      "a auto demo   m sound   t self-test",
+      "a auto  m sound  t self-test  d digest",
       "serial 115200 logs every tick",
       "any key to close",
   };
   for (int i = 0; i < 9; i++) text(4, 4 + i * 14, i == 0 ? kText : kMuted, lines[i]);
+}
+
+void drawDigest() {
+  char buf[64];
+  text(4, 4, kText, "WHOLE-DOMAIN DIGEST");
+  text(4, 20, kMuted, "SHA-256 chain over every (input, state) row");
+  snprintf(buf, sizeof buf, "%s: 8,388,608 rows", C3S_CORE_NAME);
+  text(4, 34, kText, buf);
+  if (!digestRows) {
+    text(4, 52, kMuted, "computing on this device, a few seconds..");
+    text(4, 122, kMuted, "any key to go back");
+    return;
+  }
+  snprintf(buf, sizeof buf, "%.32s", digestHex);
+  text(10, 52, kText, buf);
+  snprintf(buf, sizeof buf, "%.32s", digestHex + 32);
+  text(10, 62, kText, buf);
+  snprintf(buf, sizeof buf, "%lu rows in %lu ms on this device", (unsigned long)digestRows, (unsigned long)digestMs);
+  text(4, 80, kMuted, buf);
+  text(4, 94, kMuted, "equal to Python, the browser and the EVM");
+  text(4, 106, kMuted, "if it matches docs/CIRCUITS.md");
+  text(4, 122, kMuted, "any key to go back");
 }
 
 void draw() {
@@ -322,6 +350,8 @@ void draw() {
     drawSelfTest();
   } else if (page == Page::Help) {
     drawHelp();
+  } else if (page == Page::Digest) {
+    drawDigest();
   } else {
     drawTopBar();
     drawArena();
@@ -344,6 +374,7 @@ void onKey(char c) {
     case 'n': if (paused && phase == Phase::Looming) advance(); break;
     case 'a': autoDemo = !autoDemo; phaseMs = millis(); break;
     case 'm': sound = !sound; break;
+    case 'd': page = Page::Digest; pageUntil = 0; digestRows = 0; digestPending = true; break;
     case 't': page = Page::SelfTest; pageUntil = 0; break;
     case 'h': page = Page::Help; break;
     default: break;
@@ -440,6 +471,16 @@ void loop() {
     draw();
     lastDrawMs = now;
     dirty = false;
+  }
+  // Only once the "computing" frame is on the screen: this blocks for seconds.
+  if (digestPending && page == Page::Digest && !dirty) {
+    uint8_t d[32];
+    uint32_t t0 = millis();
+    digestRows = c3s_domain_digest(&core, d);
+    digestMs = millis() - t0;
+    c3s_hex(d, 32, digestHex);
+    digestPending = false;
+    dirty = true;
   }
   delay(1);
 }

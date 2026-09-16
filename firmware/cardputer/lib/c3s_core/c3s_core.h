@@ -53,6 +53,14 @@ uint32_t c3s_step(const c3s_prog *p, uint32_t inputs, uint32_t state, uint32_t *
 void c3s_sha256(const uint8_t *data, size_t len, uint8_t digest[32]);
 void c3s_hex(const uint8_t *bytes, size_t len, char *out); /* 2 * len characters and a NUL */
 
+/* Digest of the whole step relation: evaluates every (input, state) row bit-sliced,
+ * in blocks of 256 rows, and chains SHA-256 over the output and next-state bit
+ * planes exactly as scripts/export_evm_fixtures.py does, so the device, the host,
+ * the browser, Python and the EVM evaluator can be compared by 32 bytes. Rows are
+ * inputs first, then latch state. Returns the number of rows digested, or 0 when the
+ * program's domain is outside the supported range. */
+uint32_t c3s_domain_digest(const c3s_prog *p, uint8_t digest[32]);
+
 /* Looming geometry of a disc of half-size l approaching at constant speed v
  * (c3s/loom.py theta_at and dtheta_at). */
 double c3s_theta_deg(double l_over_v_s, double time_to_contact_s);

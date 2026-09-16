@@ -127,6 +127,17 @@ def test_policy_truth_table_equals_the_python_engine_on_all_rows(evaluator, tmp_
     assert not got[:, 1].any()
 
 
+@pytest.mark.parametrize("name,rows", [("core", 2**23), ("policy", 2**16)])
+def test_whole_domain_digest_equals_the_evm_fixture_chain(evaluator, name, rows):
+    """The firmware's own bit-sliced digest of the complete step relation must equal the
+    SHA-256 chain in the EVM fixtures, which the Solidity evaluator is checked against."""
+    fixtures = json.loads((ROOT / "contracts" / "test" / "fixtures" / "circuits.json").read_text())
+    want = next(c["domain_chain_sha256"] for c in fixtures["circuits"] if c["name"] == f"{name}-hand-abc")
+    got_rows, got = run(evaluator, "digest", name).split()
+    assert int(got_rows) == rows
+    assert got == want
+
+
 def test_encoding_equals_python_at_every_edge(evaluator, setup):
     _, enc = setup
 

@@ -51,12 +51,16 @@ if (cmd === "table" && args.length === 2) {
   const lines = [];
   while (w.sim_tick()) lines.push(Array.from({ length: 8 }, (_, i) => String(w.sim_last(i))).join(" "));
   if (lines.length) console.log(lines.join("\n"));
+} else if (cmd === "digest" && args.length === 1) {
+  const which = args[0] === "core" ? 0 : 1;
+  const rows = 2 ** (w.sim_prog(which, 0) + w.sim_prog(which, 1));
+  console.log(`${rows} 0x${cstr(w.sim_digest(which))}`);
 } else if (cmd === "encode") {
   const nums = readFileSync(0, "utf8").split(/\s+/).filter(Boolean).map(Number);
   const lines = [];
   for (let i = 0; i + 2 < nums.length; i += 3) lines.push(w.sim_encode(nums[i], nums[i + 1], nums[i + 2]));
   console.log(lines.join("\n"));
 } else {
-  console.error("usage: sim_cli.mjs selftest | table core|policy FILE | run LV AZ | encode");
+  console.error("usage: sim_cli.mjs selftest | table core|policy FILE | digest core|policy | run LV AZ | encode");
   process.exit(2);
 }

@@ -78,6 +78,11 @@ compiler (the test is skipped without one) and checks:
   truth table on all 65,536 inputs, equal `c3s.exhaust.step_table` on the manifests'
   bytes;
 - the on-boot self-test passes, with hashes equal to the manifests';
+- the firmware's own bit-sliced digest of the whole step relation (`digest core` and
+  `digest policy`, a SHA-256 chain over the output and next-state bit planes of every
+  row, in blocks of 256 rows) equals the chain in the EVM fixtures, which the
+  Solidity evaluator is checked against — so one 32-byte value ties the device's C,
+  the browser's WebAssembly, Python and the EVM together;
 - the sensory encoding equals `loom.encode_features` at, and one ulp either side of,
   every bin edge and the edges of the binocular overlap;
 - an episode run tick by tick as the firmware runs it (geometry, encoding, policy and
@@ -112,6 +117,7 @@ The screen is 240 × 135:
 | `a` | auto demo (on at boot): random l/v and azimuth every few seconds |
 | `m` | sound on takeoff |
 | `t`, `h` | self-test report, key help |
+| `d` | digest the whole 8,388,608-row step relation on the device and show it with the time it took |
 
 Each serial line is one tick, for example:
 

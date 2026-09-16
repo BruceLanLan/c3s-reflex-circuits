@@ -57,11 +57,20 @@ int main(int argc, char **argv) {
              (unsigned long)t.pathways, (unsigned long)t.state, (unsigned long)t.motor, (unsigned long)t.next_state);
     return 0;
   }
+  if (!strcmp(cmd, "digest") && argc == 3) {
+    const c3s_prog *p = !strcmp(argv[2], "core") ? &core : &policy;
+    uint8_t d[32];
+    char hex[65];
+    unsigned long rows = (unsigned long)c3s_domain_digest(p, d);
+    c3s_hex(d, 32, hex);
+    printf("%lu 0x%s\n", rows, hex);
+    return 0;
+  }
   if (!strcmp(cmd, "encode")) {
     double th, dth, az;
     while (scanf("%lf %lf %lf", &th, &dth, &az) == 3) printf("%lu\n", (unsigned long)c3s_encode(th, dth, az));
     return 0;
   }
-  fprintf(stderr, "usage: c3s_host selftest | table core|policy FILE | run LV AZ | encode\n");
+  fprintf(stderr, "usage: c3s_host selftest | table core|policy FILE | digest core|policy | run LV AZ | encode\n");
   return 2;
 }

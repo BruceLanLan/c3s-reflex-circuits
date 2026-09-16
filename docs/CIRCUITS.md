@@ -213,6 +213,31 @@ The difference is mostly reading the 1,235-byte netlist from storage on every ti
 and writing the caller's state. Storing the netlist as contract code instead of in
 storage would remove most of the read cost; that optimisation is not implemented.
 
+### Running it on a public chain without deploying anything
+
+`scripts/verify_onchain.py` makes a real BNB Smart Chain node execute the core and
+compares every answer with this repository's evaluator. Nothing is deployed: an
+`eth_call` state override installs the 2,519-byte compiled `NandMachine` runtime at a
+throwaway address for the duration of one read-only call, and `evaluate` (selector
+`0x6b758dac`) is a `pure` function, so no storage, transaction, wallet, private key
+or gas is involved, and nothing is left on chain.
+
+```sh
+python scripts/verify_onchain.py --ticks 8      # or --rpc <endpoint>
+```
+
+On chain 56 (BSC mainnet) the node reproduced 8 of the 74 ticks of one episode with
+no difference, including the four consecutive raising ticks and the long-mode
+takeoff that follows them, with the refractory timer loading at the takeoff tick
+(state 4 → 56). The script asks about every tick where the motor command is not
+`hold` before spreading the remaining calls over the episode, since repeating a
+quiet row would prove little. This makes the chain a fourth independent evaluator
+beside Python, the firmware's C and the browser's WebAssembly.
+
+What leaves the machine that runs it: the netlist bytes and input values, both
+already public here, plus the caller's IP address, to whichever RPC provider is
+chosen.
+
 ## Reproducing
 
 With Yosys 0.68 (`yosys-abc`) and Foundry 1.8.1:

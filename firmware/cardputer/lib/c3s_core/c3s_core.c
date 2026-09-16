@@ -133,6 +133,43 @@ void c3s_hex(const uint8_t *bytes, size_t len, char *out) {
   out[2 * len] = '\0';
 }
 
+/* Bit-sliced whole-domain digest. One uint32 per signal holds 32 consecutive rows,
+ * eight such slices fill the 256-row blocks that the SHA-256 chain hashes. Within a
+ * block, plane byte 31 - (j >> 3), bit j & 7, is row j: a 32-byte big-endian word
+ * whose bit j is row base + j, as in the Python and Solidity evaluators. */
+uint32_t c3s_domain_digest(const c3s_prog *p, uint8_t digest[32]) {
+  static const uint32_t slice[5] = {0xaaaaaaaau, 0xccccccccu, 0xf0f0f0f0u, 0xff00ff00u, 0xffff0000u};
+  static uint32_t sig[C3S_MAX_SIGNALS];
+  uint8_t buf[32 + 64 * 32];
+  const int bits = p->n_in + p->n_state, nplanes = p->n_out + p->n_state;
+  uint32_t rows, base, row, w;
+  int i, k, m, t;
+  if (bits < 8 || bits > 24 || p->n_in < 5 || nplanes > 64) return 0;
+  rows = 1u << bits;
+  memset(digest, 0, 32);
+  sig[0] = 0;
+  sig[1] = 0xffffffffu;
+  for (base = 0; base < rows; base += 256) {
+    memcpy(buf, digest, 32);
+    memset(buf + 32, 0, (size_t)nplanes * 32);
+    for (t = 0; t < 8; t++) {
+      row = base + (uint32_t)t * 32;
+      for (i = 0; i < p->n_in; i++)
+        sig[2 + i] = i < 5 ? slice[i] : (((row >> i) & 1u) ? 0xffffffffu : 0u);
+      for (i = 0, k = 2 + p->n_in; i < p->n_cells; i++, k++) {
+        const c3s_cell *c = &p->cells[i];
+        sig[k] = c->latch ? ((((row >> (p->n_in + c->b)) & 1u)) ? 0xffffffffu : 0u) : ~(sig[c->a] & sig[c->b]);
+      }
+      for (i = 0; i < nplanes; i++) {
+        w = i < p->n_out ? sig[p->n_signals - p->n_out + i] : sig[p->latch_d[i - p->n_out]];
+        for (m = 0; m < 4; m++) buf[32 + i * 32 + (31 - 4 * t - m)] = (uint8_t)((w >> (8 * m)) & 0xffu);
+      }
+    }
+    c3s_sha256(buf, (size_t)(32 + nplanes * 32), digest);
+  }
+  return rows;
+}
+
 /* ---- Looming stimulus and encoding ------------------------------------------ */
 
 /* CPython's math.degrees and math.radians multiply by these two constants. */

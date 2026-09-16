@@ -43,6 +43,16 @@ int sim_report(int field) {
 EXPORT(sim_sha256)
 const char *sim_sha256(int which) { return which == 0 ? report.core_sha256 : report.policy_sha256; }
 
+/* SHA-256 chain over the whole step relation; "" when the domain is unsupported. */
+EXPORT(sim_digest)
+const char *sim_digest(int which) {
+  static char hex[65];
+  uint8_t d[32];
+  if (!c3s_domain_digest(which == 0 ? &core : &policy, d)) return "";
+  c3s_hex(d, 32, hex);
+  return hex;
+}
+
 /* 0 core NAND, 1 core LATCH, 2 core bytes, 3 core depth, 4 policy NAND, 5 policy bytes,
  * 6 sensory bits, 7 raise-counter bits, 8 reference episodes, 9 tick ms */
 EXPORT(sim_info)
