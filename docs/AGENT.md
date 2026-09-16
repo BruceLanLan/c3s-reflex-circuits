@@ -75,10 +75,58 @@ checked, and they are different things:
   the check cannot pass by being vacuous; `tests/test_policy.py` includes those four
   controls.
 
+### Four more rules, each resting on the tool layer
+
+The five above generalise a measured circuit. The next four are the shapes that recur
+in the tools people actually put around agents — kill switches, approval inboxes,
+retry limits, two-person rules — and each reads an input the agent cannot write, so
+each is a boundary rather than a cost. Measured alone, with `forbid_when_blocked` off:
+
+* **A halt that stays down.** `sticky_block=True`: a tick with `blocked` high halts the
+  agent, and the halt holds until a later tick with `confirm` high; that tick grants
+  nothing either, the next one may. `heartbeat_ticks=H` halts the same way after `H`
+  consecutive ticks without `heartbeat`. Today's `forbid_when_blocked` lifts the
+  instant the flag drops; this one needs a person. 11 NAND + 1 LATCH over 32 rows for
+  the sticky block; 51 NAND + 4 LATCH over 512 rows for an 8-tick heartbeat.
+* **A confirm that is spent.** `confirm_per_irreversible=True`: a tick with
+  `irreversible` high is granted only if a `confirm` has arrived since the last
+  irreversible grant (or arrives now), and the grant spends it. Reversible grants
+  neither need nor spend it. A `confirm_window` authorises many grants per confirm,
+  which is the wrong shape for money or deletion. 15 NAND + 1 LATCH over 64 rows.
+* **A breaker.** `trip_after_failures=k`: `k` consecutive ticks with `failed` high
+  trip it, the tripping tick included; nothing is granted until a `confirm` resets it.
+  A success in between resets the count. 41 NAND + 3 LATCH over 256 rows for `k=3`.
+* **Two keys.** `two_key=True`: every grant needs both `confirm` and `confirm_b` to
+  have arrived since the last grant (or to arrive now), and the grant spends both.
+  16 NAND + 2 LATCH over 128 rows.
+
+The four inputs these read — `irreversible`, `failed`, `heartbeat`, `confirm_b` — are
+appended to the circuit only when the rule that reads them is on, in that order, so
+every policy written with the original five rules compiles to exactly the bytes it did
+before (`tests/test_policy.py` checks the published 81 NAND + 6 LATCH figure by hash).
+Each rule has its own independent monitor in `properties`, and its own control: a
+sticky block claimed of a stateless one, a shorter heartbeat, a spent confirm claimed of
+a window, a breaker at two claimed of one built at three, two keys claimed of none —
+all five are reported as violations.
+
+### One policy per tool class
+
+Rules for different kinds of action should be compiled as separate policies, not one:
+a *spend* policy (`min_gap_ticks=8, max_grants=7, confirm_per_irreversible=True,
+two_key=True` — 108 NAND + 9 LATCH, 32,768 rows), an *exec* policy (`min_gap_ticks=4,
+commit_ticks=4, confirm_per_irreversible=True, trip_after_failures=3` — 123 NAND +
+9 LATCH, 32,768 rows), and a shared *halt* (`sticky_block=True, heartbeat_ticks=8` —
+56 NAND + 4 LATCH, 512 rows) whose verdict feeds each class's `blocked`. Rows then add
+rather than multiply — 2^15 + 2^15 + 2^9 instead of 2^28 — and every check stays
+exhaustive. The honest cost: an invariant that spans classes ("no message within three
+ticks of a payment", "at most twenty grants across everything") is not verified by
+anything here unless the product of the machines is built and checked as one.
+
 Compiled rules inherit the same limits as everything else here. They bound **what the
 circuit grants**: how often, in what order, under which flag. They say nothing about
 what an agent does with a grant, and they measure time in ticks that advance only when
-something drives them.
+something drives them — an agent that decides when a tick happens has defeated every
+temporal rule above, so ticks, like `blocked`, must be the tool layer's to drive.
 
 ## What the proofs give it
 
