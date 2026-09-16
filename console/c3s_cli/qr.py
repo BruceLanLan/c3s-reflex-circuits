@@ -1,7 +1,7 @@
 """A QR encoder in the standard library alone, so pairing needs no network and no wheel.
 
 Byte mode only, versions 1–10, one error-correction level at a time — enough for a
-pairing URL (`http://192.168.1.23:8765/?token=…#approvals` is about 55 characters, which
+pairing URL (`http://192.168.1.23:8765/#approvals&token=…` is about 55 characters, which
 fits version 4 at level M with room to spare). Everything here is ISO/IEC 18004: the
 Reed–Solomon code over GF(256) with the primitive polynomial 0x11d, the block structure
 table for versions 1–10, the two-column zigzag placement, the eight masks and the four

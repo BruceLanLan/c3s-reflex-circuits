@@ -38,7 +38,7 @@ def main() -> int:
     for version in range(1, qr.MAX_VERSION + 1):
         for level, constant in levels.items():
             room = qr.capacity(version, level)
-            texts = ["http://192.168.1.23:8765/?token=abcDEF1234567890abcDEF12#approvals"[:room],
+            texts = ["http://192.168.1.23:8765/#approvals&token=abcDEF1234567890abcDEF12"[:room],
                      "".join(random.choice(alphabet) for _ in range(room)),
                      "x", "aaa"[:room], ("mid" * (room // 6)) or "ab"]
             for text in texts:

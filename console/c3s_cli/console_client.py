@@ -73,20 +73,6 @@ def wait_until_up(port: int, deadline_s: float = 90.0) -> float:
     raise ConsoleDown(f"the console did not answer on :{port} within {deadline_s:.0f}s — see {paths.LOG_FILE}")
 
 
-def serves_pairing_path(port: int) -> bool:
-    """Does this console serve the page under `/?token=…`, the path the QR points at?
-
-    `do_GET` matches the request path exactly, so a console that has not had the pairing
-    route added answers 404 to `/?token=…` and a phone that scanned the QR sees nothing.
-    Checked rather than assumed, so `c3s up` and `c3s pair` can say which is the case.
-    """
-    try:
-        status, _ = _call("GET", "/?token=probe", port, timeout=3.0)
-        return status == 200
-    except Exception:
-        return False
-
-
 def operator_token() -> str | None:
     """The operator token, from the environment or the file the console writes."""
     env = os.environ.get("REFLEX_OPERATOR_TOKEN")

@@ -111,11 +111,17 @@ def _bound_host() -> str | None:
 
 
 def _pairing_url(port: int, token: str | None, ip: str | None = None) -> str | None:
+    """The URL the QR carries: the token rides in the **fragment**, never the query string.
+
+    A fragment is not sent to the server (docs/API.md, "Pairing a phone"), so the token
+    cannot appear in the console's log — which prints whole request lines — nor in a
+    proxy's log or a `Referer`. The page reads it once, stores it and clears the bar.
+    """
     ip = ip or next(iter(paths.lan_ipv4()), None)
     if not ip:
         return None
-    suffix = f"?token={token}" if token else ""
-    return f"http://{ip}:{port}/{suffix}#approvals"
+    fragment = f"#approvals&token={token}" if token else "#approvals"
+    return f"http://{ip}:{port}/{fragment}"
 
 
 def _print_qr(url: str, invert: bool) -> None:
@@ -124,12 +130,15 @@ def _print_qr(url: str, invert: bool) -> None:
 
 
 def _pairing_caveats(port: int, with_token: bool) -> None:
-    """Say what the phone will actually get, instead of promising what it might not."""
-    if with_token and not client.serves_pairing_path(port):
-        say("  NOTE: this console answers 404 to `/?token=…` — it serves the page only at `/`, and "
-            "the page does not read the token from the URL yet. Until the two changes in "
-            "docs/INSTALL.md §8 land (they belong to the page's owners), scan "
-            "`c3s pair --no-token` instead and paste the token once when the page asks.")
+    """Say what the phone will actually get, instead of promising what it might not.
+
+    The URL itself loads today (the path is `/`); what is still missing is the page-side
+    reader for the fragment's token, which the coordinator owns in the integration pass.
+    """
+    if with_token:
+        say("  NOTE: the page does not read the token out of the fragment yet (docs/INSTALL.md §8 — "
+            "the coordinator owns that change). Until it lands the phone reaches the approvals "
+            "view and asks for the token once: paste what `c3s token` prints.")
 
 
 def _open_page(port: int) -> None:

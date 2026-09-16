@@ -119,22 +119,27 @@ c3s down --service                              # 卸掉并删 plist
 二维码的内容就是一个 URL：
 
 ```
-http://<本机局域网 IP>:8765/?token=<操作者令牌>#approvals
+http://<本机局域网 IP>:8765/#approvals&token=<操作者令牌>
 ```
 
 **要知道的三件事：**
 
-1. **令牌在 URL 里。** 它会以明文经过你的局域网（后台是 HTTP，不是 HTTPS），也会短暂出现在
-   手机的地址栏里。页面读到 `token` 后立刻存进 localStorage 并把它从地址栏移除（见 §8：这一
-   段页面改动属于 W2/W5，尚未落地）。只在你信得过的网络上扫；扫完不放心就
-   `c3s token rotate`。
+1. **令牌在 URL 的 fragment（`#` 之后）里，不在 query string 里。** fragment 不会发给服务器，
+   所以它进不了后台日志（`log_message` 会把整条请求行打进
+   `~/.c3s-circuit-agent/console.log`）、进不了代理日志、也不会跟着 `Referer` 走——这是
+   `docs/API.md` "Pairing a phone" 定的形式（`0bf4847` 取代了早先的 `?token=`）。它仍然会以明文
+   经过你的局域网（后台是 HTTP，不是 HTTPS），也会短暂出现在手机地址栏里：页面读到就存进
+   localStorage 并把它从地址栏移除（见 §8：这一段页面改动尚未落地）。只在你信得过的网络上扫；
+   扫完不放心就 `c3s token rotate`。
 2. **`--lan` = 绑 `0.0.0.0`，同一个 Wi-Fi 上的任何设备都能连这个端口。** 后台里有几个端点
    **不要令牌**：`GET /api/state`（能读到全部流水与规则）、`GET /api/manifest`、
    `POST /api/request`（能以任意 agent 名义发请求）、`POST /api/tool` 的 `irreversible` /
    `failed`。也就是说，同一网络上的人能看你的流水、也能往你的电路里灌请求（灌请求只会让裁决
    更严，不会替他放行——人的位 `confirm`/`blocked`/`heartbeat` 和装规则都要令牌）。默认
    `c3s up` 绑 `127.0.0.1`，只有本机能连；要手机审批才用 `--lan`，家里的 Wi-Fi 可以，咖啡馆
-   不要。把这些端点也门住是 W6 的活（`docs/ISOLATION.md`），这里只把话说清。
+   不要。把这些端点也门住是 W6 的活（`docs/ISOLATION.md`）：协调者已派 W6 在后台绑非回环地址时
+   收紧它们（`/api/request` 必须带 agent 令牌、`/api/state` 必须带其中一种令牌），到那时
+   `--lan` 才算安全，而不只是"提醒过你"。在那之前这一段话就是全部的保护。
 3. **Host 检查放宽到了本机的局域网地址。** 后台启动时算出本机所有网卡的 IPv4 地址
    （`console.py` 的 `_own_ipv4_addresses`），绑 `0.0.0.0` 时把 `<那些 IP>:<端口>` 也算作
    "自己的名字"，否则手机带着 `Host: 192.168.x.y:8765` 进来会被 403。这**不是**把防 DNS
@@ -173,57 +178,41 @@ python -m c3s_cli.qr_verify     # 需要 pip install qrcode；c3s 本身永远�
 `c3s up` 自己计时：从命令发出到 `GET /api/state` 回 200 的秒数会打在第二行。本机（M 系列
 Mac、规则已存在）实测 **1.0 秒**，第一次要编译并逐行核对电路，慢一点。
 
-## 8. 还差两处别人的改动（needs from W2/W5 / 后台 routing 的主人）
+## 8. 还差一处页面改动（协调者在集成那一轮做）
 
-配对 URL 是 `http://<IP>:<端口>/?token=…#approvals`，现在**扫了进不去**，缺两处改动。两处都
-不在 W1 的文件清单里（页面归 W2/W5，`do_GET` 的路由不属于我这一处 `_local_only` 的窄改），
-所以只把 diff 写在这里，不动代码。`c3s up --lan` 与 `c3s pair` 会自己探测 `/?token=probe`，
-没落地就当场把这段话打出来。
+配对 URL 现在是 `http://<IP>:<端口>/#approvals&token=<令牌>`（`docs/API.md` 的 "Pairing a
+phone"，`0bf4847` 取代了早先的 `?token=`）。这个 URL **今天就能打开**——路径是 `/`，
+`#approvals` 也已经能路由。还差的只有一件事：**页面要从 fragment 里把令牌读出来、存下来、
+并立刻从地址栏移除**。`static/index.html` 现在同时有三个 agent 在改，所以我不动它，只把 diff
+写在这里；它归协调者在波次 3 的集成那一轮落地。落地之前 `c3s pair` 会把这件事打在二维码下面。
 
-**(a) `console.py` 的一行：带 query string 的 `/` 现在 404。** `do_GET` 精确匹配
-`self.path`，`/?token=…` 匹配不上任何分支：
-
-```diff
-     def do_GET(self) -> None:
-         if not self._local_only():
-             return
--        if self.path in ("/", "/index.html"):
-+        # The pairing QR hands the token over as `/?token=…` (c3s pair), so the page must
-+        # be served with a query string too. The query is never read here: the token in it
-+        # is for the page, and this only routes.
-+        if self.path.split("?")[0] in ("/", "/index.html"):
-             self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
-```
-
-顺带一句给这一处的主人：`log_message` 会把请求行整条打进
-`~/.c3s-circuit-agent/console.log`，落地以后**令牌会明文进日志**。要么在 `log_message` 里把
-query 截掉（`fmt % args` 之前），要么把配对令牌改放到 fragment（`#approvals&token=…`，fragment
-不发给服务器）。我这边按已冻结的 `?token=` 写，改格式是协调者的决定。
-
-**(b) `static/index.html` 的一段：页面要读 `?token=` 并立刻把它从地址栏移除。** 位置在
-`let TOKEN = null; try { TOKEN = localStorage.getItem(...) }` 那两行之后；`#approvals` 的路由
-（`show(location.hash.slice(1))` + `VIEWS` 里已有 `approvals`）已经能用，不需要改：
+位置：`let TOKEN = null; try { TOKEN = localStorage.getItem(...) }` 那两行之后（在文件末尾那句
+`show(location.hash.slice(1) || "overview")` 之前，所以清掉 hash 里的令牌之后视图仍然对）：
 
 ```js
  let TOKEN = null;
  try { TOKEN = localStorage.getItem("reflex.token"); } catch (e) { /* private window */ }
-+// Pairing (`c3s pair`, the QR): the token arrives as ?token=… , is kept in this browser,
-+// and is taken out of the address bar at once — so it is not in the history, in a
-+// screenshot, or in a link the person shares. It still crossed the local network once,
-+// which docs/INSTALL.md says plainly, and `c3s token rotate` is the remedy.
++// Pairing (`c3s pair`, the QR): the fragment is `#approvals&token=…`. The token rides in
++// the fragment, which is never sent to the server (docs/API.md, "Pairing a phone"), so it
++// cannot reach the console's log — which prints whole request lines — nor a proxy's log or
++// a Referer. Keep it in this browser and take it out of the address bar at once, so it is
++// not in the history, in a screenshot, or in a link the person shares. It still crossed
++// the local network once, which docs/INSTALL.md says plainly; rotation is the remedy.
 +(() => {
++  const parts = location.hash.replace(/^#/, "").split("&");
++  const view = parts.shift() || "";
 +  let handed = null;
-+  try { handed = new URLSearchParams(location.search).get("token"); } catch (e) { /* ignore */ }
++  try { handed = new URLSearchParams(parts.join("&")).get("token"); } catch (e) { /* ignore */ }
 +  if (!handed) return;
 +  TOKEN = handed.trim();
 +  try { localStorage.setItem("reflex.token", TOKEN); } catch (e) { /* private window */ }
-+  history.replaceState(null, "", location.pathname + location.hash);
++  history.replaceState(null, "", location.pathname + (view ? "#" + view : ""));
 +})();
 ```
 
-在这两处落地之前，可用的配对方式是 **`c3s pair --no-token`**：二维码里只有
-`http://<IP>:<端口>/#approvals`（路径是 `/`，现在就能开），手机扫进去直接到审批页，页面弹框
-问一次令牌，粘贴 `c3s token` 打印的那一串即可。
+在它落地之前，扫码的手机会到审批页，然后像往常一样被问一次令牌（粘贴 `c3s token` 打印的那
+一串）；或者用 **`c3s pair --no-token`**：二维码里只有 `http://<IP>:<端口>/#approvals`，
+令牌根本不上网络。
 
 ## 9. 菜单栏
 
