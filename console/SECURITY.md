@@ -108,6 +108,13 @@ token of its own.
    paragraph), and binding by itself leaves every *other* name open. Both are off by
    default because the compatibility clause is what `docs/API.md` promises;
    `docs/ISOLATION.md` turns them on and carries the re-run proofs.
+   **Strict mode needs a stable agent name.** The Claude Code hooks name themselves
+   `claude-code:<session id>` unless `REFLEX_AGENT` says otherwise, and in that mode every
+   new session would be an unbound name — a `403` on every tool call for the whole
+   session, with nothing a person could have pre-bound, because the session id did not
+   exist yet. Set `REFLEX_AGENT` (and `--agent` for the MCP proxy, `agent=` for the
+   wallet), bind that name, and never leave the session-id default in place with the switch
+   on. It fails closed, so it is an outage rather than a hole — but a puzzling one.
 5. **The tool layer's flags are only as honest as the tool layer.** "This call is
    irreversible" is decided by a pattern list in the hook and a name list in the proxy;
    "this failed" is the framework's own report. The circuit proves *"irreversible and no
