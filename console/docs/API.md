@@ -110,6 +110,12 @@ POST /api/tool
   and the Cardputer, which are already in the person's hands. A wrong code → `403`.
 - `note` (≤ 200 chars) is stored on the tool entry and shown in Activity; it is a rule
   candidate, not a rule.
+- `source` (≤ 20 chars, optional) says which channel wrote the bit — `"telegram"`,
+  `"page"` — and is stamped on the tool entry as `source`, the same shape `/api/stop-all`
+  takes and the same field the Wi-Fi Cardputer path fills with `cardputer-wifi`. It is a
+  label, never a bit: it is excluded from the bits before they are armed, and when the
+  caller sends none the entry carries no `source` (an adapter's `irreversible` write is not
+  "the page"). Added 2026-09-17 so a chat channel can say where a write came from.
 
 ## I-3 · the agent's own token
 

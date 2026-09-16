@@ -36,6 +36,7 @@ No wallet, no key, nothing signed, nothing broadcast, no action performed.
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import re
@@ -2095,7 +2096,12 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("X-Reflex-Device-Token"):  # W11: a key press that came over Wi-Fi
                 device_tool(self, payload, BOUNDARY)
                 return
-            bits = {k: v for k, v in payload.items() if k not in ("agent", "for_reason", "token", "code", "note")}
+            # `source` says which channel the write came from (a chat button, the page), so
+            # that Activity can tell a Telegram press from a click — the Wi-Fi Cardputer path
+            # stamps its own. It is a label on the entry, never a bit: the same ≤ 20-character
+            # shape `/api/stop-all` takes, and left off when the caller says nothing.
+            source = str(payload.get("source") or "")[:20].strip() or None
+            bits = {k: v for k, v in payload.items() if k not in ("agent", "for_reason", "token", "code", "note", "source")}
             # The person's bits need the operator token; the adapter's own (irreversible,
             # failed) do not, because setting either can only make a decision stricter.
             if any(b in PERSON_BITS for b in bits) and not self._has_token(payload):
@@ -2114,7 +2120,9 @@ class Handler(BaseHTTPRequestHandler):
                                               "confirm it is for, or leave the code out"})
                     return
                 want = BOUNDARY.code_for_call(name, bind_to, keys[0])
-                if want is None or str(payload["code"]).strip() != want:
+                # compare_digest as the device path does (cardputer_relay.device_tool): the
+                # code is not a secret, but two checks of the same digits should read alike.
+                if want is None or not hmac.compare_digest(str(payload["code"]).strip(), want):
                     self._json(403, {"error": "those two digits are not the ones shown beside this call; read the "
                                               "code again on the screen the request is on"})
                     return
@@ -2123,9 +2131,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(400, {"error": "note must be a string of at most 200 characters"})
                 return
             try:
-                self._json(200, BOUNDARY.arm(name, bits, bind_to, (note or "").strip()[:200] or None))
+                entry = BOUNDARY.arm(name, bits, bind_to, (note or "").strip()[:200] or None)
             except ValueError as e:
                 self._json(400, {"error": str(e)})
+                return
+            if source:
+                entry["source"] = source  # the same dict the transcript holds, so Activity sees it too
+            self._json(200, entry)
         elif self.path in ("/api/stop-all", "/api/resume-all"):
             # The big red button, and the deliberate way back. Both are the person's: an
             # agent that could call resume-all could lift its own block.

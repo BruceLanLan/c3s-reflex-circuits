@@ -225,6 +225,27 @@ def test_a_long_note_is_cut_to_two_hundred_characters_and_a_wrong_type_refused(u
     assert call(url, "/api/tool", {"agent": "mail", "heartbeat": 1, "note": 7})[0] == 400
 
 
+# -- the source ---------------------------------------------------------------------
+
+
+def test_a_source_says_which_channel_wrote_the_bit_and_is_not_a_bit(url, boundary):
+    """A Telegram button and a click on the page write the same bit; `source` is how
+    Activity tells them apart, as the Wi-Fi Cardputer already stamps `cardputer-wifi`."""
+    refused_irreversible(boundary)
+    status, body = call(url, "/api/tool", {"agent": "mail", "confirm": 1, "for_reason": TRASH, "source": "telegram"})
+    assert status == 200, body
+    assert body["source"] == "telegram"
+    assert "source" not in body["armed"]  # a label, not a tool-layer bit
+    assert console.TRANSCRIPTS[0]["source"] == "telegram"  # the same entry Activity reads
+
+
+def test_a_source_is_cut_to_twenty_characters_and_absent_when_not_given(url, boundary):
+    status, body = call(url, "/api/tool", {"agent": "mail", "heartbeat": 1, "source": "s" * 40})
+    assert status == 200 and body["source"] == "s" * 20
+    status, body = call(url, "/api/tool", {"agent": "mail", "heartbeat": 1})
+    assert status == 200 and "source" not in body  # no default: an adapter's write is not "the page"
+
+
 # -- the effect -------------------------------------------------------------------
 
 
