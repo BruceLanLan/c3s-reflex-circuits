@@ -25,6 +25,19 @@ checks that `build.json` matches the module and the current sources. The module 
 rebuilt by `scripts/verify.sh`: another clang version may emit different bytes for the
 same sources.
 
+The page carries a second evaluator, off by default. Switching to **On BNB Smart
+Chain** sends one read-only `eth_call` per row whose state override installs the
+compiled `NandMachine` runtime at a throwaway address, so a public node executes the
+same netlist: nothing is deployed, and no wallet, private key or gas is involved.
+`scripts/build_sim_onchain.py` publishes what that call needs — the runtime bytecode,
+the `evaluate` selector and the core's netlist bytes — beside the page in
+`docs/sim/onchain.json`. Four real rows of a looming episode are checked (a quiet
+tick, the first raise, the fourth raise, and the long-mode takeoff that loads the
+refractory timer), each reported as agreeing with the WebAssembly module or
+differing. It is opt-in because choosing it sends the netlist bytes, which are
+already public, and the visitor's IP address to the chosen endpoint;
+`scripts/verify_onchain.py` does the same from the command line.
+
 ## Build and flash
 
 Requires [PlatformIO Core](https://docs.platformio.org/page/core/installation.html).

@@ -127,6 +127,27 @@ def test_policy_truth_table_equals_the_python_engine_on_all_rows(evaluator, tmp_
     assert not got[:, 1].any()
 
 
+def test_simulator_onchain_data_matches_the_artifact_and_the_manifest():
+    """docs/sim/onchain.json lets the page have a public node evaluate the core through an
+    eth_call state override. Its bytecode, selector and netlist must be the committed ones."""
+    doc = json.loads((SIM / "onchain.json").read_text())
+    m = manifest("core-hand-abc")
+    assert doc["core"]["netlist"] == m["tapeout_netlist_hex"]
+    assert doc["core"]["netlist_sha256"] == m["netlist_sha256"]
+    assert (doc["core"]["n_inputs"], doc["core"]["n_outputs"]) == (len(m["inputs"]), len(m["outputs"]))
+    assert doc["core"]["n_state"] == m["metrics"]["latch"]
+    ev = doc["evaluator"]
+    assert ev["runtime_sha256"] == hashlib.sha256(bytes.fromhex(ev["runtime_bytecode"][2:])).hexdigest()
+    assert ev["runtime_bytes"] == len(ev["runtime_bytecode"]) // 2 - 1
+
+    artifact = ROOT / "contracts" / "out" / "NandMachine.sol" / "NandMachine.json"
+    if not artifact.exists():
+        pytest.skip("Foundry artifact not built")
+    art = json.loads(artifact.read_text())
+    assert ev["runtime_bytecode"].removeprefix("0x") == art["deployedBytecode"]["object"].removeprefix("0x")
+    assert ev["selector"].removeprefix("0x") == art["methodIdentifiers"][ev["signature"]]
+
+
 @pytest.mark.parametrize("name,rows", [("core", 2**23), ("policy", 2**16)])
 def test_whole_domain_digest_equals_the_evm_fixture_chain(evaluator, name, rows):
     """The firmware's own bit-sliced digest of the complete step relation must equal the

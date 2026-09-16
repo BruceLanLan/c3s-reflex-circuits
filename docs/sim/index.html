@@ -125,6 +125,11 @@
   .lang { display: inline-flex; flex: none; border: 1px solid var(--line); }
   .lang button { background: none; border: 0; padding: 3px 9px; font-size: 12px; color: var(--dim); cursor: pointer; white-space: nowrap; }
   .lang button[aria-pressed="true"] { background: var(--rail-raised); color: var(--paper); }
+  /* Same look as .lang, but a separate class: the language switch binds ".lang button". */
+  .modes { display: inline-flex; flex: none; border: 1px solid var(--line); }
+  .modes button { background: none; border: 0; padding: 3px 9px; font-size: 12px; color: var(--dim); cursor: pointer; white-space: nowrap; }
+  .modes button[aria-pressed="true"] { background: var(--rail-raised); color: var(--paper); }
+  .modes button[disabled] { opacity: 0.45; cursor: default; }
   h2 {
     margin: 0 0 8px;
     font-size: 11px;
@@ -208,6 +213,23 @@
     </section>
 
     <section>
+      <h2 data-i18n="chainTitle">Run it on a public chain</h2>
+      <div class="modes" id="chain-mode" role="group" aria-label="Evaluator">
+        <button type="button" data-mode="local" aria-pressed="true" data-i18n="modeLocal">In this browser</button>
+        <button type="button" data-mode="chain" aria-pressed="false" data-i18n="modeChain">On BNB Smart Chain</button>
+      </div>
+      <ul class="notes">
+        <li data-i18n="chainNote">Nothing is deployed, and no wallet, key or gas is involved: one read-only eth_call, whose state override installs the compiled evaluator at a throwaway address, makes a public node run the same netlist. Choosing this sends the netlist bytes, which are already public, and your IP address to the endpoint below.</li>
+      </ul>
+      <p>
+        <input id="chain-rpc" type="text" spellcheck="false" aria-label="RPC endpoint" placeholder="https://bsc-rpc.publicnode.com"
+               style="width: 15em; max-width: 100%; background: none; border: 1px solid var(--line); color: inherit; padding: 3px 6px; font: inherit">
+        <span class="modes"><button type="button" id="chain-run" data-i18n="chainRun">Check four ticks on chain</button></span>
+      </p>
+      <ul class="checks" id="chain-checks"></ul>
+    </section>
+
+    <section>
       <h2 data-i18n="logTitle">Serial log</h2>
       <pre id="log" aria-live="off"></pre>
     </section>
@@ -265,6 +287,16 @@ const I18N = {
     cTime: (ms) => `自检用时 ${ms} ms（本浏览器）`,
     cDecode: (a, b) => `网表解码失败：核心 ${a}，策略 ${b}`,
     loadFail: "无法加载 c3s_core.wasm。请通过 http(s) 打开本页，不要直接双击文件。",
+    chainTitle: "放到公链上跑一遍",
+    modeLocal: "在本浏览器算",
+    modeChain: "在 BNB 智能链上算",
+    chainNote: "什么都不用部署，也不涉及钱包、私钥和 gas：一次只读的 eth_call，用 state override 把编译好的求值器临时装到一个随手写的地址上，让公共节点执行同一份网表。选这一项会把网表字节（本来就是公开的）和你的 IP 地址发给下面这个节点。",
+    chainRun: "让链上算四拍",
+    chainRunning: "正在询问节点…",
+    chainChain: (id, name) => `链 ${id}（${name}），什么都没部署，只读调用`,
+    chainAgrees: (x, s, m, n) => `输入 0x${x.toString(16)} 状态 ${s} → 运动 ${m} 状态 ${n}：节点与本浏览器一致`,
+    chainDiffers: (x, s, m, n) => `输入 0x${x.toString(16)} 状态 ${s} → 运动 ${m} 状态 ${n}：与本浏览器不一致`,
+    chainError: (msg) => `没能连上节点：${msg}`,
   },
 };
 Object.assign(I18N.en, {
@@ -283,11 +315,17 @@ Object.assign(I18N.en, {
   cTime: (ms) => `self-test took ${ms} ms in this browser`,
   cDecode: (a, b) => `netlist decode failed: core ${a}, policy ${b}`,
   loadFail: "Could not load c3s_core.wasm. Open this page over http(s), not as a file.",
+  chainRunning: "asking the node…",
+  chainChain: (id, name) => `chain ${id} (${name}), nothing deployed, read-only`,
+  chainAgrees: (x, s, m, n) => `inputs 0x${x.toString(16)} state ${s} → motor ${m} state ${n}: the node agrees with this browser`,
+  chainDiffers: (x, s, m, n) => `inputs 0x${x.toString(16)} state ${s} → motor ${m} state ${n}: DIFFERS from this browser`,
+  chainError: (msg) => `could not reach the node: ${msg}`,
 });
 for (const el of document.querySelectorAll("[data-i18n]")) I18N.en[el.dataset.i18n] ??= el.textContent;
 
 let lang = "en";
 try { lang = localStorage.getItem("c3s-lang") || (navigator.language.startsWith("zh") ? "zh" : "en"); } catch { /* storage unavailable */ }
+if (!I18N[lang]) lang = "en";  // a stored value from another build must not brick the page
 const t = (key) => I18N[lang][key] ?? I18N.en[key];
 
 function applyLang() {
@@ -297,6 +335,7 @@ function applyLang() {
   renderKeys();
   renderFacts();
   renderChecks();
+  renderChain();
 }
 for (const b of document.querySelectorAll(".lang button")) {
   b.addEventListener("click", () => {
@@ -742,6 +781,94 @@ function frame() {
   if (dirty) { draw(); dirty = false; }
   requestAnimationFrame(frame);
 }
+
+// ---------------------------------------------------------------- on a public chain
+
+// One read-only eth_call whose state override installs the compiled NandMachine at a
+// throwaway address: a public node runs the same netlist with nothing deployed, no
+// wallet and no gas. The rows below are real rows of a looming episode: a quiet tick,
+// the start of wing raising, the fourth raise, and the long-mode takeoff.
+const CHAIN_ADDRESS = "0x000000000000000000000000000000000000c3f5";
+const CHAIN_ROWS = [[0x10001, 0], [0x10078, 0], [0x10078, 3], [0x10079, 4]];
+let chainMode = "local", onchain = null, chainItems = [], chainBusy = false;
+
+const word = (v) => BigInt(v).toString(16).padStart(64, "0");
+
+function encodeEvaluate(o, inputs, state) {
+  const netlist = o.core.netlist.replace(/^0x/, "");
+  const bytes = netlist.length / 2;
+  const pad = "00".repeat((32 - (bytes % 32)) % 32);
+  const head = [6 * 32, o.core.n_inputs, o.core.n_outputs, o.core.n_state, inputs, state].map(word).join("");
+  return o.evaluator.selector.replace(/^0x/, "") + head + word(bytes) + netlist + pad;
+}
+
+async function rpcCall(url, method, params) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message || "RPC error");
+  return json.result;
+}
+
+// Items keep their i18n key and arguments, not finished text, so switching language
+// re-translates the rows that are already on the screen.
+function chainText(key, args) {
+  const s = t(key);
+  return typeof s === "function" ? s(...args) : s;
+}
+
+function renderChain() {
+  const el = document.getElementById("chain-checks");
+  if (!el) return;
+  el.innerHTML = chainItems
+    .map(([cls, key, args]) => `<li class="${cls}"><i></i><span>${chainText(key, args)}</span></li>`)
+    .join("");
+  for (const b of document.querySelectorAll("#chain-mode button")) {
+    b.setAttribute("aria-pressed", String(b.dataset.mode === chainMode));
+  }
+  const run = document.getElementById("chain-run");
+  if (run) run.disabled = chainMode !== "chain" || chainBusy || !w;
+}
+
+async function runChainCheck() {
+  if (chainBusy || !w) return;
+  chainBusy = true;
+  chainItems = [["info", "chainRunning", []]];
+  renderChain();
+  try {
+    onchain ??= await (await fetch("onchain.json")).json();
+    const rpc = document.getElementById("chain-rpc").value.trim() || onchain.rpc[0];
+    const id = Number(await rpcCall(rpc, "eth_chainId", []));
+    chainItems = [["info", "chainChain", [id, onchain.chains[String(id)] ?? "?"]]];
+    renderChain();
+    const override = { [CHAIN_ADDRESS]: { code: onchain.evaluator.runtime_bytecode } };
+    for (const [inputs, state] of CHAIN_ROWS) {
+      const data = "0x" + encodeEvaluate(onchain, inputs, state);
+      const raw = (await rpcCall(rpc, "eth_call", [{ to: CHAIN_ADDRESS, data }, "latest", override])).replace(/^0x/, "");
+      const motor = Number("0x" + raw.slice(0, 64)), next = Number("0x" + raw.slice(64, 128));
+      const local = w.sim_step(0, inputs, state);
+      const ok = motor === (local & 255) && next === ((local >> 8) & 255);
+      chainItems.push([ok ? "ok" : "bad", ok ? "chainAgrees" : "chainDiffers", [inputs, state, motor, next]]);
+      renderChain();
+    }
+  } catch (e) {
+    chainItems.push(["bad", "chainError", [String(e && e.message ? e.message : e)]]);
+  }
+  chainBusy = false;
+  renderChain();
+}
+
+for (const b of document.querySelectorAll("#chain-mode button")) {
+  b.addEventListener("click", () => {
+    chainMode = b.dataset.mode;
+    if (chainMode === "chain") runChainCheck();
+    else { chainItems = []; renderChain(); }
+  });
+}
+document.getElementById("chain-run").addEventListener("click", runChainCheck);
 
 function splash(lines, color) {
   fillRect(0, 0, 240, 135, kBg);
