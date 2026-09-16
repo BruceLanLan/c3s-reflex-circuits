@@ -1,12 +1,26 @@
-"""Agent duty console: a model proposes, the verified circuit decides, this watches.
+"""Boundary console: rules compiled to a circuit, and every decision made by it.
 
     C3S_REPO=~/work/c3s-reflex python console.py        # http://127.0.0.1:8765
 
-Holds one circuit state per agent name, records every proposal with the circuit's
-verdict, and serves a page that shows them. It enforces nothing of its own: the
-refusals come from the escape core, whose behaviour is checked on all 8,388,608 of
-its rows and five of whose temporal properties are proven (see docs/PROPERTIES.md and
-docs/AGENT.md in the circuits repository).
+You write rules. They compile to a NAND/LATCH circuit, which is checked against a
+plain-Python statement of the same rules on every row of its domain, and each rule is
+then proven by visiting every state the circuit can reach from reset. Agents make
+requests against that circuit; it decides; optionally a public BNB Smart Chain node
+re-evaluates the deciding row read-only, with nothing deployed.
+
+The default rules are the ones the fruit-fly escape circuit was already proven to obey
+(docs/PROPERTIES.md): at most one grant in any 8 ticks, four ticks of commitment before
+one, nothing while blocked. That is where they come from; everything after that is the
+user's to set.
+
+Two endpoints on purpose, because the separation is the whole point:
+
+    POST /api/request   request, intent   — what an agent may write
+    POST /api/tool      blocked, confirm  — what only the layer above it may write
+
+A rule resting on the agent's own bits is a cost it can choose to pay; a rule resting
+on the tool layer's bits is a boundary. Nothing here can enforce which caller is which:
+that is a property of how this is deployed, and the page says so.
 
 No wallet, no key, nothing signed, nothing broadcast, no action performed.
 """
@@ -26,133 +40,178 @@ from pathlib import Path
 REPO = Path(os.environ.get("C3S_REPO", Path.home() / "work" / "c3s-reflex")).expanduser()
 HOST = os.environ.get("CONSOLE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("CONSOLE_PORT", "8765"))
-# Optional second opinion: a public BNB Smart Chain node re-evaluates the decisive
-# tick through a read-only eth_call whose state override installs the compiled
-# evaluator for the duration of that one call. Nothing is deployed, no wallet or key
-# is involved, and no gas is spent. Set VERIFY_ON_CHAIN=0 to keep everything local.
 VERIFY_ON_CHAIN = os.environ.get("VERIFY_ON_CHAIN", "1") not in ("0", "", "no")
 BSC_RPC = os.environ.get("BSC_RPC", "https://bsc-rpc.publicnode.com")
 CHAIN_ADDRESS = "0x000000000000000000000000000000000000c3f5"
 STATIC = Path(__file__).resolve().parent / "static"
-REFRACTORY_TICKS = 7  # P1, proven; reported here, enforced by the circuit itself
 TRANSCRIPT = 200
 
 sys.path.insert(0, str(REPO))
-from c3s import calibrate, exhaust, loom  # noqa: E402
-from c3s.netlist import from_bytes  # noqa: E402
+from c3s import exhaust  # noqa: E402
+from c3s.netlist import to_bytes  # noqa: E402
+from c3s.policy import AGENT_WRITABLE, INPUT_NAMES, MUST_COME_FROM_THE_TOOL_LAYER, Policy  # noqa: E402
 
-LOOM = REPO / "circuits" / "loom-escape"
+# The rules the escape circuit itself was proven to obey; the starting point, not a law.
+FLY_DEFAULT = Policy(min_gap_ticks=8, commit_ticks=4, forbid_when_blocked=True)
+TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
+STARTED_AT = time.time()
 
 
-class Circuit:
-    """The committed escape core, its step tables, and one latch state per agent."""
+class Boundary:
+    """One compiled policy, its proofs, and one circuit state per agent."""
 
-    def __init__(self) -> None:
-        manifest = json.loads((LOOM / "core-hand-abc.json").read_text())
-        core = from_bytes(bytes.fromhex(manifest["tapeout_netlist_hex"][2:]), len(manifest["inputs"]), len(manifest["outputs"]))
-        self.name = manifest["name"]
-        self.sha256 = manifest["netlist_sha256"]
-        self.metrics = manifest["metrics"]
-        self.outs, self.nxt = exhaust.step_table(core)
-        table = json.loads((LOOM / "decision-table.json").read_text())
-        self.params = calibrate.params_from_dict(table["params"])
-        self.enc = loom.Encoding(**{k: tuple(v) if isinstance(v, list) else v for k, v in table["encoding"].items()})
+    def __init__(self, policy: Policy) -> None:
         self.lock = threading.Lock()
-        self.agents: dict[str, dict] = {}
+        self.install(policy)
+
+    def install(self, policy: Policy) -> dict:
+        """Compile, check on every row, prove every rule, then switch to it."""
+        t0 = time.time()
+        circuit = policy.build()
+        verify = policy.verify(circuit)
+        proofs = policy.properties(circuit)
+        outs, nxt = exhaust.step_table(circuit)
+        netlist = to_bytes(circuit)
+        summary = {
+            "rules": policy.describe(),
+            "settings": {
+                "min_gap_ticks": policy.min_gap_ticks,
+                "commit_ticks": policy.commit_ticks,
+                "forbid_when_blocked": policy.forbid_when_blocked,
+                "max_grants": policy.max_grants,
+                "confirm_window_ticks": policy.confirm_window_ticks,
+            },
+            "circuit": {
+                "nand": verify["metrics"]["nand"],
+                "latch": verify["metrics"]["latch"],
+                "bytes": len(netlist),
+                "depth": verify["metrics"]["depth"],
+                "netlist": "0x" + netlist.hex(),
+                "inputs": list(INPUT_NAMES),
+                "agent_writable": list(AGENT_WRITABLE),
+                "tool_layer_only": list(MUST_COME_FROM_THE_TOOL_LAYER),
+            },
+            "checked": {
+                "rows": verify["rows"],
+                "domain_bits": verify["domain_bits"],
+                "matches_reference": verify["outputs_match"] and verify["next_state_matches"],
+                "reachable_states": proofs["reachable_states"],
+                "states_possible": proofs["states_possible"],
+                "configurations_visited": proofs["configurations_visited"],
+                "rows_proven": proofs["rows_checked"],
+                "every_rule_holds": proofs["holds"],
+                "violations": proofs["violations"],
+            },
+            "compiled_in_ms": round((time.time() - t0) * 1000),
+        }
+        with self.lock:
+            self.policy, self.circuit, self.outs, self.nxt = policy, circuit, outs, nxt
+            self.netlist, self.summary = netlist, summary
+            self.agents: dict[str, dict] = {}
+        return summary
 
     def agent(self, name: str) -> dict:
         return self.agents.setdefault(
-            name, {"state": 0, "tick": 0, "last_authorised_tick": None, "last_authorised_at": None, "authorisations": 0}
+            name, {"state": 0, "ticks": 0, "grants": 0, "blocked": 0, "confirm": 0, "last_grant_tick": None}
         )
 
-    def propose(self, name: str, lv: float, az: float, reason: str, hold: int | None = None) -> dict:
-        """Drive the circuit with the proposed stimulus.
-
-        Without `hold` the episode stops at the first takeoff, which is the natural
-        unit of a proposal. With it, the same stimulus keeps being presented for that
-        many ticks, which is how the refractory limit becomes visible: the second
-        takeoff cannot come sooner than 8 ticks after the first, whatever is fed in."""
-        nf = self.enc.n_inputs
+    def arm(self, name: str, blocked: int | None, confirm: int | None) -> dict:
+        """The tool layer's bits, held until the agent's next request consumes them."""
         with self.lock:
             a = self.agent(name)
-            samples = loom.stimulus_samples(loom.Stimulus(lv, az), self.params)
-            motor, ticks, authorised_at, gaps, actions = loom.CORE_HOLD, 0, [], [], []
-            decisive: list[tuple[int, int, int, int]] = []
-            first_gap = None
-            while True:
-                theta, dtheta = samples[min(ticks, len(samples) - 1)]
-                x = loom.encode_features(theta, dtheta, az, self.enc) | (1 << nf)
-                state_before = a["state"]
-                row = x | (state_before << (nf + 1))
-                motor = int(self.outs[row])
-                a["state"] = int(self.nxt[row])
-                a["tick"] += 1
-                ticks += 1
-                if motor in (loom.CORE_SHORT, loom.CORE_LONG):
-                    if a["last_authorised_tick"] is not None:
-                        gap = a["tick"] - a["last_authorised_tick"]
-                        gaps.append(gap)
-                        if first_gap is None:
-                            first_gap = gap
-                    a["last_authorised_tick"] = a["tick"]
-                    a["last_authorised_at"] = time.time()  # wall clock, for the page only
-                    a["authorisations"] += 1
-                    authorised_at.append(a["tick"])
-                    actions.append(loom.CORE_ACTION_NAMES[motor])
-                    decisive.append((x, state_before, motor, a["state"]))
-                    if hold is None:
-                        break
-                if hold is not None and ticks >= hold:
-                    break
-                if hold is None and ticks >= len(samples):
-                    break
+            if blocked is not None:
+                a["blocked"] = int(bool(blocked))
+            if confirm is not None:
+                a["confirm"] = int(bool(confirm))
             entry = {
                 "at": time.time(),
+                "kind": "tool",
                 "agent": name,
-                "l_over_v_ms": lv,
-                "azimuth_deg": az,
-                "reason": reason,
-                "held_ticks": hold,
-                "ticks_used": ticks,
-                "motor": motor,
-                # what was authorised, not what the last tick happened to be doing
-                "action": actions[-1] if actions else loom.CORE_ACTION_NAMES[motor],
-                "authorised_actions": sorted(set(actions)),
-                "authorised": bool(authorised_at),
-                "authorisations": len(authorised_at),
-                "smallest_gap": min(gaps) if gaps else None,
-                "ticks_since_previous_authorisation": first_gap,
-                "agent_tick": a["tick"],
-                # the tick a public node is asked to re-evaluate, once the lock is free
-                "_decisive": decisive[0] if decisive else None,
+                "blocked": a["blocked"],
+                "confirm": a["confirm"],
             }
             TRANSCRIPTS.appendleft(entry)
             return entry
 
+    def request(self, name: str, intent: int, reason: str) -> dict:
+        """One tick: the agent asks, the circuit answers."""
+        n_in = len(INPUT_NAMES)
+        with self.lock:
+            a = self.agent(name)
+            inputs = 1 | (int(bool(intent)) << 1) | (a["blocked"] << 2) | (a["confirm"] << 3)
+            state_before = a["state"]
+            row = inputs | (state_before << n_in)
+            grant = int(self.outs[row])
+            a["state"] = int(self.nxt[row])
+            a["ticks"] += 1
+            gap = None
+            if grant:
+                if a["last_grant_tick"] is not None:
+                    gap = a["ticks"] - a["last_grant_tick"]
+                a["last_grant_tick"] = a["ticks"]
+                a["grants"] += 1
+            a["confirm"] = 0  # a confirmation is consumed by the tick it applies to
+            entry = {
+                "at": time.time(),
+                "kind": "request",
+                "agent": name,
+                "intent": int(bool(intent)),
+                "blocked": (inputs >> 2) & 1,
+                "confirm": (inputs >> 3) & 1,
+                "reason": reason,
+                "granted": bool(grant),
+                "tick": a["ticks"],
+                "ticks_since_previous_grant": gap,
+                "why": self.why(name, inputs, state_before, grant),
+                "_decisive": (inputs, state_before, grant, a["state"]),
+            }
+            TRANSCRIPTS.appendleft(entry)
+            return entry
+
+    def why(self, name: str, inputs: int, state: int, grant: int) -> list[str]:
+        """Which rule refused, in the policy's own words. Descriptive only: the verdict
+        is the circuit's, and this reads the same counters it reads."""
+        if grant:
+            return []
+        p = self.policy
+        gap, streak, spent, window = p.split_state(state)
+        blocked, confirm = (inputs >> 2) & 1, (inputs >> 3) & 1
+        out = []
+        if p.forbid_when_blocked and blocked:
+            out.append("blocked is high")
+        if p.gap_bits and gap:
+            out.append(f"cooldown: {gap} tick{'s' if gap != 1 else ''} left of {p.min_gap_ticks}")
+        if p.commit_ticks and streak < p.commit_ticks:
+            out.append(f"commitment: {streak} of {p.commit_ticks} consecutive intent ticks")
+        if p.max_grants and spent >= p.max_grants:
+            out.append(f"budget: {spent} of {p.max_grants} grants used")
+        if p.confirm_window_ticks and not (confirm or window):
+            out.append(f"no confirmation inside the last {p.confirm_window_ticks} ticks")
+        return out
+
     def status(self) -> dict:
         with self.lock:
+            p = self.policy
             agents = []
             for name, a in sorted(self.agents.items()):
-                since = None if a["last_authorised_tick"] is None else a["tick"] - a["last_authorised_tick"]
+                gap, streak, spent, window = p.split_state(a["state"])
                 agents.append(
                     {
                         "agent": name,
-                        "ticks": a["tick"],
-                        "authorisations": a["authorisations"],
-                        "ticks_since_authorisation": since,
-                        "refractory_ticks_left": None if since is None else max(0, REFRACTORY_TICKS - since),
-                        "last_authorised_at": a["last_authorised_at"],
+                        "ticks": a["ticks"],
+                        "grants": a["grants"],
+                        "cooldown_left": gap,
+                        "intent_streak": streak,
+                        "grants_used": spent,
+                        "confirm_window_left": window,
+                        "armed_blocked": a["blocked"],
+                        "armed_confirm": a["confirm"],
                     }
                 )
             return {
-                "circuit": {"name": self.name, "sha256": self.sha256, **self.metrics},
-                "refractory_ticks": REFRACTORY_TICKS,
-                # One tick of circuit time, from the calibration the netlist was built
-                # against. The circuit's clock advances only when a proposal drives it.
-                "tick_ms": self.params.tick_ms,
-                # Whether a public node is asked for a second opinion. chain_id is the
-                # cached value from the first successful call, so no network round trip
-                # happens here; null means no node has answered yet this session.
+                "policy": self.summary,
+                "agents": agents,
+                "transcript": [{k: v for k, v in e.items() if not k.startswith("_")} for e in list(TRANSCRIPTS)[:60]],
                 "chain": {
                     "enabled": CHAIN is not None,
                     "rpc": BSC_RPC if CHAIN is not None else None,
@@ -160,38 +219,28 @@ class Circuit:
                     "deployed": False,
                 },
                 "started_at": STARTED_AT,
-                "agents": agents,
-                "transcript": list(TRANSCRIPTS)[:60],
+                "default_rules": FLY_DEFAULT.describe(),
             }
 
 
-TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
-STARTED_AT = time.time()
-CHAIN = None  # set in __main__ once the circuit is loaded
-
-
 class Chain:
-    """A public BNB Smart Chain node asked for a second opinion on one tick.
+    """A public node asked to re-evaluate one row, read-only, with nothing deployed.
 
-    Read-only: an eth_call whose state override installs the compiled evaluator at a
-    throwaway address for the duration of that single call. Nothing is deployed, no
-    address of yours appears, no wallet or key is involved and no gas is spent. The
-    bytecode, the selector and the netlist all come from the circuits repository's
-    docs/sim/onchain.json, which its tests check against the Foundry artifact."""
+    The evaluator's bytecode and selector come from the circuits repository, but the
+    netlist is whatever policy is loaded here: a user's own compiled rules go to the
+    chain exactly as the published circuit does."""
 
     def __init__(self, rpc: str) -> None:
         self.rpc = rpc
         doc = json.loads((REPO / "docs" / "sim" / "onchain.json").read_text())
         self.code = doc["evaluator"]["runtime_bytecode"]
         self.selector = doc["evaluator"]["selector"].removeprefix("0x")
-        self.core = doc["core"]
-        self.netlist = self.core["netlist"].removeprefix("0x")
         self.chain_id: int | None = None
 
     def _call(self, method: str, params: list, timeout: int = 20):
         body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode()
         last: Exception | None = None
-        for attempt in range(2):  # a public endpoint drops a connection now and then
+        for attempt in range(2):
             try:
                 req = urllib.request.Request(
                     self.rpc, data=body, headers={"content-type": "application/json", "user-agent": "reflex-console"}
@@ -212,36 +261,39 @@ class Chain:
             self.chain_id = int(self._call("eth_chainId", []), 16)
         return self.chain_id
 
-    def evaluate(self, inputs: int, state: int) -> tuple[int, int]:
+    def evaluate(self, netlist: bytes, n_in: int, n_out: int, n_state: int, inputs: int, state: int) -> tuple[int, int]:
         word = lambda v: f"{v:064x}"  # noqa: E731
-        size = len(self.netlist) // 2
-        head = word(6 * 32) + "".join(word(v) for v in (self.core["n_inputs"], self.core["n_outputs"], self.core["n_state"], inputs, state))
-        data = "0x" + self.selector + head + word(size) + self.netlist + "00" * ((32 - size % 32) % 32)
+        head = word(6 * 32) + "".join(word(v) for v in (n_in, n_out, n_state, inputs, state))
+        body = word(len(netlist)) + netlist.hex() + "00" * ((32 - len(netlist) % 32) % 32)
+        data = "0x" + self.selector + head + body
         raw = self._call("eth_call", [{"to": CHAIN_ADDRESS, "data": data}, "latest", {CHAIN_ADDRESS: {"code": self.code}}])[2:]
         return int(raw[:64], 16), int(raw[64:128], 16)
 
 
-def validated(payload: dict) -> tuple[str, float, float, str, int | None]:
-    """A proposal is untrusted input: a name and two numbers in range, or nothing."""
-    name = str(payload.get("agent", "anonymous"))[:40] or "anonymous"
-    lv = float(payload["l_over_v_ms"])
-    az = float(payload["azimuth_deg"])
-    if not 5.0 <= lv <= 400.0:
-        raise ValueError(f"l_over_v_ms {lv} outside 5..400 ms")
-    if not -90.0 <= az <= 90.0:
-        raise ValueError(f"azimuth_deg {az} outside -90..90 degrees")
-    hold = payload.get("hold_ticks")
-    if hold is not None:
-        hold = int(hold)
-        if not 1 <= hold <= 400:
-            raise ValueError(f"hold_ticks {hold} outside 1..400")
-    return name, lv, az, str(payload.get("reason", ""))[:160], hold
+def policy_from(payload: dict) -> Policy:
+    """Rules are untrusted input: whole numbers in range, or nothing is installed."""
+    def whole(key: str, limit: int) -> int:
+        value = payload.get(key, 0)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != int(value):
+            raise ValueError(f"{key} must be a whole number")
+        value = int(value)
+        if not 0 <= value <= limit:
+            raise ValueError(f"{key}={value} outside 0..{limit}")
+        return value
+
+    return Policy(
+        min_gap_ticks=whole("min_gap_ticks", 255),
+        commit_ticks=whole("commit_ticks", 255),
+        forbid_when_blocked=bool(payload.get("forbid_when_blocked", True)),
+        max_grants=whole("max_grants", 255),
+        confirm_window_ticks=whole("confirm_window_ticks", 255),
+    )
 
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "reflex-console"
 
-    def log_message(self, fmt, *args):  # one line per request, not two
+    def log_message(self, fmt, *args):
         print(f"{self.address_string()} {fmt % args}", flush=True)
 
     def _send(self, code: int, body: bytes, kind: str) -> None:
@@ -254,70 +306,79 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, code: int, obj: dict) -> None:
         self._send(code, (json.dumps(obj) + "\n").encode(), "application/json")
 
+    def _body(self) -> dict:
+        raw = self.rfile.read(int(self.headers.get("content-length", "0"))) or b"{}"
+        payload = json.loads(raw)
+        if not isinstance(payload, dict):
+            raise ValueError("expected a JSON object")
+        return payload
+
     def do_GET(self) -> None:
         if self.path in ("/", "/index.html"):
             self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
         elif self.path == "/api/state":
-            self._json(200, CIRCUIT.status())
+            self._json(200, BOUNDARY.status())
         elif self.path == "/favicon.ico":
             self._send(204, b"", "image/x-icon")
         else:
             self._json(404, {"error": "no such path"})
 
     def do_POST(self) -> None:
-        if self.path != "/api/propose":
-            self._json(404, {"error": "no such path"})
-            return
-        payload: dict = {}
         try:
-            payload = json.loads(self.rfile.read(int(self.headers.get("content-length", "0"))) or b"{}")
-            name, lv, az, reason, hold = validated(payload)
+            payload = self._body()
         except Exception as e:
-            # A malformed proposal never reaches the circuit, but it still belongs in
-            # the duty record: who asked for what, and why it was thrown out.
-            refused = {
-                "at": time.time(),
-                "agent": str(payload.get("agent", "anonymous"))[:40] if isinstance(payload, dict) else "anonymous",
-                "l_over_v_ms": (payload or {}).get("l_over_v_ms") if isinstance(payload, dict) else None,
-                "azimuth_deg": (payload or {}).get("azimuth_deg") if isinstance(payload, dict) else None,
-                "reason": str((payload or {}).get("reason", ""))[:160] if isinstance(payload, dict) else "",
-                "error": str(e),
-                "authorised": False,
-            }
-            TRANSCRIPTS.appendleft(refused)
-            self._json(400, refused)
+            self._json(400, {"error": f"malformed request: {e}"})
             return
-        entry = CIRCUIT.propose(name, lv, az, reason, hold)
-        decisive = entry.pop("_decisive", None)
-        if CHAIN is not None and decisive is not None:
-            inputs, state, motor, next_state = decisive
+        name = str(payload.get("agent", "anonymous"))[:40] or "anonymous"
+
+        if self.path == "/api/policy":
             try:
-                got_motor, got_state = CHAIN.evaluate(inputs, state)
-                entry["chain"] = {
-                    "chain_id": CHAIN.chain(),
-                    "inputs": inputs,
-                    "state": state,
-                    "motor": got_motor,
-                    "agrees": (got_motor, got_state) == (motor, next_state),
-                    "deployed": False,
-                }
-            except Exception as e:  # the console works without a node; it just says so
-                entry["chain"] = {"error": str(e)[:120]}
-        self._json(200, entry)
+                summary = BOUNDARY.install(policy_from(payload))
+            except Exception as e:
+                self._json(400, {"error": str(e)})
+                return
+            TRANSCRIPTS.appendleft({"at": time.time(), "kind": "policy", "rules": summary["rules"],
+                                    "circuit": {k: summary["circuit"][k] for k in ("nand", "latch")},
+                                    "rows": summary["checked"]["rows"],
+                                    "every_rule_holds": summary["checked"]["every_rule_holds"]})
+            self._json(200, summary)
+        elif self.path == "/api/tool":
+            self._json(200, BOUNDARY.arm(name, payload.get("blocked"), payload.get("confirm")))
+        elif self.path == "/api/request":
+            entry = BOUNDARY.request(name, payload.get("intent", 0), str(payload.get("reason", ""))[:160])
+            decisive = entry.pop("_decisive", None)
+            if CHAIN is not None and decisive is not None:
+                inputs, state, grant, next_state = decisive
+                try:
+                    got, got_state = CHAIN.evaluate(
+                        BOUNDARY.netlist, len(INPUT_NAMES), 1, BOUNDARY.policy.state_bits, inputs, state
+                    )
+                    entry["chain"] = {
+                        "chain_id": CHAIN.chain(),
+                        "grant": got,
+                        "agrees": (got, got_state) == (grant, next_state),
+                        "deployed": False,
+                    }
+                except Exception as e:
+                    entry["chain"] = {"error": str(e)[:120]}
+            self._json(200, entry)
+        else:
+            self._json(404, {"error": "no such path"})
 
 
 if __name__ == "__main__":
-    print(f"loading the circuit from {REPO} …", flush=True)
-    CIRCUIT = Circuit()
-    print(f"{CIRCUIT.name}: {CIRCUIT.metrics['nand']} NAND + {CIRCUIT.metrics['latch']} LATCH, sha256 {CIRCUIT.sha256[:16]}…")
+    print(f"compiling the default rules (the ones the fly circuit obeys) from {REPO} …", flush=True)
+    BOUNDARY = Boundary(FLY_DEFAULT)
+    s = BOUNDARY.summary
+    print(f"  {'; '.join(s['rules'])}")
+    print(f"  {s['circuit']['nand']} NAND + {s['circuit']['latch']} LATCH · {s['checked']['rows']} rows checked · "
+          f"every rule holds: {s['checked']['every_rule_holds']}", flush=True)
     CHAIN = None
     if VERIFY_ON_CHAIN:
         try:
-            # No network call here: one bad moment at startup must not switch the
-            # second opinion off for the session. The chain id is fetched on first use.
             CHAIN = Chain(BSC_RPC)
             print(f"second opinion: {BSC_RPC} — read-only eth_call, nothing deployed, no wallet", flush=True)
         except Exception as e:
-            print(f"no second opinion ({e}); the console runs on the local circuit alone", flush=True)
-    print(f"duty console on http://{HOST}:{PORT}  (no wallet, no key, nothing signed)", flush=True)
+            print(f"no second opinion ({e}); decisions are checked locally only", flush=True)
+    print(f"boundary console on http://{HOST}:{PORT}  (no wallet, no key, nothing signed)", flush=True)
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
