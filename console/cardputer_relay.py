@@ -103,10 +103,13 @@ def frame(state: dict) -> tuple[list[str], list[dict]]:
     blocked = sum(1 for a in state.get("agents", []) if a.get("armed", {}).get("blocked"))
     lines = [f"S|{clean(' '.join(parts), 40)}|{granted}|{len(requests) - granted}|{chain}|{blocked}"]
 
-    armed = {a["agent"]: a.get("armed", {}) for a in state.get("agents", [])}
+    agents = {a["agent"]: a for a in state.get("agents", [])}
     items = pending_items(state)[:4]
     for i, it in enumerate(items):
-        is_armed = int(bool(armed.get(it["agent"], {}).get(it["bit"])))
+        # "given" on the device means a confirm is waiting for *this* call, not merely armed.
+        a = agents.get(it["agent"], {})
+        bound = (a.get("bound") or {}).get(it["bit"])
+        is_armed = int(bool((a.get("armed") or {}).get(it["bit"])) and (bound is None or bound == it.get("reason")))
         lines.append(f"I|{i}|{clean(it['agent'], 30)}|{it['class']}|{it['tick']}|{clean(it['why'], 60)}|{it['bit']}|{is_armed}")
     if requests:
         e = requests[0]
