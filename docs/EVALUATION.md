@@ -138,6 +138,39 @@ coupling is not identifiable from qualitative targets alone. Stronger conclusion
 would need quantitative targets (recorded GF response timing, measured mode
 probabilities per `l/v`), which this repository does not have.
 
+## Parameter identifiability
+
+Calibration picked one point on a 1,105-point grid — `gf_threshold`,
+`parallel_threshold`, `wing_raise_ticks` — using the constraints C1–C3 and then a
+tie-break (short-mode fraction closest to 0.4). Many points satisfy the constraints,
+so: how much of the published circuit is fixed by the measured wiring plus the
+constraints, and how much by that tie-break?
+
+`scripts/run_sensitivity.py` re-enumerates the grid (the feasible count is
+cross-checked against the committed `teacher-calibration.json`), builds every
+feasible point's decision table and core, and synthesises one policy per *distinct*
+table, since the table depends only on the two thresholds. Results:
+`circuits/loom-escape/sensitivity.json`. The hypotheses and thresholds below were
+committed in `d8b3484`, before the run.
+
+| | Result | Pre-set reading |
+| --- | --- | --- |
+| Feasible points | 89 of 1,105, giving **48 distinct decision tables** | — |
+| **H1** invariant rows | 43,916 of 65,536 rows (**67.0 %**) are identical across every feasible point | ≥ 95 % weakly identified, ≤ 60 % parameters dominate → **partially identified** |
+| **H2** cost spread | policy size ranges **67 to 149 NAND**, median 85; spread 96.5 % of the median | ≤ 10 % insensitive → **size depends on the parameters** |
+| **H3** typicality | the published point is **74 NAND**, at the 21.9th percentile, and its table's mean row distance to the others is at the 24.0th | inside the central 80 % of both → **a typical feasible circuit** |
+
+Read together: two thirds of the behaviour is settled before the tie-break, and the
+remaining third is where the parameters speak — so the published table is neither
+forced by the data nor an arbitrary pick. The published point is typical by the
+registered test, though it sits on the cheap side of the size distribution (74
+against a median of 85), which is what the tie-break optimises for indirectly: it
+prefers a mid-range short-mode fraction, and those tables happen to synthesise small.
+
+Policy NAND counts depend on the ABC build, so `sensitivity.json` is informational
+in the same way as the other ABC-dependent artifacts, and `scripts/verify.sh` does
+not rerun it.
+
 ## Sealed family
 
 Before the controls were run and before any evaluation on it, a family of 48
