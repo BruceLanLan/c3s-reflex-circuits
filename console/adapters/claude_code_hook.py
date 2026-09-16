@@ -120,8 +120,11 @@ def deny(reason: str) -> None:
 
 
 def describe(tool: str, args: dict) -> str:
+    # The call itself, not the model's account of it: this line is what a person approves,
+    # and a confirm is bound to it, so it must be the same when the same call comes back.
+    # Bash's `description` is free text the model rewrites on every attempt.
     if tool == "Bash":
-        return args.get("description") or args.get("command", "")
+        return args.get("command", "")
     if tool in ("Write", "Edit", "NotebookEdit", "Read"):
         return args.get("file_path", "")
     return ", ".join(f"{k}={v}" for k, v in list(args.items())[:3] if isinstance(v, (str, int, float)))
