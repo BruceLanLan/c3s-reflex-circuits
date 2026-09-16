@@ -130,15 +130,14 @@ def _print_qr(url: str, invert: bool) -> None:
 
 
 def _pairing_caveats(port: int, with_token: bool) -> None:
-    """Say what the phone will actually get, instead of promising what it might not.
+    """Say what the phone will actually get.
 
-    The URL itself loads today (the path is `/`); what is still missing is the page-side
-    reader for the fragment's token, which the coordinator owns in the integration pass.
+    The page takes the token out of the fragment, keeps it in that browser and removes it
+    from the address bar (docs/INSTALL.md §8). It still crossed the local network once.
     """
     if with_token:
-        say("  NOTE: the page does not read the token out of the fragment yet (docs/INSTALL.md §8 — "
-            "the coordinator owns that change). Until it lands the phone reaches the approvals "
-            "view and asks for the token once: paste what `c3s token` prints.")
+        say("  The phone keeps the token in its browser; it crossed this Wi-Fi once. "
+            "`c3s token rotate` replaces it; `c3s pair --no-token` keeps it off the network.")
 
 
 def _open_page(port: int) -> None:
