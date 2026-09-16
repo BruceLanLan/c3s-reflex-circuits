@@ -12,13 +12,19 @@ credentials, so the only way to press this key is to be at the device.
 
 Wire format, one ASCII line each, fields separated by `|` (stripped from the values):
 
-    host -> device, once a second
-      S|<circuits>|<granted>|<refused>|<chain>
+    host -> device, on change and every 2 s
+      S|<circuits>|<granted>|<refused>|<chain>|<agents blocked>
       I|<i>|<agent>|<class>|<tick>|<why>|<bit>|<armed>     up to four items a person can resolve
       L|<G or R>|<agent>|<class>|<why or reason>            the latest decision
       E|<items>                                             commit the frame
     device -> host
       K|confirm|<agent>   K|confirm_b|<agent>   K|block|<agent>   K|unblock|<agent>
+      K|stop_all|*        K|resume_all|*        (every agent the console knows)
+      H|                  the device is present, every 2 s while a console listens
+
+While the device's heartbeat is fresh the console treats it as the `heartbeat` bit for
+every agent, so a halt policy with `heartbeat_ticks` stops them all when the device is
+unplugged, reset or silent.
 
 A key for an agent the host did not just show is ignored: the device can only act on
 what a person could see on its screen.
@@ -90,7 +96,8 @@ def frame(state: dict) -> tuple[list[str], set[str]]:
     if state.get("chain", {}).get("enabled"):
         latest = next((e for e in requests if e.get("chain")), None)
         chain = "idle" if latest is None else ("err" if latest["chain"].get("error") else ("ok" if latest["chain"].get("agrees") else "DISAGREE"))
-    lines = [f"S|{clean(' '.join(parts), 40)}|{granted}|{len(requests) - granted}|{chain}"]
+    blocked = sum(1 for a in state.get("agents", []) if a.get("armed", {}).get("blocked"))
+    lines = [f"S|{clean(' '.join(parts), 40)}|{granted}|{len(requests) - granted}|{chain}|{blocked}"]
 
     armed = {a["agent"]: a.get("armed", {}) for a in state.get("agents", [])}
     items = pending_items(state)[:4]
@@ -112,6 +119,13 @@ class Relay(threading.Thread):
         self.shown: set[str] = set()
         self.connected = False
         self.last_key, self.last_key_at = None, 0.0
+        self.heard_at = 0.0
+        boundary.heartbeat_source = self.present
+
+    HEARTBEAT_FRESH_S = 5.0
+
+    def present(self) -> bool:
+        return self.connected and time.time() - self.heard_at < self.HEARTBEAT_FRESH_S
 
     def _port(self) -> str | None:
         if self.want not in ("1", "auto", "yes"):
@@ -136,12 +150,23 @@ class Relay(threading.Thread):
         if len(parts) != 3 or parts[0] != "K":
             return
         _, action, agent = parts
+        if action in ("stop_all", "resume_all") and agent == "*":
+            now = time.time()
+            if self.last_key == (action, agent) and now - self.last_key_at < 0.5:
+                return
+            self.last_key, self.last_key_at = (action, agent), now
+            value = 1 if action == "stop_all" else 0
+            names = [a["agent"] for a in self.boundary.status()["agents"]]
+            for name in names:
+                self.boundary.arm(name, {"blocked": value})["source"] = "cardputer"
+            self.log(f"cardputer: {action} for {len(names)} agent(s) (a person pressed a key)")
+            return
         # The same key for the same agent twice within half a second is one press.
         now = time.time()
         if self.last_key == (action, agent) and now - self.last_key_at < 0.5:
             return
         self.last_key, self.last_key_at = (action, agent), now
-        bits ={"confirm": {"confirm": 1}, "confirm_b": {"confirm_b": 1},
+        bits = {"confirm": {"confirm": 1}, "confirm_b": {"confirm_b": 1},
                 "block": {"blocked": 1}, "unblock": {"blocked": 0}}.get(action)
         if bits is None:
             return
@@ -183,7 +208,9 @@ class Relay(threading.Thread):
                         while b"\n" in buf:
                             raw, buf = buf.split(b"\n", 1)
                             text = raw.decode("ascii", "replace").strip()
-                            if text.startswith("K|"):
+                            if text.startswith("H|"):
+                                self.heard_at = time.time()
+                            elif text.startswith("K|"):
                                 self._key(text)
                             elif text.startswith(("brain view", "c3s escape core", "digest ")):
                                 self.log(f"cardputer says: {text}")

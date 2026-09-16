@@ -78,6 +78,7 @@ DEFAULT_CLASS = "exec"
 # The rules the escape circuit itself was proven to obey; the starting point, not a law.
 FLY_DEFAULT = Policy(min_gap_ticks=8, commit_ticks=4, forbid_when_blocked=True)
 TRANSCRIPTS: deque = deque(maxlen=TRANSCRIPT)
+CHAIN = None  # set in __main__ when the chain second opinion is on
 STARTED_AT = time.time()
 
 
@@ -175,6 +176,8 @@ def _fresh_class_state() -> dict:
 
 class Boundary:
     """Up to five compiled policies, one per class, and per-agent circuit state per class."""
+
+    heartbeat_source = None  # callable -> bool, set by a tool-layer device (cardputer_relay)
 
     def __init__(self, default_exec: Policy) -> None:
         self.lock = threading.Lock()
@@ -275,6 +278,10 @@ class Boundary:
             a = self.agent(name)
             a["ticks"] += 1
             armed = a["armed"]
+            # A present device is a heartbeat for every agent: a halt policy with a
+            # heartbeat rule stops them all when it is unplugged or goes quiet.
+            if self.heartbeat_source is not None and self.heartbeat_source():
+                armed["heartbeat"] = 1
             decisive: dict[str, tuple] = {}
 
             halt_entry = None
