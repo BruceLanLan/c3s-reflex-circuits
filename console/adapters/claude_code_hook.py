@@ -171,6 +171,10 @@ def main() -> None:
         hint = " Too many consecutive failures; a person must reset the breaker. Stop and report."
     if any(w.startswith("blocked") or w.startswith("halted") for w in why_list):
         hint = " The tool layer has blocked this agent; only it can lift that."
+    held = verdict.get("confirm_waiting_for") or []
+    if held and not verdict.get("granted"):
+        hint += (f" A person has approved one specific call, and this is not it: {held[0]!r}. If that is what you"
+                 " meant, send exactly that call; any other call needs its own approval.")
     deny(f"refused by the boundary at tick {verdict.get('tick')}: {why}.{hint}")
 
 
